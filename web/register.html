@@ -56,7 +56,8 @@
           role: document.getElementById("role").value,
         });
         setToken(access_token);
-        location.href = "index.html";
+        const role = document.getElementById("role").value;
+        location.href = role === "master" ? "master-profile-edit.html" : "index.html";
       } catch (e) {
         errorBox.textContent = "Не удалось зарегистрироваться: " + e.message;
       }

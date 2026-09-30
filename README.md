@@ -6,6 +6,11 @@
 MVP: backend на FastAPI + PostgreSQL, простой веб-клиент вместо мобильного приложения/бота
 (контакт с мастером — звонок или WhatsApp, см. ТЗ п.9).
 
+Регистрация не обязательна для просмотра: категории, поиск мастеров, профиль
+и отзывы доступны анонимно. Без входа скрывается телефон мастера (вместо кнопок
+«Позвонить»/WhatsApp — приглашение войти); создание заказа и просмотр номера
+требуют регистрации.
+
 ## Структура проекта
 
 ```
@@ -48,7 +53,10 @@ uvicorn app.main:app --reload
 
 - `POST /auth/register`, `POST /auth/login`, `GET /auth/me`
 - `GET /categories`
-- `GET /masters` (фильтры: category_id, city, verified, min_rating, lat/lon), `GET /masters/{id}`
+- `GET /masters` (фильтры: category_id, city, verified, min_rating, lat/lon), `GET /masters/{id}` —
+  доступны без авторизации, но телефон мастера (`user.phone`) виден только вошедшим пользователям
+- `GET /masters/me`, `PATCH /masters/me` — просмотр и редактирование своего профиля (только для роли `master`)
+- `POST /masters/me/services`, `DELETE /masters/me/services/{id}` — свои услуги и цены
 - `POST /orders`, `GET /orders`, `GET /orders/{id}`
 - `POST /orders/{id}/offer` — мастер предлагает цену
 - `POST /orders/{id}/accept` — клиент выбирает предложение

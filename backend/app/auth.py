@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 
 def hash_password(password: str) -> str:
@@ -45,3 +46,18 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_error
     return user
+
+
+def get_current_user_optional(
+    token: str | None = Depends(optional_oauth2_scheme), db: Session = Depends(get_db)
+) -> User | None:
+    if token is None:
+        return None
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        user_id = payload.get("sub")
+        if user_id is None:
+            return None
+    except JWTError:
+        return None
+    return db.get(User, int(user_id))

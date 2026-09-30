@@ -8,7 +8,10 @@ async function renderNav() {
   }
   try {
     const user = await api.me();
-    nav.innerHTML = `<span>${user.name}</span> · <a href="#" onclick="logout(); return false;">Выйти</a>`;
+    const profileLink = user.role === "master"
+      ? `<a href="master-profile-edit.html">Мой профиль</a> · `
+      : "";
+    nav.innerHTML = `${profileLink}<span>${user.name}</span> · <a href="#" onclick="logout(); return false;">Выйти</a>`;
   } catch (e) {
     clearToken();
     nav.innerHTML = `<a href="login.html">Войти</a>`;

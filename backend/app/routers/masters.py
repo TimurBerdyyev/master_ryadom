@@ -3,9 +3,10 @@ from math import asin, cos, radians, sin, sqrt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
-from app.models import Master, Service
-from app.schemas import MasterOut, MasterRegister
+from app.models import Master, Service, User, UserRole
+from app.schemas import MasterOut, MasterProfileUpdate, ServiceCreate, ServiceOut
 
 router = APIRouter(prefix="/masters", tags=["masters"])
 
@@ -18,6 +19,18 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * 6371 * asin(sqrt(a))
 
 
+def require_master(current_user: User = Depends(get_current_user)) -> Master:
+    if current_user.role != UserRole.master or not current_user.master:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Доступно только мастерам")
+    return current_user.master
+
+
+def mask_phone(masters_out: list[MasterOut]) -> list[MasterOut]:
+    for m in masters_out:
+        m.user.phone = None
+    return masters_out
+
+
 @router.get("", response_model=list[MasterOut])
 def search_masters(
     category_id: int | None = None,
@@ -26,6 +39,7 @@ def search_masters(
     min_rating: float | None = None,
     lat: float | None = None,
     lon: float | None = None,
+    current_user: User | None = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
     query = db.query(Master)
@@ -50,12 +64,67 @@ def search_masters(
     else:
         masters.sort(key=lambda m: m.rating, reverse=True)
 
-    return masters
+    result = [MasterOut.model_validate(m) for m in masters]
+    if current_user is None:
+        result = mask_phone(result)
+    return result
+
+
+@router.get("/me", response_model=MasterOut)
+def get_my_master_profile(master: Master = Depends(require_master)):
+    return master
+
+
+@router.patch("/me", response_model=MasterOut)
+def update_my_master_profile(
+    data: MasterProfileUpdate,
+    master: Master = Depends(require_master),
+    db: Session = Depends(get_db),
+):
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(master, field, value)
+    db.commit()
+    db.refresh(master)
+    return master
+
+
+@router.post("/me/services", response_model=ServiceOut)
+def add_my_service(
+    data: ServiceCreate,
+    master: Master = Depends(require_master),
+    db: Session = Depends(get_db),
+):
+    service = Service(master_id=master.id, **data.model_dump())
+    db.add(service)
+    db.commit()
+    db.refresh(service)
+    return service
+
+
+@router.delete("/me/services/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_service(
+    service_id: int,
+    master: Master = Depends(require_master),
+    db: Session = Depends(get_db),
+):
+    service = db.get(Service, service_id)
+    if not service or service.master_id != master.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Услуга не найдена")
+    db.delete(service)
+    db.commit()
 
 
 @router.get("/{master_id}", response_model=MasterOut)
-def get_master(master_id: int, db: Session = Depends(get_db)):
+def get_master(
+    master_id: int,
+    current_user: User | None = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     master = db.get(Master, master_id)
     if not master:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Мастер не найден")
-    return master
+
+    result = MasterOut.model_validate(master)
+    if current_user is None:
+        result.user.phone = None
+    return result

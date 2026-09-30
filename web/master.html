@@ -60,8 +60,12 @@
 
           <div class="contact-actions">
             <button class="btn" onclick="location.href='order.html?category_id=${master.services[0]?.category_id || ''}'">Заказать мастера</button>
-            <a class="btn secondary" href="tel:${master.user.phone}">Позвонить</a>
-            <a class="btn secondary" href="${waLink(master.user.phone)}" target="_blank" rel="noopener">WhatsApp</a>
+            ${master.user.phone
+              ? `
+                <a class="btn secondary" href="tel:${master.user.phone}">Позвонить</a>
+                <a class="btn secondary" href="${waLink(master.user.phone)}" target="_blank" rel="noopener">WhatsApp</a>
+              `
+              : `<a class="btn secondary" href="login.html?next=${encodeURIComponent(location.pathname + location.search)}">Войдите, чтобы увидеть номер</a>`}
           </div>
 
           <div class="section-title">Отзывы</div>

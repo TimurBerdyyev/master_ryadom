@@ -44,4 +44,8 @@ const api = {
   masterReviews: (id) => apiRequest(`/masters/${id}/reviews`),
   createOrder: (data) => apiRequest("/orders", { method: "POST", body: JSON.stringify(data) }),
   myOrders: () => apiRequest("/orders"),
+  myMasterProfile: () => apiRequest("/masters/me"),
+  updateMasterProfile: (data) => apiRequest("/masters/me", { method: "PATCH", body: JSON.stringify(data) }),
+  addMyService: (data) => apiRequest("/masters/me/services", { method: "POST", body: JSON.stringify(data) }),
+  deleteMyService: (id) => apiRequest(`/masters/me/services/${id}`, { method: "DELETE" }),
 };

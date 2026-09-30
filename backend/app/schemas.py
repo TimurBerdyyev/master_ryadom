@@ -27,7 +27,7 @@ class UserOut(BaseModel):
 
     id: int
     name: str
-    phone: str
+    phone: str | None = None
     role: UserRole
     photo: str | None = None
 
@@ -71,6 +71,21 @@ class MasterRegister(BaseModel):
     district: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+
+
+class MasterProfileUpdate(BaseModel):
+    description: str | None = None
+    experience_years: int | None = None
+    city: str | None = None
+    district: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class ServiceCreate(BaseModel):
+    category_id: int
+    title: str
+    price_from: float
 
 
 class OrderCreate(BaseModel):
