@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Мастер рядом — найдите специалиста рядом с вами</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main>
+    <h1>Что вам нужно?</h1>
+
+    <form class="search-bar" onsubmit="event.preventDefault(); goSearch();">
+      <input id="searchInput" type="text" placeholder="Например: почистить кондиционер" />
+      <button class="btn" type="submit">Найти</button>
+    </form>
+
+    <div id="categories" class="category-grid"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    async function loadCategories() {
+      const grid = document.getElementById("categories");
+      try {
+        const categories = await api.categories();
+        grid.innerHTML = categories.map(c =>
+          `<div class="category-card" onclick="location.href='masters.html?category_id=${c.id}&name=${encodeURIComponent(c.name)}'">${c.name}</div>`
+        ).join("");
+      } catch (e) {
+        grid.innerHTML = `<p class="error">Не удалось загрузить категории: ${e.message}</p>`;
+      }
+    }
+
+    function goSearch() {
+      const q = document.getElementById("searchInput").value.trim();
+      location.href = `masters.html?q=${encodeURIComponent(q)}`;
+    }
+
+    loadCategories();
+    renderNav();
+  </script>
+</body>
+</html>

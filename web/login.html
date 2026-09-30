@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Вход — Мастер рядом</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main>
+    <h1>Вход</h1>
+
+    <form class="card" id="loginForm">
+      <label>
+        Телефон
+        <input id="phone" type="tel" placeholder="+996 700 000 000" required />
+      </label>
+      <label>
+        Пароль
+        <input id="password" type="password" required />
+      </label>
+      <div id="formError" class="error"></div>
+      <button class="btn" type="submit">Войти</button>
+      <p class="muted">Нет аккаунта? <a href="register.html">Зарегистрироваться</a></p>
+    </form>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById("formError");
+      errorBox.textContent = "";
+      try {
+        const { access_token } = await api.login({
+          phone: document.getElementById("phone").value,
+          password: document.getElementById("password").value,
+        });
+        setToken(access_token);
+        const next = new URLSearchParams(location.search).get("next") || "index.html";
+        location.href = next;
+      } catch (e) {
+        errorBox.textContent = "Не удалось войти: " + e.message;
+      }
+    });
+
+    renderNav();
+  </script>
+</body>
+</html>

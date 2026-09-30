@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Поиск мастеров — Мастер рядом</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main>
+    <h1 id="title">Мастера</h1>
+
+    <div class="filters">
+      <select id="verifiedFilter">
+        <option value="">Все мастера</option>
+        <option value="true">Только проверенные</option>
+      </select>
+      <select id="ratingFilter">
+        <option value="">Любой рейтинг</option>
+        <option value="4">От 4 и выше</option>
+        <option value="4.5">От 4.5 и выше</option>
+      </select>
+      <input id="cityFilter" type="text" placeholder="Город" />
+      <button class="btn secondary" onclick="loadMasters()">Применить</button>
+    </div>
+
+    <div id="masterList" class="master-list"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const categoryId = params.get("category_id");
+    const categoryName = params.get("name");
+    if (categoryName) document.getElementById("title").textContent = categoryName;
+
+    function initials(name) {
+      return name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
+    }
+
+    async function loadMasters() {
+      const list = document.getElementById("masterList");
+      list.innerHTML = `<p class="muted">Загрузка…</p>`;
+
+      const query = {};
+      if (categoryId) query.category_id = categoryId;
+      const verified = document.getElementById("verifiedFilter").value;
+      if (verified) query.verified = verified;
+      const minRating = document.getElementById("ratingFilter").value;
+      if (minRating) query.min_rating = minRating;
+      const city = document.getElementById("cityFilter").value.trim();
+      if (city) query.city = city;
+
+      try {
+        const masters = await api.searchMasters(query);
+        if (masters.length === 0) {
+          list.innerHTML = `<p class="muted">Мастера не найдены. Попробуйте изменить фильтры.</p>`;
+          return;
+        }
+        list.innerHTML = masters.map(m => `
+          <div class="master-card" onclick="location.href='master.html?id=${m.id}'">
+            <div class="avatar">${initials(m.user.name)}</div>
+            <div class="info">
+              <div class="name">${m.user.name} ${m.verified ? '<span class="badge">Проверен</span>' : ''}</div>
+              <div class="meta">
+                <span class="rating">★ ${m.rating.toFixed(1)}</span>
+                · ${m.completed_orders} заказов
+                ${m.city ? '· ' + m.city : ''}
+              </div>
+              <div class="meta">${m.description ? m.description.slice(0, 90) : ''}</div>
+            </div>
+          </div>
+        `).join("");
+      } catch (e) {
+        list.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+      }
+    }
+
+    loadMasters();
+    renderNav();
+  </script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Новый заказ — Мастер рядом</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main>
+    <h1>Создать заказ</h1>
+    <p class="muted">Заявка увидят подходящие мастера в вашем городе — они предложат цену, а вы выберете лучшее предложение.</p>
+
+    <form class="card" id="orderForm">
+      <label>
+        Категория
+        <select id="category" required></select>
+      </label>
+
+      <label>
+        Опишите проблему
+        <textarea id="description" rows="4" required placeholder="Например: течёт кран на кухне"></textarea>
+      </label>
+
+      <label>
+        Адрес
+        <input id="address" type="text" placeholder="Город, улица, дом" />
+      </label>
+
+      <label>
+        Дата
+        <input id="date" type="date" />
+      </label>
+
+      <label>
+        Время
+        <input id="time" type="time" />
+      </label>
+
+      <label>
+        Ваша цена (необязательно)
+        <input id="price" type="number" min="0" placeholder="Оставьте пустым, чтобы мастера предложили цену сами" />
+      </label>
+
+      <div id="formError" class="error"></div>
+      <button class="btn" type="submit">Отправить заявку</button>
+    </form>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    if (!getToken()) {
+      location.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+    }
+
+    const preselectCategory = new URLSearchParams(location.search).get("category_id");
+
+    async function loadCategories() {
+      const select = document.getElementById("category");
+      try {
+        const categories = await api.categories();
+        select.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+        if (preselectCategory) select.value = preselectCategory;
+      } catch (e) {
+        document.getElementById("formError").textContent = "Не удалось загрузить категории: " + e.message;
+      }
+    }
+
+    document.getElementById("orderForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById("formError");
+      errorBox.textContent = "";
+
+      const date = document.getElementById("date").value;
+      const time = document.getElementById("time").value;
+      const price = document.getElementById("price").value;
+
+      const payload = {
+        category_id: Number(document.getElementById("category").value),
+        description: document.getElementById("description").value,
+        address: document.getElementById("address").value || null,
+        date: date ? new Date(`${date}T${time || "00:00"}:00`).toISOString() : null,
+        time: time || null,
+        price: price ? Number(price) : null,
+      };
+
+      try {
+        const order = await api.createOrder(payload);
+        location.href = `order-success.html?id=${order.id}`;
+      } catch (e) {
+        errorBox.textContent = "Не удалось отправить заявку: " + e.message;
+      }
+    });
+
+    loadCategories();
+    renderNav();
+  </script>
+</body>
+</html>

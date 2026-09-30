@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Профиль мастера — Мастер рядом</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main id="content">
+    <p class="muted">Загрузка…</p>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const masterId = new URLSearchParams(location.search).get("id");
+
+    function initials(name) {
+      return name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
+    }
+
+    function waLink(phone) {
+      const digits = phone.replace(/[^\d]/g, "");
+      return `https://wa.me/${digits}`;
+    }
+
+    async function load() {
+      const content = document.getElementById("content");
+      try {
+        const [master, reviews] = await Promise.all([
+          api.getMaster(masterId),
+          api.masterReviews(masterId),
+        ]);
+
+        content.innerHTML = `
+          <div class="profile-header">
+            <div class="avatar">${initials(master.user.name)}</div>
+            <div>
+              <h1 style="margin-bottom:4px">${master.user.name} ${master.verified ? '<span class="badge">Проверен</span>' : ''}</h1>
+              <div class="meta"><span class="rating">★ ${master.rating.toFixed(1)}</span> · ${reviews.length} отзывов · ${master.completed_orders} заказов</div>
+              ${master.city ? `<div class="meta">${master.city}${master.district ? ', ' + master.district : ''}</div>` : ''}
+              ${master.experience_years ? `<div class="meta">Опыт: ${master.experience_years} лет</div>` : ''}
+            </div>
+          </div>
+
+          ${master.description ? `<p>${master.description}</p>` : ''}
+
+          <div class="section-title">Услуги и цены</div>
+          <div>
+            ${master.services.length
+              ? master.services.map(s => `<div class="service-row"><span>${s.title}</span><span>от ${s.price_from} сом</span></div>`).join("")
+              : '<p class="muted">Мастер пока не добавил услуги</p>'}
+          </div>
+
+          <div class="contact-actions">
+            <button class="btn" onclick="location.href='order.html?category_id=${master.services[0]?.category_id || ''}'">Заказать мастера</button>
+            <a class="btn secondary" href="tel:${master.user.phone}">Позвонить</a>
+            <a class="btn secondary" href="${waLink(master.user.phone)}" target="_blank" rel="noopener">WhatsApp</a>
+          </div>
+
+          <div class="section-title">Отзывы</div>
+          <div>
+            ${reviews.length
+              ? reviews.map(r => `
+                <div class="review">
+                  <div class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
+                  ${r.text ? `<div>${r.text}</div>` : ''}
+                </div>
+              `).join("")
+              : '<p class="muted">Отзывов пока нет</p>'}
+          </div>
+        `;
+      } catch (e) {
+        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+      }
+    }
+
+    load();
+    renderNav();
+  </script>
+</body>
+</html>

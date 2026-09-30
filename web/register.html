@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Регистрация — Мастер рядом</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main>
+    <h1>Регистрация</h1>
+
+    <form class="card" id="registerForm">
+      <label>
+        Кто вы?
+        <select id="role">
+          <option value="client">Я ищу мастера</option>
+          <option value="master">Я мастер</option>
+        </select>
+      </label>
+      <label>
+        Имя
+        <input id="name" type="text" required />
+      </label>
+      <label>
+        Телефон
+        <input id="phone" type="tel" placeholder="+996 700 000 000" required />
+      </label>
+      <label>
+        Пароль
+        <input id="password" type="password" required minlength="6" />
+      </label>
+      <div id="formError" class="error"></div>
+      <button class="btn" type="submit">Зарегистрироваться</button>
+      <p class="muted">Уже есть аккаунт? <a href="login.html">Войти</a></p>
+    </form>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById("formError");
+      errorBox.textContent = "";
+      try {
+        const { access_token } = await api.register({
+          name: document.getElementById("name").value,
+          phone: document.getElementById("phone").value,
+          password: document.getElementById("password").value,
+          role: document.getElementById("role").value,
+        });
+        setToken(access_token);
+        location.href = "index.html";
+      } catch (e) {
+        errorBox.textContent = "Не удалось зарегистрироваться: " + e.message;
+      }
+    });
+
+    renderNav();
+  </script>
+</body>
+</html>

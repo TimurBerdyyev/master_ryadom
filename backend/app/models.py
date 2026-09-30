@@ -1,0 +1,259 @@
+import enum
+from datetime import datetime
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    Time,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+
+class UserRole(str, enum.Enum):
+    client = "client"
+    master = "master"
+    admin = "admin"
+
+
+class UserStatus(str, enum.Enum):
+    active = "active"
+    blocked = "blocked"
+
+
+class OrderStatus(str, enum.Enum):
+    created = "created"
+    searching = "searching"
+    offers_received = "offers_received"
+    master_selected = "master_selected"
+    master_confirmed = "master_confirmed"
+    master_en_route = "master_en_route"
+    in_progress = "in_progress"
+    completed = "completed"
+    reviewed = "reviewed"
+    cancelled = "cancelled"
+
+
+class OfferStatus(str, enum.Enum):
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"
+
+
+class ComplaintStatus(str, enum.Enum):
+    open = "open"
+    resolved = "resolved"
+    dismissed = "dismissed"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255))
+    phone: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.client)
+    photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[UserStatus] = mapped_column(Enum(UserStatus), default=UserStatus.active)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    master: Mapped["Master"] = relationship(back_populates="user", uselist=False)
+    addresses: Mapped[list["Address"]] = relationship(back_populates="user")
+    notifications: Mapped[list["Notification"]] = relationship(back_populates="user")
+
+
+class Master(Base):
+    __tablename__ = "masters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    city: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    district: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rating: Mapped[float] = mapped_column(Float, default=0.0)
+    completed_orders: Mapped[int] = mapped_column(Integer, default=0)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="master")
+    services: Mapped[list["Service"]] = relationship(back_populates="master")
+    photos: Mapped[list["Photo"]] = relationship(back_populates="master")
+    working_hours: Mapped[list["WorkingHours"]] = relationship(back_populates="master")
+    reviews: Mapped[list["Review"]] = relationship(back_populates="master")
+    orders: Mapped[list["Order"]] = relationship(back_populates="master")
+
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True)
+    icon: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    services: Mapped[list["Service"]] = relationship(back_populates="category")
+    orders: Mapped[list["Order"]] = relationship(back_populates="category")
+
+
+class Service(Base):
+    __tablename__ = "services"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"))
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    title: Mapped[str] = mapped_column(String(255))
+    price_from: Mapped[float] = mapped_column(Numeric(10, 2))
+
+    master: Mapped["Master"] = relationship(back_populates="services")
+    category: Mapped["Category"] = relationship(back_populates="services")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True)
+    description: Mapped[str] = mapped_column(Text)
+    address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    time: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.created)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    category: Mapped["Category"] = relationship(back_populates="orders")
+    master: Mapped["Master"] = relationship(back_populates="orders")
+    offers: Mapped[list["OrderOffer"]] = relationship(back_populates="order")
+    photos: Mapped[list["Photo"]] = relationship(back_populates="order")
+    review: Mapped["Review"] = relationship(back_populates="order", uselist=False)
+
+
+class OrderOffer(Base):
+    __tablename__ = "order_offers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"))
+    price: Mapped[float] = mapped_column(Numeric(10, 2))
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[OfferStatus] = mapped_column(Enum(OfferStatus), default=OfferStatus.pending)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    order: Mapped["Order"] = relationship(back_populates="offers")
+
+
+class Review(Base):
+    __tablename__ = "reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), unique=True)
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"))
+    client_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    rating: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    order: Mapped["Order"] = relationship(back_populates="review")
+    master: Mapped["Master"] = relationship(back_populates="reviews")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Photo(Base):
+    __tablename__ = "photos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True)
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True)
+    url: Mapped[str] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    master: Mapped["Master"] = relationship(back_populates="photos")
+    order: Mapped["Order"] = relationship(back_populates="photos")
+
+
+class Address(Base):
+    __tablename__ = "addresses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address: Mapped[str] = mapped_column(String(500))
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    user: Mapped["User"] = relationship(back_populates="addresses")
+
+
+class WorkingHours(Base):
+    __tablename__ = "working_hours"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"))
+    weekday: Mapped[int] = mapped_column(Integer)  # 0 = monday .. 6 = sunday
+    start_time: Mapped[str] = mapped_column(Time)
+    end_time: Mapped[str] = mapped_column(Time)
+
+    master: Mapped["Master"] = relationship(back_populates="working_hours")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    title: Mapped[str] = mapped_column(String(255))
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="notifications")
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    amount: Mapped[float] = mapped_column(Numeric(10, 2))
+    commission: Mapped[float] = mapped_column(Numeric(10, 2))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Complaint(Base):
+    __tablename__ = "complaints"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    target_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True)
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[ComplaintStatus] = mapped_column(Enum(ComplaintStatus), default=ComplaintStatus.open)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
