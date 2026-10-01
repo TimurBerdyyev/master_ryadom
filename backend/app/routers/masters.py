@@ -1,14 +1,17 @@
 from math import asin, cos, radians, sin, sqrt
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
-from app.models import Master, Service, User, UserRole
-from app.schemas import MasterOut, MasterProfileUpdate, ServiceCreate, ServiceOut
+from app.models import Master, Photo, Service, User, UserRole
+from app.schemas import MasterOut, MasterProfileUpdate, PhotoOut, ServiceCreate, ServiceOut
+from app.uploads import delete_upload, save_upload
 
 router = APIRouter(prefix="/masters", tags=["masters"])
+
+MAX_MASTER_PHOTOS = 20
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -111,6 +114,47 @@ def delete_my_service(
     if not service or service.master_id != master.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Услуга не найдена")
     db.delete(service)
+    db.commit()
+
+
+@router.post("/me/photos", response_model=list[PhotoOut])
+async def upload_my_photos(
+    files: list[UploadFile] = File(...),
+    master: Master = Depends(require_master),
+    db: Session = Depends(get_db),
+):
+    existing_count = len(master.photos)
+    if existing_count + len(files) > MAX_MASTER_PHOTOS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Максимум {MAX_MASTER_PHOTOS} фотографий работ (уже загружено {existing_count})",
+        )
+
+    photos = []
+    for file in files:
+        url = await save_upload(file, f"masters/{master.id}")
+        photo = Photo(master_id=master.id, url=url)
+        db.add(photo)
+        photos.append(photo)
+
+    db.commit()
+    for photo in photos:
+        db.refresh(photo)
+    return photos
+
+
+@router.delete("/me/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_photo(
+    photo_id: int,
+    master: Master = Depends(require_master),
+    db: Session = Depends(get_db),
+):
+    photo = db.get(Photo, photo_id)
+    if not photo or photo.master_id != master.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Фото не найдено")
+
+    delete_upload(photo.url)
+    db.delete(photo)
     db.commit()
 
 

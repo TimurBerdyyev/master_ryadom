@@ -22,7 +22,7 @@
     const masterId = new URLSearchParams(location.search).get("id");
 
     function initials(name) {
-      return name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
+      return esc(name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase());
     }
 
     function waLink(phone) {
@@ -42,19 +42,19 @@
           <div class="profile-header">
             <div class="avatar">${initials(master.user.name)}</div>
             <div>
-              <h1 style="margin-bottom:4px">${master.user.name} ${master.verified ? '<span class="badge">Проверен</span>' : ''}</h1>
+              <h1 style="margin-bottom:4px">${esc(master.user.name)} ${master.verified ? '<span class="badge">Проверен</span>' : ''}</h1>
               <div class="meta"><span class="rating">★ ${master.rating.toFixed(1)}</span> · ${reviews.length} отзывов · ${master.completed_orders} заказов</div>
-              ${master.city ? `<div class="meta">${master.city}${master.district ? ', ' + master.district : ''}</div>` : ''}
+              ${master.city ? `<div class="meta">${esc(master.city)}${master.district ? ', ' + esc(master.district) : ''}</div>` : ''}
               ${master.experience_years ? `<div class="meta">Опыт: ${master.experience_years} лет</div>` : ''}
             </div>
           </div>
 
-          ${master.description ? `<p>${master.description}</p>` : ''}
+          ${master.description ? `<p>${esc(master.description)}</p>` : ''}
 
           <div class="section-title">Услуги и цены</div>
           <div>
             ${master.services.length
-              ? master.services.map(s => `<div class="service-row"><span>${s.title}</span><span>от ${s.price_from} сом</span></div>`).join("")
+              ? master.services.map(s => `<div class="service-row"><span>${esc(s.title)}</span><span>от ${s.price_from} сом</span></div>`).join("")
               : '<p class="muted">Мастер пока не добавил услуги</p>'}
           </div>
 
@@ -62,11 +62,18 @@
             <button class="btn" onclick="location.href='order.html?category_id=${master.services[0]?.category_id || ''}'">Заказать мастера</button>
             ${master.user.phone
               ? `
-                <a class="btn secondary" href="tel:${master.user.phone}">Позвонить</a>
+                <a class="btn secondary" href="tel:${esc(master.user.phone)}">Позвонить</a>
                 <a class="btn secondary" href="${waLink(master.user.phone)}" target="_blank" rel="noopener">WhatsApp</a>
               `
               : `<a class="btn secondary" href="login.html?next=${encodeURIComponent(location.pathname + location.search)}">Войдите, чтобы увидеть номер</a>`}
           </div>
+
+          ${master.photos.length ? `
+            <div class="section-title">Фото работ</div>
+            <div class="photo-grid">
+              ${master.photos.map(p => `<img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото работы" onclick="window.open('${esc(uploadUrl(p.url))}', '_blank')" />`).join("")}
+            </div>
+          ` : ''}
 
           <div class="section-title">Отзывы</div>
           <div>
@@ -74,14 +81,14 @@
               ? reviews.map(r => `
                 <div class="review">
                   <div class="stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</div>
-                  ${r.text ? `<div>${r.text}</div>` : ''}
+                  ${r.text ? `<div>${esc(r.text)}</div>` : ''}
                 </div>
               `).join("")
               : '<p class="muted">Отзывов пока нет</p>'}
           </div>
         `;
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
       }
     }
 

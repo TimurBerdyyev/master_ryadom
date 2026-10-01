@@ -42,9 +42,9 @@
             <tbody>
               ${masters.map(m => `
                 <tr>
-                  <td><a href="../master.html?id=${m.id}">${m.user.name}</a></td>
-                  <td>${m.user.phone}</td>
-                  <td>${m.city || "—"}</td>
+                  <td><a href="../master.html?id=${m.id}">${esc(m.user.name)}</a></td>
+                  <td>${esc(m.user.phone)}</td>
+                  <td>${m.city ? esc(m.city) : "—"}</td>
                   <td>★ ${m.rating.toFixed(1)}</td>
                   <td>${m.completed_orders}</td>
                   <td>${m.verified
@@ -61,7 +61,7 @@
           </table>
         `;
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
       }
     }
 

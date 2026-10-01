@@ -41,7 +41,7 @@
     if (categoryName) document.getElementById("title").textContent = categoryName;
 
     function initials(name) {
-      return name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
+      return esc(name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase());
     }
 
     async function loadMasters() {
@@ -67,18 +67,18 @@
           <div class="master-card" onclick="location.href='master.html?id=${m.id}'">
             <div class="avatar">${initials(m.user.name)}</div>
             <div class="info">
-              <div class="name">${m.user.name} ${m.verified ? '<span class="badge">Проверен</span>' : ''}</div>
+              <div class="name">${esc(m.user.name)} ${m.verified ? '<span class="badge">Проверен</span>' : ''}</div>
               <div class="meta">
                 <span class="rating">★ ${m.rating.toFixed(1)}</span>
                 · ${m.completed_orders} заказов
-                ${m.city ? '· ' + m.city : ''}
+                ${m.city ? '· ' + esc(m.city) : ''}
               </div>
-              <div class="meta">${m.description ? m.description.slice(0, 90) : ''}</div>
+              <div class="meta">${m.description ? esc(m.description.slice(0, 90)) : ''}</div>
             </div>
           </div>
         `).join("");
       } catch (e) {
-        list.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+        list.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
       }
     }
 

@@ -50,8 +50,8 @@
             <tbody>
               ${users.map(u => `
                 <tr>
-                  <td>${u.name}</td>
-                  <td>${u.phone}</td>
+                  <td>${esc(u.name)}</td>
+                  <td>${esc(u.phone)}</td>
                   <td>${roleLabels[u.role] || u.role}</td>
                   <td>${statusPill(u.status)}</td>
                   <td>${new Date(u.created_at).toLocaleDateString("ru-RU")}</td>
@@ -66,7 +66,7 @@
           </table>
         `;
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
       }
     }
 

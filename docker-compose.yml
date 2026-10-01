@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: master_ryadom
-      POSTGRES_PASSWORD: master_ryadom
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-master_ryadom}
       POSTGRES_DB: master_ryadom
     volumes:
       - db_data:/var/lib/postgresql/data
@@ -18,8 +18,12 @@ services:
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql://master_ryadom:master_ryadom@db:5432/master_ryadom
+      DATABASE_URL: postgresql://master_ryadom:${POSTGRES_PASSWORD:-master_ryadom}@db:5432/master_ryadom
       REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       - db
       - redis
@@ -37,3 +41,4 @@ services:
 
 volumes:
   db_data:
+  uploads_data:

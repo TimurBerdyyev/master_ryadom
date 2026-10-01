@@ -49,7 +49,7 @@
             <tbody>
               ${categories.map(c => `
                 <tr>
-                  <td>${c.name}</td>
+                  <td>${esc(c.name)}</td>
                   <td><button class="btn small danger" onclick="removeCategory(${c.id})">Удалить</button></td>
                 </tr>
               `).join("")}
@@ -57,7 +57,7 @@
           </table>
         `;
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
       }
     }
 

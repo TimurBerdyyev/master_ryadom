@@ -2,6 +2,20 @@ const API_BASE = window.location.hostname === "localhost" || window.location.hos
   ? "http://localhost:8000"
   : "/api";
 
+function esc(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function uploadUrl(path) {
+  return path.startsWith("/uploads/") ? `${API_BASE}${path}` : path;
+}
+
 function getToken() {
   return localStorage.getItem("token");
 }
@@ -34,6 +48,28 @@ async function apiRequest(path, options = {}) {
   return res.json();
 }
 
+async function apiUpload(path, files) {
+  const formData = new FormData();
+  for (const file of files) formData.append("files", file);
+
+  const headers = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: formData });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.detail || detail;
+    } catch (e) {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 const api = {
   register: (data) => apiRequest("/auth/register", { method: "POST", body: JSON.stringify(data) }),
   login: (data) => apiRequest("/auth/login", { method: "POST", body: JSON.stringify(data) }),
@@ -44,6 +80,11 @@ const api = {
   masterReviews: (id) => apiRequest(`/masters/${id}/reviews`),
   createOrder: (data) => apiRequest("/orders", { method: "POST", body: JSON.stringify(data) }),
   myOrders: () => apiRequest("/orders"),
+  getOrder: (id) => apiRequest(`/orders/${id}`),
+  uploadOrderPhotos: (orderId, files) => apiUpload(`/orders/${orderId}/photos`, files),
+  deleteOrderPhoto: (orderId, photoId) => apiRequest(`/orders/${orderId}/photos/${photoId}`, { method: "DELETE" }),
+  uploadMyPhotos: (files) => apiUpload("/masters/me/photos", files),
+  deleteMyPhoto: (id) => apiRequest(`/masters/me/photos/${id}`, { method: "DELETE" }),
   myMasterProfile: () => apiRequest("/masters/me"),
   updateMasterProfile: (data) => apiRequest("/masters/me", { method: "PATCH", body: JSON.stringify(data) }),
   addMyService: (data) => apiRequest("/masters/me/services", { method: "POST", body: JSON.stringify(data) }),

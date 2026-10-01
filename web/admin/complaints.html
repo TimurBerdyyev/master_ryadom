@@ -47,7 +47,7 @@
               <span class="status-pill ${statusClass[c.status]}">${statusLabels[c.status]}</span>
               <span class="muted">${new Date(c.created_at).toLocaleDateString("ru-RU")}</span>
             </div>
-            <div>${c.text}</div>
+            <div>${esc(c.text)}</div>
             <div class="muted" style="margin-top:6px">
               Автор #${c.author_id}${c.target_user_id ? `, на пользователя #${c.target_user_id}` : ""}${c.order_id ? `, заказ #${c.order_id}` : ""}
             </div>
@@ -60,7 +60,7 @@
           </div>
         `).join("");
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
       }
     }
 

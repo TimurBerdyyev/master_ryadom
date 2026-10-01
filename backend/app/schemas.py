@@ -1,21 +1,25 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ComplaintStatus, OfferStatus, OrderStatus, UserRole, UserStatus
 
+# bcrypt silently ignores bytes past 72; reject earlier with a clear error instead of a
+# confusing login mismatch for passwords that differ only after that point.
+PASSWORD_MAX_LENGTH = 72
+
 
 class UserRegister(BaseModel):
-    name: str
-    phone: str
-    password: str
+    name: str = Field(min_length=1, max_length=255)
+    phone: str = Field(min_length=5, max_length=32)
+    password: str = Field(min_length=6, max_length=PASSWORD_MAX_LENGTH)
     role: Literal[UserRole.client, UserRole.master] = UserRole.client
 
 
 class UserLogin(BaseModel):
-    phone: str
-    password: str
+    phone: str = Field(min_length=1, max_length=32)
+    password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
 
 class Token(BaseModel):
@@ -50,6 +54,14 @@ class ServiceOut(BaseModel):
     category_id: int
 
 
+class PhotoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    url: str
+    created_at: datetime
+
+
 class MasterOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -63,41 +75,42 @@ class MasterOut(BaseModel):
     verified: bool
     user: UserOut
     services: list[ServiceOut] = []
+    photos: list[PhotoOut] = []
 
 
 class MasterRegister(BaseModel):
-    description: str | None = None
-    experience_years: int | None = None
-    city: str | None = None
-    district: str | None = None
+    description: str | None = Field(None, max_length=2000)
+    experience_years: int | None = Field(None, ge=0, le=80)
+    city: str | None = Field(None, max_length=255)
+    district: str | None = Field(None, max_length=255)
     latitude: float | None = None
     longitude: float | None = None
 
 
 class MasterProfileUpdate(BaseModel):
-    description: str | None = None
-    experience_years: int | None = None
-    city: str | None = None
-    district: str | None = None
+    description: str | None = Field(None, max_length=2000)
+    experience_years: int | None = Field(None, ge=0, le=80)
+    city: str | None = Field(None, max_length=255)
+    district: str | None = Field(None, max_length=255)
     latitude: float | None = None
     longitude: float | None = None
 
 
 class ServiceCreate(BaseModel):
     category_id: int
-    title: str
-    price_from: float
+    title: str = Field(min_length=1, max_length=255)
+    price_from: float = Field(ge=0, le=10_000_000)
 
 
 class OrderCreate(BaseModel):
     category_id: int
-    description: str
-    address: str | None = None
+    description: str = Field(min_length=1, max_length=2000)
+    address: str | None = Field(None, max_length=500)
     latitude: float | None = None
     longitude: float | None = None
-    price: float | None = None
+    price: float | None = Field(None, ge=0, le=10_000_000)
     date: datetime | None = None
-    time: str | None = None
+    time: str | None = Field(None, max_length=16)
 
 
 class OrderOut(BaseModel):
@@ -114,11 +127,12 @@ class OrderOut(BaseModel):
     time: str | None = None
     status: OrderStatus
     created_at: datetime
+    photos: list[PhotoOut] = []
 
 
 class OrderOfferCreate(BaseModel):
-    price: float
-    comment: str | None = None
+    price: float = Field(ge=0, le=10_000_000)
+    comment: str | None = Field(None, max_length=1000)
 
 
 class OrderOfferOut(BaseModel):
@@ -134,8 +148,8 @@ class OrderOfferOut(BaseModel):
 
 
 class ReviewCreate(BaseModel):
-    rating: int
-    text: str | None = None
+    rating: int = Field(ge=1, le=5)
+    text: str | None = Field(None, max_length=2000)
 
 
 class ReviewOut(BaseModel):
@@ -161,7 +175,7 @@ class NotificationOut(BaseModel):
 
 
 class ComplaintCreate(BaseModel):
-    text: str
+    text: str = Field(min_length=1, max_length=2000)
     target_user_id: int | None = None
     order_id: int | None = None
 
@@ -183,8 +197,8 @@ class ComplaintStatusUpdate(BaseModel):
 
 
 class CategoryCreate(BaseModel):
-    name: str
-    icon: str | None = None
+    name: str = Field(min_length=1, max_length=255)
+    icon: str | None = Field(None, max_length=500)
 
 
 class AdminUserOut(BaseModel):

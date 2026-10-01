@@ -31,10 +31,10 @@
       try {
         const categories = await api.categories();
         grid.innerHTML = categories.map(c =>
-          `<div class="category-card" onclick="location.href='masters.html?category_id=${c.id}&name=${encodeURIComponent(c.name)}'">${c.name}</div>`
+          `<div class="category-card" onclick="location.href='masters.html?category_id=${c.id}&name=${encodeURIComponent(c.name)}'">${esc(c.name)}</div>`
         ).join("");
       } catch (e) {
-        grid.innerHTML = `<p class="error">Не удалось загрузить категории: ${e.message}</p>`;
+        grid.innerHTML = `<p class="error">Не удалось загрузить категории: ${esc(e.message)}</p>`;
       }
     }
 

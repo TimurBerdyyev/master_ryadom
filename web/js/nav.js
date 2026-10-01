@@ -14,7 +14,7 @@ async function renderNav() {
     if (user.role === "master") links.push(`<a href="${ROOT}master-profile-edit.html">Мой профиль</a>`);
     if (user.role === "admin") links.push(`<a href="${ROOT}admin/index.html">Админка</a>`);
     const extra = links.length ? links.join(" · ") + " · " : "";
-    nav.innerHTML = `${extra}<span>${user.name}</span> · <a href="#" onclick="logout(); return false;">Выйти</a>`;
+    nav.innerHTML = `${extra}<span>${esc(user.name)}</span> · <a href="#" onclick="logout(); return false;">Выйти</a>`;
   } catch (e) {
     clearToken();
     nav.innerHTML = `<a href="${ROOT}login.html">Войти</a>`;

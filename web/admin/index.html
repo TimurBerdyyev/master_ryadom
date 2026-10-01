@@ -52,7 +52,7 @@
           </div>
         `).join("");
       } catch (e) {
-        grid.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+        grid.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
       }
     }
 

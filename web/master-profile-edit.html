@@ -56,6 +56,14 @@
       <div id="serviceError" class="error"></div>
       <button class="btn secondary" type="submit">Добавить услугу</button>
     </form>
+
+    <div class="section-title">Фото работ</div>
+    <div id="photosGrid" class="photo-grid"></div>
+    <label class="btn secondary" style="display:inline-flex; cursor:pointer;">
+      Добавить фото
+      <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" />
+    </label>
+    <div id="photoError" class="error"></div>
   </main>
 
   <script src="js/api.js"></script>
@@ -75,6 +83,7 @@
         document.getElementById("city").value = master.city || "";
         document.getElementById("district").value = master.district || "";
         renderServices(master.services);
+        renderPhotos(master.photos);
       } catch (e) {
         document.getElementById("profileError").textContent = "Не удалось загрузить профиль: " + e.message;
       }
@@ -89,13 +98,46 @@
       list.innerHTML = services.map(s => `
         <div class="master-card" style="align-items:center">
           <div class="info">
-            <div class="name">${s.title}</div>
+            <div class="name">${esc(s.title)}</div>
             <div class="meta">от ${s.price_from} сом</div>
           </div>
           <button class="btn secondary" onclick="removeService(${s.id})">Удалить</button>
         </div>
       `).join("");
     }
+
+    function renderPhotos(photos) {
+      const grid = document.getElementById("photosGrid");
+      grid.innerHTML = photos.map(p => `
+        <div class="photo-thumb-wrap">
+          <img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото работы" />
+          <button class="remove-btn" onclick="removePhoto(${p.id})" title="Удалить">×</button>
+        </div>
+      `).join("");
+    }
+
+    async function removePhoto(id) {
+      try {
+        await api.deleteMyPhoto(id);
+        loadProfile();
+      } catch (e) {
+        alert("Не удалось удалить фото: " + e.message);
+      }
+    }
+
+    document.getElementById("photoInput").addEventListener("change", async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      const errorBox = document.getElementById("photoError");
+      errorBox.textContent = "";
+      try {
+        await api.uploadMyPhotos(files);
+        e.target.value = "";
+        loadProfile();
+      } catch (err) {
+        errorBox.textContent = "Не удалось загрузить фото: " + err.message;
+      }
+    });
 
     async function removeService(id) {
       try {
@@ -109,7 +151,7 @@
     async function loadCategories() {
       categories = await api.categories();
       document.getElementById("serviceCategory").innerHTML =
-        categories.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+        categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
     }
 
     document.getElementById("profileForm").addEventListener("submit", async (e) => {

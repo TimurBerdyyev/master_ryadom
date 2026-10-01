@@ -23,8 +23,6 @@ def create_review(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Это не ваш заказ")
     if order.status != OrderStatus.completed:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Отзыв можно оставить только для завершённого заказа")
-    if not 1 <= data.rating <= 5:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Рейтинг должен быть от 1 до 5")
 
     review = Review(
         order_id=order.id,

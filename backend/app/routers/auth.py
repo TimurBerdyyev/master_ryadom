@@ -4,12 +4,16 @@ from sqlalchemy.orm import Session
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
 from app.database import get_db
 from app.models import Master, User, UserRole, UserStatus
+from app.rate_limit import rate_limit
 from app.schemas import Token, UserLogin, UserOut, UserRegister
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+register_rate_limit = rate_limit("register", max_attempts=10, window_seconds=600)
+login_rate_limit = rate_limit("login", max_attempts=10, window_seconds=600)
 
-@router.post("/register", response_model=Token)
+
+@router.post("/register", response_model=Token, dependencies=[Depends(register_rate_limit)])
 def register(data: UserRegister, db: Session = Depends(get_db)):
     if db.query(User).filter(User.phone == data.phone).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Пользователь с таким телефоном уже существует")
@@ -31,7 +35,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     return Token(access_token=create_access_token(user.id))
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=Token, dependencies=[Depends(login_rate_limit)])
 def login(data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.phone == data.phone).first()
     if not user or not verify_password(data.password, user.password_hash):

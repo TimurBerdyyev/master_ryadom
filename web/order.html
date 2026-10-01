@@ -47,6 +47,11 @@
         <input id="price" type="number" min="0" placeholder="Оставьте пустым, чтобы мастера предложили цену сами" />
       </label>
 
+      <label>
+        Фото проблемы (до 5 штук, необязательно)
+        <input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+      </label>
+
       <div id="formError" class="error"></div>
       <button class="btn" type="submit">Отправить заявку</button>
     </form>
@@ -65,12 +70,19 @@
       const select = document.getElementById("category");
       try {
         const categories = await api.categories();
-        select.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+        select.innerHTML = categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
         if (preselectCategory) select.value = preselectCategory;
       } catch (e) {
         document.getElementById("formError").textContent = "Не удалось загрузить категории: " + e.message;
       }
     }
+
+    document.getElementById("photos").addEventListener("change", (e) => {
+      if (e.target.files.length > 5) {
+        document.getElementById("formError").textContent = "Можно приложить не больше 5 фото";
+        e.target.value = "";
+      }
+    });
 
     document.getElementById("orderForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -80,6 +92,7 @@
       const date = document.getElementById("date").value;
       const time = document.getElementById("time").value;
       const price = document.getElementById("price").value;
+      const photoFiles = Array.from(document.getElementById("photos").files || []);
 
       const payload = {
         category_id: Number(document.getElementById("category").value),
@@ -92,6 +105,13 @@
 
       try {
         const order = await api.createOrder(payload);
+        if (photoFiles.length) {
+          try {
+            await api.uploadOrderPhotos(order.id, photoFiles);
+          } catch (photoErr) {
+            console.error("Не удалось загрузить фото заказа:", photoErr.message);
+          }
+        }
         location.href = `order-success.html?id=${order.id}`;
       } catch (e) {
         errorBox.textContent = "Не удалось отправить заявку: " + e.message;
