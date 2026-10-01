@@ -48,4 +48,17 @@ const api = {
   updateMasterProfile: (data) => apiRequest("/masters/me", { method: "PATCH", body: JSON.stringify(data) }),
   addMyService: (data) => apiRequest("/masters/me/services", { method: "POST", body: JSON.stringify(data) }),
   deleteMyService: (id) => apiRequest(`/masters/me/services/${id}`, { method: "DELETE" }),
+  fileComplaint: (data) => apiRequest("/complaints", { method: "POST", body: JSON.stringify(data) }),
+
+  adminStats: () => apiRequest("/admin/stats"),
+  adminUsers: (params = {}) => apiRequest(`/admin/users?${new URLSearchParams(params)}`),
+  adminSetUserStatus: (id, status) => apiRequest(`/admin/users/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  adminMasters: (params = {}) => apiRequest(`/admin/masters?${new URLSearchParams(params)}`),
+  adminVerifyMaster: (id, verified) => apiRequest(`/admin/masters/${id}/verify`, { method: "PATCH", body: JSON.stringify({ verified }) }),
+  adminOrders: (params = {}) => apiRequest(`/admin/orders?${new URLSearchParams(params)}`),
+  adminComplaints: (params = {}) => apiRequest(`/admin/complaints?${new URLSearchParams(params)}`),
+  adminSetComplaintStatus: (id, status) => apiRequest(`/admin/complaints/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  adminCategories: () => apiRequest("/categories"),
+  adminAddCategory: (data) => apiRequest("/admin/categories", { method: "POST", body: JSON.stringify(data) }),
+  adminDeleteCategory: (id) => apiRequest(`/admin/categories/${id}`, { method: "DELETE" }),
 };

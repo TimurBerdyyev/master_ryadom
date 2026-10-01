@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Категории — Админ-панель</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="../index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="wide">
+    <h1>Категории</h1>
+    <div class="admin-tabs">
+      <a href="index.html">Дашборд</a>
+      <a href="users.html">Пользователи</a>
+      <a href="masters.html">Мастера</a>
+      <a href="orders.html">Заказы</a>
+      <a href="complaints.html">Жалобы</a>
+      <a href="categories.html" class="active">Категории</a>
+    </div>
+
+    <div id="content"><p class="muted">Загрузка…</p></div>
+
+    <form class="card" id="addForm" style="margin-top:20px">
+      <label>
+        Название категории
+        <input id="categoryName" type="text" required placeholder="Например: Клининг" />
+      </label>
+      <div id="formError" class="error"></div>
+      <button class="btn secondary" type="submit">Добавить категорию</button>
+    </form>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script src="guard.js"></script>
+  <script>
+    async function load() {
+      const content = document.getElementById("content");
+      try {
+        const categories = await api.adminCategories();
+        content.innerHTML = `
+          <table class="admin-table">
+            <thead><tr><th>Название</th><th></th></tr></thead>
+            <tbody>
+              ${categories.map(c => `
+                <tr>
+                  <td>${c.name}</td>
+                  <td><button class="btn small danger" onclick="removeCategory(${c.id})">Удалить</button></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+      }
+    }
+
+    async function removeCategory(id) {
+      if (!confirm("Удалить категорию? Это также затронет связанные услуги.")) return;
+      try {
+        await api.adminDeleteCategory(id);
+        load();
+      } catch (e) {
+        alert("Не удалось удалить: " + e.message);
+      }
+    }
+
+    document.getElementById("addForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById("formError");
+      errorBox.textContent = "";
+      try {
+        await api.adminAddCategory({ name: document.getElementById("categoryName").value });
+        document.getElementById("categoryName").value = "";
+        load();
+      } catch (e) {
+        errorBox.textContent = "Не удалось добавить: " + e.message;
+      }
+    });
+
+    requireAdmin().then(load);
+    renderNav();
+  </script>
+</body>
+</html>

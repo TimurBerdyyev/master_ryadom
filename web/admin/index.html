@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Админ-панель — Мастер рядом</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="../index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="wide">
+    <h1>Админ-панель</h1>
+    <div class="admin-tabs">
+      <a href="index.html" class="active">Дашборд</a>
+      <a href="users.html">Пользователи</a>
+      <a href="masters.html">Мастера</a>
+      <a href="orders.html">Заказы</a>
+      <a href="complaints.html">Жалобы</a>
+      <a href="categories.html">Категории</a>
+    </div>
+
+    <div id="stats" class="stat-grid"></div>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script src="guard.js"></script>
+  <script>
+    async function loadStats() {
+      const grid = document.getElementById("stats");
+      try {
+        const s = await api.adminStats();
+        const tiles = [
+          ["Всего пользователей", s.users_total],
+          ["Клиентов", s.clients_total],
+          [`Мастеров (${s.masters_verified} проверено)`, s.masters_total],
+          ["Активных заказов", s.orders_active],
+          ["Завершённых заказов", s.orders_completed],
+          ["Отменённых заказов", s.orders_cancelled],
+          ["Оборот", `${s.revenue_total.toFixed(0)} сом`],
+          ["Комиссия сервиса (10%)", `${s.commission_total.toFixed(0)} сом`],
+          ["Открытых жалоб", s.complaints_open],
+        ];
+        grid.innerHTML = tiles.map(([label, value]) => `
+          <div class="stat-tile">
+            <div class="value">${value}</div>
+            <div class="label">${label}</div>
+          </div>
+        `).join("");
+      } catch (e) {
+        grid.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+      }
+    }
+
+    requireAdmin().then(loadStats);
+    renderNav();
+  </script>
+</body>
+</html>

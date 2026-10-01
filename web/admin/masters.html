@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Мастера — Админ-панель</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="../index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="wide">
+    <h1>Мастера</h1>
+    <div class="admin-tabs">
+      <a href="index.html">Дашборд</a>
+      <a href="users.html">Пользователи</a>
+      <a href="masters.html" class="active">Мастера</a>
+      <a href="orders.html">Заказы</a>
+      <a href="complaints.html">Жалобы</a>
+      <a href="categories.html">Категории</a>
+    </div>
+
+    <div id="content"><p class="muted">Загрузка…</p></div>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script src="guard.js"></script>
+  <script>
+    async function load() {
+      const content = document.getElementById("content");
+      try {
+        const masters = await api.adminMasters();
+        content.innerHTML = `
+          <table class="admin-table">
+            <thead>
+              <tr><th>Мастер</th><th>Телефон</th><th>Город</th><th>Рейтинг</th><th>Заказов</th><th>Статус</th><th></th></tr>
+            </thead>
+            <tbody>
+              ${masters.map(m => `
+                <tr>
+                  <td><a href="../master.html?id=${m.id}">${m.user.name}</a></td>
+                  <td>${m.user.phone}</td>
+                  <td>${m.city || "—"}</td>
+                  <td>★ ${m.rating.toFixed(1)}</td>
+                  <td>${m.completed_orders}</td>
+                  <td>${m.verified
+                    ? '<span class="status-pill ok">Проверен</span>'
+                    : '<span class="status-pill warn">Не проверен</span>'}</td>
+                  <td>
+                    ${m.verified
+                      ? `<button class="btn small secondary" onclick="setVerified(${m.id}, false)">Снять отметку</button>`
+                      : `<button class="btn small" onclick="setVerified(${m.id}, true)">Подтвердить</button>`}
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+      }
+    }
+
+    async function setVerified(id, verified) {
+      try {
+        await api.adminVerifyMaster(id, verified);
+        load();
+      } catch (e) {
+        alert("Не удалось изменить статус: " + e.message);
+      }
+    }
+
+    requireAdmin().then(load);
+    renderNav();
+  </script>
+</body>
+</html>

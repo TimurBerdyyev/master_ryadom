@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import User
+from app.models import User, UserRole, UserStatus
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
@@ -45,7 +45,15 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.get(User, int(user_id))
     if user is None:
         raise credentials_error
+    if user.status == UserStatus.blocked:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Аккаунт заблокирован")
     return user
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != UserRole.admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Доступно только администратору")
+    return current_user
 
 
 def get_current_user_optional(

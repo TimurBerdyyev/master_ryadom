@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Пользователи — Админ-панель</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="../index.html">🔧 Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="wide">
+    <h1>Пользователи</h1>
+    <div class="admin-tabs">
+      <a href="index.html">Дашборд</a>
+      <a href="users.html" class="active">Пользователи</a>
+      <a href="masters.html">Мастера</a>
+      <a href="orders.html">Заказы</a>
+      <a href="complaints.html">Жалобы</a>
+      <a href="categories.html">Категории</a>
+    </div>
+
+    <div id="content"><p class="muted">Загрузка…</p></div>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/nav.js"></script>
+  <script src="guard.js"></script>
+  <script>
+    function statusPill(status) {
+      return status === "blocked"
+        ? '<span class="status-pill bad">Заблокирован</span>'
+        : '<span class="status-pill ok">Активен</span>';
+    }
+
+    const roleLabels = { client: "Клиент", master: "Мастер", admin: "Админ" };
+
+    async function load() {
+      const content = document.getElementById("content");
+      try {
+        const users = await api.adminUsers();
+        content.innerHTML = `
+          <table class="admin-table">
+            <thead>
+              <tr><th>Имя</th><th>Телефон</th><th>Роль</th><th>Статус</th><th>Регистрация</th><th></th></tr>
+            </thead>
+            <tbody>
+              ${users.map(u => `
+                <tr>
+                  <td>${u.name}</td>
+                  <td>${u.phone}</td>
+                  <td>${roleLabels[u.role] || u.role}</td>
+                  <td>${statusPill(u.status)}</td>
+                  <td>${new Date(u.created_at).toLocaleDateString("ru-RU")}</td>
+                  <td>
+                    ${u.role === "admin" ? "" : u.status === "blocked"
+                      ? `<button class="btn small secondary" onclick="setStatus(${u.id}, 'active')">Разблокировать</button>`
+                      : `<button class="btn small danger" onclick="setStatus(${u.id}, 'blocked')">Заблокировать</button>`}
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      } catch (e) {
+        content.innerHTML = `<p class="error">Ошибка: ${e.message}</p>`;
+      }
+    }
+
+    async function setStatus(id, status) {
+      try {
+        await api.adminSetUserStatus(id, status);
+        load();
+      } catch (e) {
+        alert("Не удалось изменить статус: " + e.message);
+      }
+    }
+
+    requireAdmin().then(load);
+    renderNav();
+  </script>
+</body>
+</html>

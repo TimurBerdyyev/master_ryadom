@@ -1,15 +1,16 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models import OfferStatus, OrderStatus, UserRole
+from app.models import ComplaintStatus, OfferStatus, OrderStatus, UserRole, UserStatus
 
 
 class UserRegister(BaseModel):
     name: str
     phone: str
     password: str
-    role: UserRole = UserRole.client
+    role: Literal[UserRole.client, UserRole.master] = UserRole.client
 
 
 class UserLogin(BaseModel):
@@ -157,3 +158,63 @@ class NotificationOut(BaseModel):
     text: str | None = None
     is_read: bool
     created_at: datetime
+
+
+class ComplaintCreate(BaseModel):
+    text: str
+    target_user_id: int | None = None
+    order_id: int | None = None
+
+
+class ComplaintOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    author_id: int
+    target_user_id: int | None = None
+    order_id: int | None = None
+    text: str
+    status: ComplaintStatus
+    created_at: datetime
+
+
+class ComplaintStatusUpdate(BaseModel):
+    status: ComplaintStatus
+
+
+class CategoryCreate(BaseModel):
+    name: str
+    icon: str | None = None
+
+
+class AdminUserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    phone: str
+    email: str | None = None
+    role: UserRole
+    status: UserStatus
+    created_at: datetime
+
+
+class UserStatusUpdate(BaseModel):
+    status: UserStatus
+
+
+class MasterVerifyUpdate(BaseModel):
+    verified: bool
+
+
+class AdminStats(BaseModel):
+    users_total: int
+    clients_total: int
+    masters_total: int
+    masters_verified: int
+    orders_active: int
+    orders_completed: int
+    orders_cancelled: int
+    revenue_total: float
+    commission_total: float
+    complaints_open: int

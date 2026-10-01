@@ -31,6 +31,18 @@ docker compose up --build
 
 При старте backend сам создаёт таблицы и заполняет список категорий услуг.
 
+### Создание администратора
+
+Публичная регистрация не позволяет получить роль `admin` (только `client`/`master`).
+Первого администратора создают из контейнера backend/локально:
+
+```bash
+docker compose exec backend python -m app.create_admin "+996700000099" "пароль" "Имя"
+# или локально из backend/: python -m app.create_admin "+996700000099" "пароль" "Имя"
+```
+
+Админ-панель — `web/admin/index.html` (вкладки: дашборд, пользователи, мастера, заказы, жалобы, категории).
+
 ## Запуск backend локально без Docker
 
 ```bash
@@ -63,10 +75,14 @@ uvicorn app.main:app --reload
 - `POST /orders/{id}/cancel`
 - `POST /orders/{id}/review`, `GET /masters/{id}/reviews`
 - `GET /notifications`
+- `POST /complaints` — подать жалобу (на пользователя и/или заказ)
+- `GET /admin/stats` — пользователи/мастера/заказы/оборот/комиссия (раздел 12 ТЗ)
+- `GET/PATCH /admin/users`, `GET/PATCH /admin/masters` (подтверждение мастера),
+  `GET /admin/orders`, `GET/PATCH /admin/complaints`, `POST/DELETE /admin/categories`
+  — всё только для роли `admin` (см. `python -m app.create_admin`)
 
 ## Что дальше (не входит в этот этап)
 
 - Загрузка фото (сейчас поля `photo`/`photos` в моделях есть, эндпоинтов загрузки нет)
-- Админ-панель (раздел 12 ТЗ)
 - Мобильное приложение на Flutter (Этап 4 плана MVP)
-- Оплата/комиссия (раздел 18 ТЗ) — таблица `payments` в БД уже заложена
+- Оплата/комиссия (раздел 18 ТЗ) — расчёт комиссии есть в статистике админки, реальных платежей нет

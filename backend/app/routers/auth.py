@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
 from app.database import get_db
-from app.models import Master, User, UserRole
+from app.models import Master, User, UserRole, UserStatus
 from app.schemas import Token, UserLogin, UserOut, UserRegister
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -36,6 +36,8 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.phone == data.phone).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Неверный телефон или пароль")
+    if user.status == UserStatus.blocked:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Аккаунт заблокирован")
     return Token(access_token=create_access_token(user.id))
 
 
