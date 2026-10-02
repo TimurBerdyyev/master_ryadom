@@ -16,6 +16,7 @@ from app.schemas import (
     OrderStatusUpdate,
     PhotoOut,
 )
+from app.subscriptions import require_access
 from app.uploads import delete_upload, save_upload
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -114,6 +115,7 @@ def order_feed(current_user: User = Depends(get_current_user), db: Session = Dep
     master = _my_master(current_user)
     if master is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Доступно только мастерам")
+    require_access(db, master)
 
     category_ids = {s.category_id for s in master.services}
     if not category_ids:
@@ -191,6 +193,7 @@ def offer_order(
     master = _my_master(current_user)
     if master is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Только мастер может предложить цену")
+    require_access(db, master)
 
     order = _get_order(db, order_id)
     if order.status not in OFFERABLE_STATUSES:

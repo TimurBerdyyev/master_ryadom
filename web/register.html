@@ -26,7 +26,7 @@
           <input type="radio" name="role" id="roleClient" value="client" checked />
           <label for="roleClient"><svg class="i " aria-hidden="true"><use href="#i-house"></use></svg><span data-i18n="reg.roleClient">Ищу мастера</span><small data-i18n="reg.roleClientS">Создаю заказы</small></label>
           <input type="radio" name="role" id="roleMaster" value="master" />
-          <label for="roleMaster"><svg class="i " aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="reg.roleMaster">Я мастер</span><small data-i18n="reg.roleMasterS">Получаю заказы</small></label>
+          <label for="roleMaster"><svg class="i " aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="reg.roleMaster">Я мастер</span><small data-i18n="reg.roleMasterS">Получаю заказы</small><small id="trialHint" class="trial-hint" hidden></small></label>
         </div>
         <label>
           <span data-i18n="reg.name">Имя</span>
@@ -55,6 +55,13 @@
   <script>
     const params = new URLSearchParams(location.search);
     if (params.get("role") === "master") document.getElementById("roleMaster").checked = true;
+
+    api.publicConfig().then(cfg => {
+      if (!cfg.subscriptions_enabled) return;
+      const hint = document.getElementById("trialHint");
+      hint.textContent = t("reg.trialHint");
+      hint.hidden = false;
+    }).catch(() => {});
 
     document.getElementById("registerForm").addEventListener("submit", async (e) => {
       e.preventDefault();

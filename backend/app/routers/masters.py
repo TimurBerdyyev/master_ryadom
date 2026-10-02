@@ -8,6 +8,7 @@ from app.auth import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import Category, Master, Photo, Service, User, UserRole, UserStatus
 from app.schemas import MasterOut, MasterProfileUpdate, PhotoOut, ServiceCreate, ServiceOut
+from app.subscriptions import filter_masters_with_access
 from app.uploads import delete_upload, save_upload
 
 router = APIRouter(prefix="/masters", tags=["masters"])
@@ -61,6 +62,7 @@ def search_masters(
         .join(User, Master.user_id == User.id)
         .filter(User.status == UserStatus.active)
     )
+    query = filter_masters_with_access(query)
     if category_id is not None:
         # .any() instead of a join: a master with several services in one category must appear once
         query = query.filter(Master.services.any(Service.category_id == category_id))

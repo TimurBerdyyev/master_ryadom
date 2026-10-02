@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n="sub.docTitle">Тариф мастера — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="narrow">
+    <div class="page-head">
+      <div>
+        <h1 data-i18n="sub.title">Тариф мастера</h1>
+        <p class="muted" data-i18n="sub.sub">Подписка открывает доступ к новым заказам и показ в поиске.</p>
+      </div>
+    </div>
+    <div id="content">
+      <div class="skeleton" style="height:170px;margin-bottom:16px"></div>
+      <div class="skeleton" style="height:220px"></div>
+    </div>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const loggedIn = requireLogin("subscription.html");
+
+    const STATE = {
+      trial: { label: "sub.stateTrial", text: "sub.trialText", icon: "sparkles", cls: "info" },
+      active: { label: "sub.stateActive", text: "sub.activeText", icon: "badge-check", cls: "ok" },
+      expired: { label: "sub.stateExpired", text: "sub.expiredText", icon: "triangle-alert", cls: "bad" },
+    };
+
+    function statusCard(sub) {
+      const st = STATE[sub.state];
+      return `
+        <div class="plan-status ${sub.state}">
+          <div class="plan-status-icon">${icon(st.icon)}</div>
+          <div style="flex:1;min-width:200px">
+            ${sub.state === "expired" ? "" : `<span class="status-pill ${st.cls}">${t(st.label)}</span>`}
+            <div class="plan-status-title" style="${sub.state === "expired" ? "margin-top:0" : ""}">${sub.state === "expired" ? t(st.label) : t("sub.daysLeft", { days: plural(sub.days_left, "p.days") })}</div>
+            <div class="muted">${t("sub.until", { date: formatDate(sub.access_until) })}</div>
+            <p style="margin:10px 0 0;color:var(--ink-2)">${t(st.text)}</p>
+          </div>
+        </div>`;
+    }
+
+    function plansHtml(sub) {
+      const best = Math.max(...sub.plans.map(p => p.discount));
+      return `
+        <div class="section-title">${t("sub.plansTitle")}</div>
+        <div class="plan-grid">
+          ${sub.plans.map(p => `
+            <div class="plan-card ${p.discount === best && best > 0 ? "featured" : ""}">
+              ${p.discount === best && best > 0 ? `<span class="plan-flag">${t("sub.bestValue")}</span>` : ""}
+              <div class="plan-months">${plural(p.months, "p.months")}</div>
+              <div class="plan-price">${formatPrice(p.price)}</div>
+              <div class="muted plan-per">
+                ${t("sub.perMonth", { price: formatPrice(Math.round(p.price / p.months)) })}
+                ${p.discount ? `<span class="plan-save">−${p.discount}%</span>` : ""}
+              </div>
+              <button class="btn ${p.discount === best && best > 0 ? "accent" : "secondary"} block" onclick="pay(${p.months})">${icon("wallet")}${t("sub.pay")}</button>
+            </div>`).join("")}
+        </div>
+        <div class="notice success" id="manualNotice" hidden style="margin-top:14px"></div>`;
+    }
+
+    function benefitsHtml() {
+      const items = [["inbox", "sub.benefit1"], ["send", "sub.benefit2"], ["search", "sub.benefit3"], ["phone", "sub.benefit4"]];
+      return `
+        <div class="section-title">${t("sub.benefitsTitle")}</div>
+        <div class="benefit-grid">
+          ${items.map(([ic, key]) => `<div class="trust-item"><span class="ico">${icon(ic, "lg")}</span><div>${t(key)}</div></div>`).join("")}
+        </div>`;
+    }
+
+    function historyHtml(payments) {
+      if (!payments.length) return "";
+      const pill = { pending: "warn", paid: "ok", cancelled: "" };
+      return `
+        <div class="section-title">${t("sub.historyTitle")}</div>
+        <div class="table-wrap"><table class="admin-table">
+          <thead><tr><th>${t("sub.colDate")}</th><th>${t("sub.colPeriod")}</th><th>${t("sub.colAmount")}</th><th>${t("admin.status")}</th></tr></thead>
+          <tbody>${payments.map(p => `
+            <tr>
+              <td>${formatDate(p.created_at)}</td>
+              <td>${plural(p.months, "p.months")}</td>
+              <td>${p.provider === "admin" ? t("sub.gift") : formatPrice(p.amount)}</td>
+              <td><span class="status-pill ${pill[p.status]}">${t("pay." + p.status)}</span></td>
+            </tr>`).join("")}
+          </tbody>
+        </table></div>`;
+    }
+
+    async function load() {
+      const content = document.getElementById("content");
+      try {
+        const me = await api.me();
+        if (me.role !== "master") {
+          content.innerHTML = emptyState("briefcase", t("feed.onlyMasters"), t("feed.onlyMastersText"),
+            `<a class="btn" href="masters.html">${t("nav.find")}</a>`);
+          return;
+        }
+        const sub = await api.mySubscription();
+        if (!sub.enabled) {
+          content.innerHTML = emptyState("sparkles", t("sub.disabledTitle"), t("sub.disabledText"),
+            `<a class="btn" href="feed.html">${icon("inbox")}${t("nav.feed")}</a>`) + benefitsHtml();
+          return;
+        }
+        content.innerHTML = `<div class="reveal">${statusCard(sub)}</div>${plansHtml(sub)}${benefitsHtml()}${historyHtml(sub.payments)}`;
+      } catch (e) {
+        content.innerHTML = emptyState("triangle-alert", t("common.error"), esc(e.message));
+      }
+    }
+
+    async function pay(months) {
+      try {
+        const { payment, payment_url } = await api.checkoutSubscription(months);
+        if (payment_url) {
+          location.href = payment_url;  // real payment provider page
+          return;
+        }
+        await load();
+        const notice = document.getElementById("manualNotice");
+        notice.innerHTML = `${icon("circle-check")}<div><b>${t("sub.manualTitle")}</b><br />${t("sub.manualText", { id: payment.id, amount: formatPrice(payment.amount) })}</div>`;
+        notice.hidden = false;
+        notice.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (e) {
+        toast(t("sub.checkoutError") + e.message);
+      }
+    }
+
+    if (loggedIn) load();
+    renderNav();
+  </script>
+</body>
+</html>

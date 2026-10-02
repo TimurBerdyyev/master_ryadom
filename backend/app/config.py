@@ -13,6 +13,13 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_size_mb: int = 5
 
+    # Paid plan for masters. Off until launch: while disabled every master has full access
+    # and no subscription records are created. See app/subscriptions.py.
+    subscriptions_enabled: bool = False
+    subscription_trial_days: int = 30
+    subscription_price: int = 500  # сом за 1 месяц; скидки за 3/6/12 месяцев — PLANS в subscriptions.py
+    payment_provider: str = "manual"  # см. app/payments.py
+
     model_config = SettingsConfigDict(env_file=".env")
 
     @property

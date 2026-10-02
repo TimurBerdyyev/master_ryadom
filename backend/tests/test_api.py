@@ -281,3 +281,120 @@ def test_no_n_plus_one_queries(client):
             assert count["n"] <= 10, f"{path}: {count['n']} SQL queries"
     finally:
         event.remove(engine, "before_cursor_execute", on_query)
+
+
+# ---------- master subscriptions ----------
+
+def make_admin(client):
+    db = SessionLocal()
+    phone = f"+99679{next(_counter):07d}"
+    db.add(User(name="Admin", phone=phone, password_hash=hash_password("adminpass"), role=UserRole.admin))
+    db.commit()
+    db.close()
+    token = client.post("/auth/login", json={"phone": phone, "password": "adminpass"}).json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def expire_trial(master_id, days_ago=1):
+    from datetime import timedelta
+
+    from app.models import MasterSubscription, utcnow
+    db = SessionLocal()
+    sub = db.query(MasterSubscription).filter(MasterSubscription.master_id == master_id).one()
+    sub.trial_ends_at = utcnow() - timedelta(days=days_ago)
+    db.commit()
+    db.close()
+
+
+def test_subscriptions_disabled_by_default(client):
+    from app.config import settings
+    assert settings.subscriptions_enabled is False
+    assert client.get("/config").json()["subscriptions_enabled"] is False
+
+    master_h, _ = make_master(client)
+    sub = client.get("/subscription/me", headers=master_h).json()
+    assert sub["enabled"] is False and sub["state"] == "disabled"
+    assert client.get("/orders/feed", headers=master_h).status_code == 200
+    assert client.post("/subscription/me/checkout", headers=master_h, json={"months": 1}).status_code == 400
+
+
+def test_subscription_flow(client, monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "subscriptions_enabled", True)
+    monkeypatch.setattr(settings, "subscription_price", 500)
+
+    master_h, _ = make_master(client, "Подписчик")
+    sub = client.get("/subscription/me", headers=master_h).json()
+    assert sub["state"] == "trial" and sub["days_left"] == 30
+    assert {p["months"]: p["price"] for p in sub["plans"]} == {1: 500, 3: 1350, 6: 2550, 12: 4500}
+    master_id = client.get("/masters/me", headers=master_h).json()["id"]
+    assert master_id in [m["id"] for m in client.get("/masters", params={"q": "Подписчик"}).json()]
+
+    # clients have no subscription page
+    client_h, _ = register(client)
+    assert client.get("/subscription/me", headers=client_h).status_code == 403
+
+    # trial over -> no feed, no offers, hidden from search
+    order = client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "x"}).json()
+    expire_trial(master_id)
+    assert client.get("/subscription/me", headers=master_h).json()["state"] == "expired"
+    assert client.get("/orders/feed", headers=master_h).status_code == 402
+    assert client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 1}).status_code == 402
+    assert master_id not in [m["id"] for m in client.get("/masters", params={"q": "Подписчик"}).json()]
+
+    # checkout: invalid plan, then a new request replaces the previous pending one
+    assert client.post("/subscription/me/checkout", headers=master_h, json={"months": 2}).status_code == 400
+    first = client.post("/subscription/me/checkout", headers=master_h, json={"months": 1}).json()
+    r = client.post("/subscription/me/checkout", headers=master_h, json={"months": 3})
+    assert r.status_code == 200 and r.json()["payment_url"] is None  # manual provider
+    payment = r.json()["payment"]
+    assert payment["amount"] == 1350 and payment["status"] == "pending"
+    statuses = {p["id"]: p["status"] for p in client.get("/subscription/me", headers=master_h).json()["payments"]}
+    assert statuses[first["payment"]["id"]] == "cancelled"
+
+    # only an admin confirms payments
+    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=master_h).status_code == 403
+    admin_h = make_admin(client)
+    pending = client.get("/admin/subscription-payments", params={"status": "pending"}, headers=admin_h).json()
+    assert payment["id"] in [p["id"] for p in pending]
+    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=admin_h).status_code == 200
+    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=admin_h).status_code == 400
+
+    sub = client.get("/subscription/me", headers=master_h).json()
+    assert sub["state"] == "active" and 89 <= sub["days_left"] <= 90
+    assert client.get("/orders/feed", headers=master_h).status_code == 200
+    assert master_id in [m["id"] for m in client.get("/masters", params={"q": "Подписчик"}).json()]
+
+    # admin can grant months; they stack on top of the paid period
+    assert client.post(f"/admin/subscriptions/{master_id}/extend", headers=admin_h, json={"months": 1}).status_code == 200
+    assert 119 <= client.get("/subscription/me", headers=master_h).json()["days_left"] <= 120
+    rows = client.get("/admin/subscriptions", headers=admin_h).json()
+    assert any(r["master_id"] == master_id and r["state"] == "active" for r in rows)
+
+    # webhook: unknown provider / manual provider accept nothing
+    assert client.post("/payments/webhook/nope", content=b"{}").status_code == 404
+    assert client.post("/payments/webhook/manual", content=b"{}").status_code == 404
+
+
+def test_paying_during_trial_keeps_remaining_days(client, monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "subscriptions_enabled", True)
+    master_h, _ = make_master(client)
+    payment = client.post("/subscription/me/checkout", headers=master_h, json={"months": 1}).json()["payment"]
+    client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=make_admin(client))
+    # 30 trial days left + 30 paid days
+    assert 59 <= client.get("/subscription/me", headers=master_h).json()["days_left"] <= 60
+
+
+def test_existing_masters_get_trial_when_enabled(client, monkeypatch):
+    from app.config import settings
+    from app.database import SessionLocal as Session_
+    from app.models import Master
+    from app.subscriptions import ensure_all_masters
+
+    make_master(client, "Старый мастер")  # registered while the feature was off -> no subscription row
+    monkeypatch.setattr(settings, "subscriptions_enabled", True)
+    db = Session_()
+    ensure_all_masters(db)
+    assert db.query(Master).filter(~Master.subscription.has()).count() == 0
+    db.close()

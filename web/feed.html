@@ -39,6 +39,7 @@
       <button class="btn secondary" onclick="load()"><svg class="i" aria-hidden="true"><use href="#i-refresh-cw"></use></svg><span data-i18n="feed.refresh">Обновить</span></button>
     </div>
 
+    <div id="planBanner"></div>
     <div id="list" class="stack"></div>
   </main>
 
@@ -107,12 +108,41 @@
             `<a class="btn" href="masters.html">${t("nav.find")}</a>`);
           return;
         }
+        renderPlanBanner();
         const [feed, cats] = await Promise.all([api.orderFeed(), api.categories()]);
         orders = feed;
         categories = Object.fromEntries(cats.map(c => [c.id, c.name]));
         render();
       } catch (e) {
-        list.innerHTML = emptyState("triangle-alert", t("orders.loadError"), esc(e.message));
+        list.innerHTML = e.status === 402
+          ? paywall()
+          : emptyState("triangle-alert", t("orders.loadError"), esc(e.message));
+      }
+    }
+
+    function paywall() {
+      return emptyState("lock", t("sub.stateExpired"), t("sub.expiredText"),
+        `<a class="btn accent" href="subscription.html">${icon("wallet")}${t("feed.renew")}</a>`);
+    }
+
+    // Heads-up a few days before the trial/paid period runs out (only when paid plans are on).
+    async function renderPlanBanner() {
+      const box = document.getElementById("planBanner");
+      try {
+        const sub = await api.mySubscription();
+        if (!sub.enabled || sub.state === "expired" || sub.days_left > 5) {
+          box.innerHTML = "";
+          return;
+        }
+        const key = sub.state === "trial" ? "feed.trialBanner" : "feed.subBanner";
+        box.innerHTML = `
+          <div class="notice plan-banner">
+            ${icon("timer")}<span>${t(key, { days: plural(sub.days_left, "p.days") })}</span>
+            <span class="spacer"></span>
+            <a class="btn small accent" href="subscription.html">${t("feed.renew")}</a>
+          </div>`;
+      } catch (e) {
+        box.innerHTML = "";
       }
     }
 
@@ -125,6 +155,7 @@
         load();
       } catch (e) {
         toast(t("common.error") + e.message);
+        if (e.status === 402) load();  // subscription ran out meanwhile: show the paywall
       }
     }
 

@@ -53,6 +53,12 @@ class OfferStatus(str, enum.Enum):
     rejected = "rejected"
 
 
+class SubscriptionPaymentStatus(str, enum.Enum):
+    pending = "pending"
+    paid = "paid"
+    cancelled = "cancelled"
+
+
 class ComplaintStatus(str, enum.Enum):
     open = "open"
     resolved = "resolved"
@@ -99,6 +105,7 @@ class Master(Base):
     working_hours: Mapped[list["WorkingHours"]] = relationship(back_populates="master")
     reviews: Mapped[list["Review"]] = relationship(back_populates="master")
     orders: Mapped[list["Order"]] = relationship(back_populates="master")
+    subscription: Mapped["MasterSubscription"] = relationship(back_populates="master", uselist=False)
 
 
 class Category(Base):
@@ -264,3 +271,34 @@ class Complaint(Base):
     text: Mapped[str] = mapped_column(Text)
     status: Mapped[ComplaintStatus] = mapped_column(Enum(ComplaintStatus), default=ComplaintStatus.open)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class MasterSubscription(Base):
+    """Paid access for a master: free until trial_ends_at, then until paid_until."""
+    __tablename__ = "master_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"), unique=True)
+    trial_ends_at: Mapped[datetime] = mapped_column(DateTime)
+    paid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    master: Mapped["Master"] = relationship(back_populates="subscription")
+
+
+class SubscriptionPayment(Base):
+    __tablename__ = "subscription_payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"), index=True)
+    months: Mapped[int] = mapped_column(Integer)
+    amount: Mapped[float] = mapped_column(Numeric(10, 2))
+    status: Mapped[SubscriptionPaymentStatus] = mapped_column(
+        Enum(SubscriptionPaymentStatus), default=SubscriptionPaymentStatus.pending, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32))
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    master: Mapped["Master"] = relationship()

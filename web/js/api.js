@@ -222,7 +222,9 @@ async function apiRequest(path, options = {}) {
     } catch (e) {
       /* ignore */
     }
-    throw new Error(detail);
+    const error = new Error(detail);
+    error.status = res.status;  // e.g. 402 — the master's subscription has run out
+    throw error;
   }
   if (res.status === 204) return null;
   return res.json();
@@ -284,6 +286,13 @@ const api = {
   notifications: () => apiRequest("/notifications"),
   unreadCount: () => apiRequest("/notifications/unread-count"),
   readAllNotifications: () => apiRequest("/notifications/read-all", { method: "POST" }),
+  publicConfig: () => apiRequest("/config"),
+  mySubscription: () => apiRequest("/subscription/me"),
+  checkoutSubscription: (months) => apiRequest("/subscription/me/checkout", { method: "POST", body: JSON.stringify({ months }) }),
+  adminSubscriptions: () => apiRequest("/admin/subscriptions"),
+  adminSubscriptionPayments: (params = {}) => apiRequest(`/admin/subscription-payments?${new URLSearchParams(params)}`),
+  adminConfirmPayment: (id) => apiRequest(`/admin/subscription-payments/${id}/confirm`, { method: "POST" }),
+  adminExtendSubscription: (masterId, months) => apiRequest(`/admin/subscriptions/${masterId}/extend`, { method: "POST", body: JSON.stringify({ months }) }),
 
   adminStats: () => apiRequest("/admin/stats"),
   adminUsers: (params = {}) => apiRequest(`/admin/users?${new URLSearchParams(params)}`),

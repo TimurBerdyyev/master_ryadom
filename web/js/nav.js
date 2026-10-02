@@ -79,6 +79,7 @@ async function renderNav() {
       links.push(navLink("feed.html", t("nav.feed"), "inbox"));
       links.push(navLink("orders.html", t("nav.myJobs"), "clipboard-list"));
       links.push(navLink("master-profile-edit.html", t("common.profile"), "settings-2"));
+      links.push(`<span id="planLink"></span>`);
     } else {
       links.push(navLink("masters.html", t("nav.find"), "search"));
       links.push(navLink("orders.html", t("nav.myOrders"), "clipboard-list"));
@@ -92,9 +93,24 @@ async function renderNav() {
       <a class="nav-link" href="#" onclick="logout(); return false;" title="${t("nav.logout")}">${icon("log-out")}<span class="nav-logout-label">${t("nav.logout")}</span></a>
     `;
     refreshUnread();
+    if (user.role === "master") renderPlanLink();
   } catch (e) {
     clearToken();
     nav.innerHTML = guestNav;
+  }
+}
+
+// "Тариф" appears only once paid plans are switched on; a dot warns about an expired or ending plan.
+async function renderPlanLink() {
+  const slot = document.getElementById("planLink");
+  if (!slot) return;
+  try {
+    const sub = await api.mySubscription();
+    if (!sub.enabled) return;
+    const warn = sub.state === "expired" || sub.days_left <= 5;
+    slot.outerHTML = navLink("subscription.html", t("nav.plan") + (warn ? ' <span class="nav-dot"></span>' : ""), "wallet");
+  } catch (e) {
+    /* no plan link */
   }
 }
 

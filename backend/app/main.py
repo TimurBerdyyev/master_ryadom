@@ -8,8 +8,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import DEFAULT_JWT_SECRET, settings
 from app.database import Base, SessionLocal, engine
-from app.routers import admin, auth, categories, complaints, masters, notifications, orders, reviews
+from app.payments import get_provider
+from app.routers import admin, auth, categories, complaints, masters, notifications, orders, reviews, subscriptions
 from app.seed import seed_categories
+from app.subscriptions import ensure_all_masters
 
 logger = logging.getLogger("master_ryadom")
 
@@ -31,9 +33,15 @@ async def lifespan(_app: FastAPI):
         for index in table.indexes:
             index.create(bind=engine, checkfirst=True)
 
+    get_provider()  # fail fast on a typo in PAYMENT_PROVIDER
+
     db = SessionLocal()
     try:
         seed_categories(db)
+        if settings.subscriptions_enabled:
+            started = ensure_all_masters(db)
+            if started:
+                logger.info("Подписки: пробный период начат для %s мастеров", started)
     finally:
         db.close()
     yield
@@ -71,6 +79,8 @@ app.include_router(reviews.router)
 app.include_router(notifications.router)
 app.include_router(complaints.router)
 app.include_router(admin.router)
+app.include_router(subscriptions.router)
+app.include_router(subscriptions.admin_router)
 
 
 @app.get("/health")

@@ -22,6 +22,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      SUBSCRIPTIONS_ENABLED: ${SUBSCRIPTIONS_ENABLED:-false}
+      SUBSCRIPTION_TRIAL_DAYS: ${SUBSCRIPTION_TRIAL_DAYS:-30}
+      SUBSCRIPTION_PRICE: ${SUBSCRIPTION_PRICE:-500}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-manual}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

@@ -3000,3 +3000,194 @@ header.topbar nav {
     gap: 8px;
   }
 }
+
+.nav-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* ---------- Master plan ---------- */
+
+.plan-status {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: 24px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.plan-status.trial {
+  background: linear-gradient(120deg, var(--primary-50), #f7f9ff);
+  border-color: var(--primary-100);
+}
+
+.plan-status.active {
+  background: linear-gradient(120deg, var(--success-50), #f5fcf8);
+  border-color: rgba(15, 157, 88, .25);
+}
+
+.plan-status.expired {
+  background: linear-gradient(120deg, var(--danger-50), #fff8f7);
+  border-color: rgba(220, 58, 47, .25);
+}
+
+.plan-status-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.plan-status.active .plan-status-icon {
+  color: var(--success);
+}
+
+.plan-status.expired .plan-status-icon {
+  color: var(--danger);
+}
+
+.plan-status-icon .i {
+  width: 28px;
+  height: 28px;
+}
+
+.plan-status-title {
+  margin: 10px 0 2px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .plan-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 18px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  transition: transform .25s var(--ease), box-shadow .25s var(--ease);
+}
+
+.plan-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.plan-card.featured {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-sm);
+}
+
+.plan-flag {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.plan-months {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.plan-price {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -.03em;
+}
+
+.plan-per {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.plan-save {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--success-50);
+  color: var(--success);
+  font-weight: 700;
+}
+
+.plan-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.plan-banner .spacer {
+  min-width: 8px;
+}
+
+.role-picker label .trial-hint {
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.plan-price {
+  font-size: clamp(18px, 2.1vw, 22px);
+  white-space: nowrap;
+}
+
+.plan-card .btn {
+  margin-top: auto;
+}
+
+.benefit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .benefit-grid {
+    grid-template-columns: 1fr;
+  }
+}

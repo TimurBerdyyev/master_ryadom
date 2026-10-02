@@ -3,10 +3,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
+from app.config import settings
 from app.database import get_db
 from app.models import Master, User, UserRole, UserStatus
 from app.rate_limit import rate_limit
 from app.schemas import Token, UserLogin, UserOut, UserRegister
+from app.subscriptions import ensure_subscription
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -33,7 +35,11 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Пользователь с таким телефоном уже существует")
 
     if data.role == UserRole.master:
-        db.add(Master(user_id=user.id))
+        master = Master(user_id=user.id)
+        db.add(master)
+        db.flush()
+        if settings.subscriptions_enabled:
+            ensure_subscription(db, master)  # free trial starts at sign-up
 
     try:
         db.commit()

@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import ComplaintStatus, OfferStatus, OrderStatus, UserRole, UserStatus
+from app.models import ComplaintStatus, OfferStatus, OrderStatus, SubscriptionPaymentStatus, UserRole, UserStatus
 
 # bcrypt silently ignores bytes past 72; reject earlier with a clear error instead of a
 # confusing login mismatch for passwords that differ only after that point.
@@ -310,3 +310,69 @@ class AdminStats(BaseModel):
     revenue_total: float
     commission_total: float
     complaints_open: int
+
+
+class PublicConfigOut(BaseModel):
+    subscriptions_enabled: bool
+    subscription_trial_days: int
+    subscription_price: int
+
+
+class SubscriptionPlanOut(BaseModel):
+    months: int
+    price: int
+    discount: int
+
+
+class SubscriptionPaymentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    months: int
+    amount: float
+    status: SubscriptionPaymentStatus
+    provider: str
+    created_at: datetime
+    paid_at: datetime | None = None
+
+
+class SubscriptionOut(BaseModel):
+    enabled: bool
+    state: Literal["disabled", "trial", "active", "expired"]
+    trial_ends_at: datetime | None = None
+    paid_until: datetime | None = None
+    access_until: datetime | None = None
+    days_left: int = 0
+    plans: list[SubscriptionPlanOut] = []
+    payments: list[SubscriptionPaymentOut] = []
+    manual_payments: bool = True
+
+
+class CheckoutIn(BaseModel):
+    months: int
+
+
+class CheckoutOut(BaseModel):
+    payment: SubscriptionPaymentOut
+    payment_url: str | None = None
+
+
+class AdminSubscriptionOut(BaseModel):
+    master_id: int
+    name: str
+    phone: str
+    state: Literal["trial", "active", "expired"]
+    trial_ends_at: datetime
+    paid_until: datetime | None = None
+    access_until: datetime
+    days_left: int
+
+
+class AdminSubscriptionPaymentOut(SubscriptionPaymentOut):
+    master_id: int
+    master_name: str
+    master_phone: str
+
+
+class ExtendIn(BaseModel):
+    months: int = Field(ge=1, le=24)
