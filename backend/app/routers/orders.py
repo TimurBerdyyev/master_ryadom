@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
@@ -94,6 +95,7 @@ def _notify_masters_about_new_order(db: Session, order: Order) -> None:
             .join(User, Master.user_id == User.id)
             .filter(User.status == UserStatus.active, User.id != order.client_id)
             .filter(Master.services.any(Service.category_id == order.category_id))
+            .filter(Master.city == order.city)
         )
         .limit(MAX_NEW_ORDER_NOTIFICATIONS)
         .all()
@@ -134,14 +136,14 @@ def list_orders(current_user: User = Depends(get_current_user), db: Session = De
 
 @router.get("/feed", response_model=list[OrderFeedOut])
 def order_feed(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Open orders in the categories the master works in."""
+    """Open orders in the master's categories and city."""
     master = _my_master(current_user)
     if master is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Доступно только мастерам")
     require_access(db, master)
 
     category_ids = {s.category_id for s in master.services}
-    if not category_ids:
+    if not category_ids or not master.city:
         return []
 
     orders = (
@@ -151,6 +153,8 @@ def order_feed(current_user: User = Depends(get_current_user), db: Session = Dep
             Order.status.in_(OFFERABLE_STATUSES),
             Order.category_id.in_(category_ids),
             Order.client_id != current_user.id,
+            # Orders created before cities existed have none — keep them visible to everyone.
+            or_(Order.city == master.city, Order.city.is_(None)),
         )
         .order_by(Order.created_at.desc())
         .limit(100)

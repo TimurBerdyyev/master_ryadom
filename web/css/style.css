@@ -3254,3 +3254,21 @@ form.card label.check input[type="checkbox"] {
   letter-spacing: .5em;
   padding-left: calc(14px + .5em) !important;
 }
+
+.city-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  background: var(--primary-50);
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.city-chip .i {
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+}

@@ -50,6 +50,8 @@ def reset_password(data: PasswordResetIn, db: Session = Depends(get_db)):
 def register(data: UserRegister, db: Session = Depends(get_db)):
     if db.query(User).filter(User.phone == data.phone).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Пользователь с таким телефоном уже существует")
+    if data.role == UserRole.master and not data.city:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Укажите город, в котором вы работаете")
     check_code(db, data.phone, "register", data.code)
 
     user = User(
@@ -66,7 +68,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Пользователь с таким телефоном уже существует")
 
     if data.role == UserRole.master:
-        master = Master(user_id=user.id)
+        master = Master(user_id=user.id, city=data.city)
         db.add(master)
         db.flush()
         if settings.subscriptions_enabled:

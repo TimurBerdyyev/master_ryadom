@@ -34,6 +34,7 @@
     <div class="page-head">
       <div>
         <h1 data-i18n="nav.feed">Новые заказы</h1>
+        <p class="city-chip" id="cityChip" hidden></p>
         <p class="muted" data-i18n="feed.sub">Открытые заказы в ваших категориях. Адрес и телефон клиента откроются, когда он выберет вас.</p>
       </div>
       <button class="btn secondary" onclick="load()"><svg class="i" aria-hidden="true"><use href="#i-refresh-cw"></use></svg><span data-i18n="feed.refresh">Обновить</span></button>
@@ -69,7 +70,7 @@
       const list = document.getElementById("list");
       if (!orders.length) {
         list.classList.remove("reveal");
-        list.innerHTML = emptyState("inbox", t("feed.emptyTitle"), t("feed.emptyText"),
+        list.innerHTML = emptyState("inbox", t("feed.emptyTitle"), `${t("feed.emptyCityText")} ${t("feed.emptyText")}`,
           `<a class="btn" href="master-profile-edit.html">${icon("settings-2")}${t("feed.myServices")}</a>`);
         return;
       }
@@ -109,6 +110,16 @@
           return;
         }
         renderPlanBanner();
+        const profile = await api.myMasterProfile();
+        const chip = document.getElementById("cityChip");
+        if (!profile.city) {
+          chip.hidden = true;
+          list.innerHTML = emptyState("map-pin", t("feed.noCityTitle"), t("feed.noCityText"),
+            `<a class="btn" href="master-profile-edit.html">${icon("map-pin")}${t("feed.chooseCity")}</a>`);
+          return;
+        }
+        chip.innerHTML = `${icon("map-pin")}<b>${esc(cityName(profile.city))}</b> · <a class="link" href="master-profile-edit.html">${t("city.change")}</a>`;
+        chip.hidden = false;
         const [feed, cats] = await Promise.all([api.orderFeed(), api.categories()]);
         orders = feed;
         categories = Object.fromEntries(cats.map(c => [c.id, c.name]));

@@ -170,7 +170,8 @@
       const isOwner = order.client_id === me.id;
       const tiles = [
         order.date ? metaTile("calendar", t("detail.when"), `${formatDate(order.date)}${order.time ? ", " + esc(order.time) : ""}`) : "",
-        order.address ? metaTile("map-pin", t("common.address"), esc(order.address)) : "",
+        order.city ? metaTile("map-pin", t("common.city"), esc(cityName(order.city))) : "",
+        order.address ? metaTile("house", t("common.address"), esc(order.address)) : "",
         order.price ? metaTile("wallet", order.master_id ? t("detail.price") : t("detail.budget"), formatPrice(order.price)) : "",
         metaTile("clock", t("detail.created"), formatDate(order.created_at, true)),
       ].join("");

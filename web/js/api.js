@@ -60,6 +60,28 @@ function categoryBadge(name, cls = "cat-dot") {
   return `<span class="${cls}" style="${c.style}">${icon(c.iconName)}</span>`;
 }
 
+// Cities are stored as canonical Russian names; show them in the interface language.
+function cityName(name) {
+  return name && I18N[`city.${name}`] ? t(`city.${name}`) : (name || "");
+}
+
+let _citiesPromise = null;
+
+function getCities() {
+  _citiesPromise = _citiesPromise || api.publicConfig().then(cfg => cfg.cities || []);
+  return _citiesPromise;
+}
+
+// <option>s for a city <select>; the first option is a placeholder with an empty value.
+async function cityOptionsHtml(selected, placeholderKey = "city.choose") {
+  const cities = await getCities();
+  // Keep a legacy free-text value visible instead of silently dropping it.
+  const list = selected && !cities.includes(selected) ? [selected, ...cities] : cities;
+  return `<option value="">${t(placeholderKey)}</option>` + list
+    .map(c => `<option value="${esc(c)}" ${c === selected ? "selected" : ""}>${esc(cityName(c))}</option>`)
+    .join("");
+}
+
 const AVATAR_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0d9488", "#16a34a", "#0891b2", "#4f46e5"];
 
 function avatarColor(name) {

@@ -48,7 +48,7 @@
                 <tr>
                   <td><a href="../master.html?id=${m.id}">${esc(m.user.name)}</a></td>
                   <td>${esc(m.user.phone)}</td>
-                  <td>${m.city ? esc(m.city) : "—"}</td>
+                  <td>${m.city ? esc(cityName(m.city)) : "—"}</td>
                   <td>${ratingHtml(m.rating)}</td>
                   <td>${m.completed_orders}</td>
                   <td>${m.verified

@@ -92,6 +92,12 @@
 
       <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="neworder.where">Где и когда</span></h2>
       <label>
+        <span data-i18n="common.city">Город</span>
+        <select id="city" required></select>
+        <span class="hint" data-i18n="neworder.cityHint">Заказ увидят мастера из этого города</span>
+      </label>
+
+      <label>
         <span data-i18n="common.address">Адрес</span>
         <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-house"></use></svg><input id="address" type="text" maxlength="500" data-i18n-ph="neworder.addressPh" /></span>
         <span class="hint" data-i18n="neworder.addressHint">Мастер увидит адрес только после того, как вы его выберете</span>
@@ -135,6 +141,18 @@
     const preselectCategory = new URLSearchParams(location.search).get("category_id");
     document.getElementById("date").min = new Date().toISOString().slice(0, 10);
 
+    function lastCity() {
+      try {
+        return localStorage.getItem("lastCity") || "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    async function loadCities() {
+      document.getElementById("city").innerHTML = await cityOptionsHtml(lastCity());
+    }
+
     async function loadCategories() {
       const picker = document.getElementById("categoryPicker");
       try {
@@ -174,6 +192,7 @@
 
       const payload = {
         category_id: Number(checked.value),
+        city: document.getElementById("city").value,
         description: document.getElementById("description").value.trim(),
         address: document.getElementById("address").value.trim() || null,
         date: date ? new Date(`${date}T${time || "00:00"}:00`).toISOString() : null,
@@ -184,6 +203,11 @@
       button.disabled = true;
       try {
         const order = await api.createOrder(payload);
+        try {
+          localStorage.setItem("lastCity", payload.city);
+        } catch (e) {
+          /* storage unavailable */
+        }
         let photoWarning = "";
         if (photoFiles.length) {
           try {
@@ -199,7 +223,10 @@
       }
     });
 
-    if (loggedIn) loadCategories();
+    if (loggedIn) {
+      loadCategories();
+      loadCities().catch(() => {});
+    }
     renderNav();
   </script>
 </body>

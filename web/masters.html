@@ -29,10 +29,7 @@
         <svg class="i" aria-hidden="true"><use href="#i-search"></use></svg>
         <input id="searchInput" type="search" maxlength="100" data-i18n-ph="search.ph" data-i18n-aria="search.aria" />
       </div>
-      <div class="input-icon">
-        <svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg>
-        <input id="cityFilter" type="text" maxlength="100" data-i18n-ph="common.city" data-i18n-aria="common.city" />
-      </div>
+      <select id="cityFilter" data-i18n-aria="common.city"></select>
       <select id="ratingFilter" data-i18n-aria="search.ratingAria">
         <option value="" data-i18n="search.anyRating">Любой рейтинг</option>
         <option value="4">★ 4.0+</option>
@@ -62,7 +59,10 @@
     let categories = [];
 
     document.getElementById("searchInput").value = params.get("q") || "";
-    document.getElementById("cityFilter").value = params.get("city") || "";
+    const cityReady = cityOptionsHtml(params.get("city") || "", "city.all")
+      .then(html => { document.getElementById("cityFilter").innerHTML = html; })
+      .catch(() => {});
+    document.getElementById("cityFilter").addEventListener("change", applyFilters);
 
     function categoryName(id) {
       return categories.find(c => String(c.id) === String(id))?.name;
@@ -107,7 +107,7 @@
               ${ratingHtml(m.rating)}
               <span>${icon("briefcase")}${plural(m.completed_orders, "p.orders")}</span>
               ${m.experience_years ? `<span>${icon("timer")}${t("search.exp", { years: plural(m.experience_years, "p.years") })}</span>` : ""}
-              ${m.city ? `<span>${icon("map-pin")}${esc(m.city)}</span>` : ""}
+              ${m.city ? `<span>${icon("map-pin")}${esc(cityName(m.city))}</span>` : ""}
             </div>
             ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ""}
             ${tags.length ? `<div class="tags">${tags.map(tag => `<span class="tag">${esc(tag)}</span>`).join("")}</div>` : ""}
@@ -155,7 +155,9 @@
       }
     }
 
-    api.categories().then(c => { categories = c; renderChips(); loadMasters(); }).catch(() => loadMasters());
+    Promise.all([api.categories(), cityReady])
+      .then(([c]) => { categories = c; renderChips(); loadMasters(); })
+      .catch(() => loadMasters());
     renderNav();
   </script>
 </body>

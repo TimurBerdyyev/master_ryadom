@@ -87,6 +87,7 @@
             </div>
             <div class="desc">${esc(o.description.length > 180 ? o.description.slice(0, 180) + "…" : o.description)}</div>
             <div class="foot">
+              ${o.city ? `<span>${icon("map-pin")}${esc(cityName(o.city))}</span>` : ""}
               <span>${icon("calendar")}${formatDate(o.created_at)}</span>
               ${o.price ? `<span>${icon("wallet")}<b>${formatPrice(o.price)}</b></span>` : ""}
               ${who}

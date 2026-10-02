@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.cities import normalize_city
 from app.models import ComplaintStatus, OfferStatus, OrderStatus, SubscriptionPaymentStatus, UserRole, UserStatus
 
 # bcrypt silently ignores bytes past 72; reject earlier with a clear error instead of a
@@ -22,6 +23,22 @@ Latitude = Annotated[float, Field(ge=-90, le=90)]
 Longitude = Annotated[float, Field(ge=-180, le=180)]
 
 
+def _valid_city(value: str | None) -> str | None:
+    if value is None or not value.strip():
+        return None
+    city = normalize_city(value)
+    if city is None:
+        raise ValueError("Выберите город из списка")
+    return city
+
+
+def _required_city(value: str) -> str:
+    city = _valid_city(value)
+    if city is None:
+        raise ValueError("Выберите город из списка")
+    return city
+
+
 class UserRegister(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     phone: str = Field(min_length=5, max_length=32)
@@ -32,6 +49,9 @@ class UserRegister(BaseModel):
     notify_enabled: bool = False
     notify_channel: Literal["telegram", "sms"] = "telegram"
     lang: Literal["ru", "ky", "en"] = "ru"
+    city: str | None = Field(None, max_length=100)  # required for masters: they get orders from this city
+
+    _city = field_validator("city")(_valid_city)
 
     @field_validator("name")
     @classmethod
@@ -161,6 +181,8 @@ class MasterProfileUpdate(BaseModel):
     latitude: Latitude | None = None
     longitude: Longitude | None = None
 
+    _city = field_validator("city")(_valid_city)
+
 
 class ServiceCreate(BaseModel):
     category_id: int
@@ -170,6 +192,7 @@ class ServiceCreate(BaseModel):
 
 class OrderCreate(BaseModel):
     category_id: int
+    city: str = Field(min_length=1, max_length=100)
     description: str = Field(min_length=1, max_length=2000)
     address: str | None = Field(None, max_length=500)
     latitude: Latitude | None = None
@@ -177,6 +200,8 @@ class OrderCreate(BaseModel):
     price: float | None = Field(None, ge=0, le=10_000_000)
     date: datetime | None = None
     time: str | None = Field(None, max_length=16, pattern=r"^\d{1,2}:\d{2}$")
+
+    _city = field_validator("city")(_required_city)
 
 
 class ContactOut(BaseModel):
@@ -192,6 +217,7 @@ class OrderOut(BaseModel):
     client_id: int
     category_id: int
     master_id: int | None = None
+    city: str | None = None
     description: str
     address: str | None = None
     price: float | None = None
@@ -243,6 +269,7 @@ class OrderFeedOut(BaseModel):
 
     id: int
     category_id: int
+    city: str | None = None
     description: str
     price: float | None = None
     date: datetime | None = None
@@ -346,6 +373,7 @@ class AdminStats(BaseModel):
 
 
 class PublicConfigOut(BaseModel):
+    cities: list[str] = []
     telegram_enabled: bool = False
     subscriptions_enabled: bool
     subscription_trial_days: int

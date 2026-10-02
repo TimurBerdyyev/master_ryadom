@@ -71,7 +71,7 @@
                   ${ratingHtml(master.rating)}
                   <span>${icon("message-circle")}${plural(reviews.length, "p.reviews")}</span>
                   <span>${icon("briefcase")}${plural(master.completed_orders, "p.orders")}</span>
-                  ${master.city ? `<span>${icon("map-pin")}${esc(master.city)}${master.district ? ", " + esc(master.district) : ""}</span>` : ""}
+                  ${master.city ? `<span>${icon("map-pin")}${esc(cityName(master.city))}${master.district ? ", " + esc(master.district) : ""}</span>` : ""}
                 </div>
               </div>
             </div>

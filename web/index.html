@@ -184,7 +184,7 @@
               </div>
               ${m.description ? `<p class="desc">${esc(m.description)}</p>` : ""}
               <div class="foot">
-                <span>${m.verified ? verifiedBadge() : (m.city ? esc(m.city) : "")}</span>
+                <span>${m.verified ? verifiedBadge() : (m.city ? esc(cityName(m.city)) : "")}</span>
                 ${prices.length ? `<span class="price-from">${priceFromHtml(Math.min(...prices))}</span>` : ""}
               </div>
             </a>`;

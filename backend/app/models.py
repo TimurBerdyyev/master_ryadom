@@ -142,6 +142,8 @@ class Order(Base):
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), index=True)
     master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True, index=True)
     description: Mapped[str] = mapped_column(Text)
+    # Masters only see orders from their own city (null only for orders created before cities existed).
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)

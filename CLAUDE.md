@@ -45,6 +45,12 @@
 - Telegram-бот — `app/telegram.py` (привязка по одноразовой ссылке `t.me/<bot>?start=<token>`),
   вебхук `/telegram/webhook` с секретом в заголовке; локально — `python -m app.telegram_poll`.
 
+## Города
+- Список городов — `backend/app/cities.py` (`CITIES`, канонические русские названия; переводы — `city.*` в `i18n.js`).
+  Сайт берёт список из `/config`, выбор только из списка (`cityOptionsHtml()`), сервер нормализует регистр (`normalize_city`).
+- Заказ обязательно с городом; мастер указывает город при регистрации. Лента `/orders/feed` и уведомления
+  о новых заказах — только заказы города мастера (+ старые заказы без города). Мастер без города видит пустую ленту.
+
 ## Деплой
 Пошагово — `DEPLOY.md` (Caddy с HTTPS → nginx → backend; Postgres, Redis; бэкапы `deploy/backup.sh`).
 `ENVIRONMENT=production` не даёт запуститься с дефолтным JWT, console-SMS, `CORS_ORIGINS=*`, `SITE_URL` на localhost.

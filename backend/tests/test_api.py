@@ -53,7 +53,8 @@ def sms_code(client, phone, purpose="register"):
 def register(client, role="client", name="Тест"):
     phone = f"+996700000{next(_counter)}"
     r = client.post("/auth/register", json={"name": name, "phone": phone, "password": "secret123", "role": role,
-                                            "code": sms_code(client, phone)})
+                                            "code": sms_code(client, phone),
+                                            "city": "Бишкек" if role == "master" else None})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}, phone
 
@@ -77,7 +78,7 @@ def test_full_order_flow(client):
     other_master_h, _ = make_master(client, "Пётр")
 
     order = client.post("/orders", headers=client_h,
-                        json={"category_id": category_id(client), "description": "Течёт кран", "address": "ул. Ленина 1"}).json()
+                        json={"city": "Бишкек", "category_id": category_id(client), "description": "Течёт кран", "address": "ул. Ленина 1"}).json()
 
     feed = client.get("/orders/feed", headers=master_h).json()
     item = next(o for o in feed if o["id"] == order["id"])
@@ -148,7 +149,7 @@ def test_search(client):
 def test_offer_restrictions(client):
     client_h, _ = register(client)
     electrician_h, _ = make_master(client, "Электрик", "Электрика")
-    order = client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "x"}).json()
+    order = client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
 
     # wrong category
     assert client.post(f"/orders/{order['id']}/offer", headers=electrician_h, json={"price": 1}).status_code == 403
@@ -156,7 +157,7 @@ def test_offer_restrictions(client):
     assert client.post(f"/orders/{order['id']}/offer", headers=client_h, json={"price": 1}).status_code == 403
     # master can't offer on own order
     master_h, _ = make_master(client)
-    own = client.post("/orders", headers=master_h, json={"category_id": category_id(client), "description": "x"}).json()
+    own = client.post("/orders", headers=master_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
     assert client.post(f"/orders/{own['id']}/offer", headers=master_h, json={"price": 1}).status_code == 400
     # negative price rejected
     assert client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": -5}).status_code == 422
@@ -166,7 +167,7 @@ def test_idor(client):
     owner_h, _ = register(client)
     stranger_h, _ = register(client)
     master_h, _ = make_master(client)
-    order = client.post("/orders", headers=owner_h, json={"category_id": category_id(client), "description": "x"}).json()
+    order = client.post("/orders", headers=owner_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
     offer = client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 100}).json()
 
     oid = order["id"]
@@ -237,7 +238,7 @@ def test_blocked_user(client):
 
 def test_uploads(client):
     h, _ = register(client)
-    order = client.post("/orders", headers=h, json={"category_id": category_id(client), "description": "x"}).json()
+    order = client.post("/orders", headers=h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
     url = f"/orders/{order['id']}/photos"
 
     # HTML disguised as PNG is rejected
@@ -260,9 +261,9 @@ def test_uploads(client):
 def test_validation(client):
     h, _ = register(client)
     cid = category_id(client)
-    assert client.post("/orders", headers=h, json={"category_id": cid, "description": "x", "latitude": 999}).status_code == 422
-    assert client.post("/orders", headers=h, json={"category_id": cid, "description": "x", "time": "<b>"}).status_code == 422
-    assert client.post("/orders", headers=h, json={"category_id": cid, "description": ""}).status_code == 422
+    assert client.post("/orders", headers=h, json={"city": "Бишкек", "category_id": cid, "description": "x", "latitude": 999}).status_code == 422
+    assert client.post("/orders", headers=h, json={"city": "Бишкек", "category_id": cid, "description": "x", "time": "<b>"}).status_code == 422
+    assert client.post("/orders", headers=h, json={"city": "Бишкек", "category_id": cid, "description": ""}).status_code == 422
     assert client.get("/masters", params={"sort": "drop table"}).status_code == 422
 
 
@@ -278,7 +279,7 @@ def test_no_n_plus_one_queries(client):
     rate_limit._attempts.clear()
     client_h, _ = register(client)
     for _ in range(10):
-        client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "x"})
+        client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"})
     master_h, _ = make_master(client)
 
     count = {"n": 0}
@@ -348,7 +349,7 @@ def test_subscription_flow(client, monkeypatch):
     assert client.get("/subscription/me", headers=client_h).status_code == 403
 
     # trial over -> no feed, no offers, hidden from search
-    order = client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "x"}).json()
+    order = client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
     expire_trial(master_id)
     assert client.get("/subscription/me", headers=master_h).json()["state"] == "expired"
     assert client.get("/orders/feed", headers=master_h).status_code == 402
@@ -505,8 +506,10 @@ def test_pre_migration_database_is_upgraded(tmp_path):
     old_tables = [t for t in Base.metadata.sorted_tables
                   if t.name not in {"master_subscriptions", "subscription_payments", "phone_codes", "notification_settings"}]
     Base.metadata.create_all(legacy, tables=old_tables)
-    with legacy.begin() as conn:  # the old users table had no password_changed_at column
+    with legacy.begin() as conn:  # columns added by later migrations didn't exist back then
         conn.execute(text("ALTER TABLE users DROP COLUMN password_changed_at"))
+        conn.execute(text("DROP INDEX ix_orders_city"))
+        conn.execute(text("ALTER TABLE orders DROP COLUMN city"))
         conn.execute(text("INSERT INTO categories (name) VALUES ('Сантехника')"))
 
     upgrade_database(legacy)
@@ -538,10 +541,10 @@ def outbox(monkeypatch):
     return sent
 
 
-def register_master(client, notify_enabled=False, channel="sms", lang="ru", category="Сантехника"):
+def register_master(client, notify_enabled=False, channel="sms", lang="ru", category="Сантехника", city="Бишкек"):
     phone = f"+996700000{next(_counter)}"
     r = client.post("/auth/register", json={
-        "name": "Мастер", "phone": phone, "password": "secret123", "role": "master",
+        "name": "Мастер", "phone": phone, "password": "secret123", "role": "master", "city": city,
         "code": sms_code(client, phone), "notify_enabled": notify_enabled, "notify_channel": channel, "lang": lang,
     })
     headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -559,7 +562,7 @@ def test_notifications_need_consent(client, outbox):
     client_h, _ = register(client)
     outbox.clear()
     order = client.post("/orders", headers=client_h,
-                        json={"category_id": category_id(client), "description": "Течёт кран", "price": 800}).json()
+                        json={"city": "Бишкек", "category_id": category_id(client), "description": "Течёт кран", "price": 800}).json()
 
     # everyone in the category gets the in-app notification…
     for h in (silent_h, sms_h):
@@ -574,7 +577,7 @@ def test_notifications_need_consent(client, outbox):
     # the master can switch notifications off
     client.put("/notifications/settings", headers=sms_h, json={"enabled": False, "channel": "sms", "lang": "ky"})
     outbox.clear()
-    client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "Ещё"})
+    client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "Ещё"})
     assert outbox == []
 
     # clients have no notification settings
@@ -584,7 +587,7 @@ def test_notifications_need_consent(client, outbox):
 def test_chosen_and_cancelled_notifications(client, outbox):
     master_h, phone = register_master(client, notify_enabled=True, channel="sms")
     client_h, _ = register(client)
-    order = client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "x"}).json()
+    order = client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
     offer = client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 500}).json()
     outbox.clear()
     client.post(f"/orders/{order['id']}/accept", params={"offer_id": offer["id"]}, headers=client_h)
@@ -626,7 +629,7 @@ def test_telegram_linking(client, outbox, monkeypatch):
     # new orders now arrive in Telegram
     client_h, _ = register(client)
     outbox.clear()
-    client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "Срочно"})
+    client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "Срочно"})
     assert any(m[0] == "telegram" and m[1] == "555" and "Срочно" in m[2] for m in outbox)
 
 
@@ -638,3 +641,86 @@ def test_production_refuses_unsafe_settings(monkeypatch):
     with pytest.raises(RuntimeError) as e:
         check_production_settings()
     assert "SMS_PROVIDER=console" in str(e.value) and "CORS_ORIGINS" in str(e.value)
+
+
+
+# ---------- cities: masters see orders from their own city ----------
+
+def test_master_must_choose_city(client):
+    phone = "+996755100001"
+    base = {"name": "M", "phone": phone, "password": "secret123", "role": "master", "code": sms_code(client, phone)}
+    r = client.post("/auth/register", json=base)
+    assert r.status_code == 400 and "город" in r.json()["detail"]
+    assert client.post("/auth/register", json={**base, "city": "Москва"}).status_code == 422
+    r = client.post("/auth/register", json={**base, "city": "ош"})  # case-insensitive -> canonical
+    assert r.status_code == 200
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/masters/me", headers=headers).json()["city"] == "Ош"
+
+
+def test_orders_need_a_known_city(client):
+    h, _ = register(client)
+    cid = category_id(client)
+    assert client.post("/orders", headers=h, json={"category_id": cid, "description": "x"}).status_code == 422
+    assert client.post("/orders", headers=h, json={"category_id": cid, "description": "x", "city": "Атлантида"}).status_code == 422
+    r = client.post("/orders", headers=h, json={"category_id": cid, "description": "x", "city": " каракол "})
+    assert r.status_code == 200 and r.json()["city"] == "Каракол"
+    assert "Каракол" in client.get("/config").json()["cities"]
+
+
+def test_feed_and_notifications_follow_city(client, outbox):
+    bishkek_h, bishkek_phone = register_master(client, notify_enabled=True, channel="sms", city="Бишкек")
+    osh_h, osh_phone = register_master(client, notify_enabled=True, channel="sms", city="Ош")
+    client_h, _ = register(client)
+    outbox.clear()
+    osh_order = client.post("/orders", headers=client_h,
+                            json={"city": "Ош", "category_id": category_id(client), "description": "Ош заказ"}).json()
+
+    osh_feed = [o["id"] for o in client.get("/orders/feed", headers=osh_h).json()]
+    bishkek_feed = [o["id"] for o in client.get("/orders/feed", headers=bishkek_h).json()]
+    assert osh_order["id"] in osh_feed and osh_order["id"] not in bishkek_feed
+    # only the Osh master is notified (in-app and SMS)
+    assert [m[1] for m in outbox] == [osh_phone]
+    assert not any(f"#{osh_order['id']}" in (n["text"] or "") for n in client.get("/notifications", headers=bishkek_h).json())
+
+    # a master without a city sees nothing until they set one
+    client.patch("/masters/me", headers=osh_h, json={"city": ""})
+    assert client.get("/orders/feed", headers=osh_h).json() == []
+    client.patch("/masters/me", headers=osh_h, json={"city": "Ош"})
+    assert osh_order["id"] in [o["id"] for o in client.get("/orders/feed", headers=osh_h).json()]
+
+
+def test_legacy_orders_without_city_stay_visible(client):
+    from app.models import Order
+    master_h, _ = make_master(client)
+    client_h, _ = register(client)
+    order = client.post("/orders", headers=client_h,
+                        json={"city": "Бишкек", "category_id": category_id(client), "description": "старый"}).json()
+    db = SessionLocal()
+    db.get(Order, order["id"]).city = None  # as if created before cities existed
+    db.commit()
+    db.close()
+    assert order["id"] in [o["id"] for o in client.get("/orders/feed", headers=master_h).json()]
+
+
+def test_city_migration_backfills_old_data(tmp_path):
+    from alembic import command
+    from sqlalchemy import create_engine, text
+
+    from app.migrations import _config
+    engine = create_engine(f"sqlite:///{tmp_path}/old.db")
+    cfg = _config(engine)
+    command.upgrade(cfg, "0003")
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO categories (id, name) VALUES (1, 'Сантехника')"))
+        conn.execute(text("INSERT INTO users (id, name, phone, password_hash, role, status, created_at) "
+                          "VALUES (1, 'M', '+996700000001', 'x', 'master', 'active', '2026-01-01')"))
+        conn.execute(text("INSERT INTO masters (id, user_id, city, rating, completed_orders, verified, created_at) "
+                          "VALUES (1, 1, ' бишкек ', 0, 0, 0, '2026-01-01')"))
+        conn.execute(text("INSERT INTO orders (id, client_id, category_id, description, address, status, created_at) VALUES "
+                          "(1, 1, 1, 'a', 'Ош, ул. Ленина 1', 'searching', '2026-01-01'), "
+                          "(2, 1, 1, 'b', 'ул. Без города', 'searching', '2026-01-01')"))
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT city FROM masters WHERE id = 1")).scalar() == "Бишкек"
+        assert dict(conn.execute(text("SELECT id, city FROM orders")).all()) == {1: "Ош", 2: None}

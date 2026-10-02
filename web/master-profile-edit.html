@@ -39,7 +39,8 @@
         </label>
         <label>
           <span data-i18n="common.city">Город</span>
-          <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><input id="city" type="text" maxlength="255" data-i18n-ph="edit.cityPh" /></span>
+          <select id="city" required></select>
+          <span class="hint" data-i18n="reg.cityHint">Вы будете получать заказы из этого города</span>
         </label>
       </div>
       <label>
@@ -114,7 +115,7 @@
         const master = await api.myMasterProfile();
         document.getElementById("description").value = master.description || "";
         document.getElementById("experience_years").value = master.experience_years || "";
-        document.getElementById("city").value = master.city || "";
+        document.getElementById("city").innerHTML = await cityOptionsHtml(master.city || "");
         document.getElementById("district").value = master.district || "";
         renderServices(master.services);
         const link = document.getElementById("publicLink");

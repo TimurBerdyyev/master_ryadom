@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import require_admin
+from app.cities import CITIES
 from app.config import settings
 from app.database import get_db
 from app.models import Master, MasterSubscription, SubscriptionPayment, SubscriptionPaymentStatus, utcnow
@@ -40,6 +41,7 @@ def _require_enabled() -> None:
 def public_config():
     """Feature flags the web client needs before login (e.g. to mention the free trial)."""
     return PublicConfigOut(
+        cities=CITIES,
         telegram_enabled=settings.telegram_enabled,
         subscriptions_enabled=settings.subscriptions_enabled,
         subscription_trial_days=settings.subscription_trial_days,

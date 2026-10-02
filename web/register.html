@@ -44,6 +44,13 @@
             <span class="hint" data-i18n="reg.pwHint">Минимум 6 символов</span>
           </label>
 
+          <!-- Masters only: the city they get orders from -->
+          <label id="cityField" hidden>
+            <span data-i18n="reg.cityLabel">Город, где вы работаете</span>
+            <select id="city"></select>
+            <span class="hint" data-i18n="reg.cityHint">Вы будете получать заказы из этого города</span>
+          </label>
+
           <!-- Masters only: explicit opt-in to notifications outside the site -->
           <fieldset class="consent-box" id="notifyBox" hidden>
             <legend><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="reg.notifyTitle">Уведомления о новых заказах</span></legend>
@@ -103,6 +110,8 @@
 
     function syncRole() {
       document.getElementById("notifyBox").hidden = !roleMaster.checked;
+      document.getElementById("cityField").hidden = !roleMaster.checked;
+      document.getElementById("city").required = roleMaster.checked;
     }
     function syncConsent() {
       document.getElementById("channelPicker").hidden = !document.getElementById("notifyEnabled").checked;
@@ -111,6 +120,8 @@
     document.getElementById("notifyEnabled").addEventListener("change", syncConsent);
     syncRole();
     syncConsent();
+
+    cityOptionsHtml("").then(html => { document.getElementById("city").innerHTML = html; }).catch(() => {});
 
     api.publicConfig().then(cfg => {
       if (cfg.subscriptions_enabled) {
@@ -140,6 +151,7 @@
         phone: document.getElementById("phone").value,
         password: document.getElementById("password").value,
         role: isMaster ? "master" : "client",
+        city: isMaster ? document.getElementById("city").value : null,
         notify_enabled: notifyEnabled,
         notify_channel: document.querySelector('input[name="channel"]:checked')?.value || "sms",
         lang: LANG,
