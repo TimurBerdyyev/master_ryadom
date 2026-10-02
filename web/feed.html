@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Новые заказы — Мастер рядом</title>
+  <title data-i18n="feed.docTitle">Новые заказы — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
   <style>
@@ -33,16 +33,17 @@
   <main class="narrow">
     <div class="page-head">
       <div>
-        <h1>Новые заказы</h1>
-        <p class="muted">Открытые заказы в ваших категориях. Адрес и телефон клиента откроются, когда он выберет вас.</p>
+        <h1 data-i18n="nav.feed">Новые заказы</h1>
+        <p class="muted" data-i18n="feed.sub">Открытые заказы в ваших категориях. Адрес и телефон клиента откроются, когда он выберет вас.</p>
       </div>
-      <button class="btn secondary" onclick="load()"><svg class="i" aria-hidden="true"><use href="#i-refresh-cw"></use></svg>Обновить</button>
+      <button class="btn secondary" onclick="load()"><svg class="i" aria-hidden="true"><use href="#i-refresh-cw"></use></svg><span data-i18n="feed.refresh">Обновить</span></button>
     </div>
 
     <div id="list" class="stack"></div>
   </main>
 
   <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -56,10 +57,10 @@
       return `
         <form class="offer-form" onsubmit="event.preventDefault(); sendOffer(${o.id});">
           <span class="input-icon">${icon("wallet")}<input class="input" id="price-${o.id}" type="number" min="0" max="10000000" required
-                 placeholder="Цена, сом" aria-label="Ваша цена" value="${mine ? Number(mine.price) : ""}" /></span>
-          <input class="input" id="comment-${o.id}" type="text" maxlength="1000" aria-label="Комментарий"
-                 placeholder="Комментарий: когда сможете приехать" value="${mine && mine.comment ? esc(mine.comment) : ""}" />
-          <button class="btn ${mine ? "secondary" : "accent"}" type="submit">${icon(mine ? "pencil" : "send")}${mine ? "Изменить" : "Предложить"}</button>
+                 placeholder="${t("feed.pricePh")}" aria-label="${t("feed.priceAria")}" value="${mine ? Number(mine.price) : ""}" /></span>
+          <input class="input" id="comment-${o.id}" type="text" maxlength="1000" aria-label="${t("feed.commentAria")}"
+                 placeholder="${t("feed.commentPh")}" value="${mine && mine.comment ? esc(mine.comment) : ""}" />
+          <button class="btn ${mine ? "secondary" : "accent"}" type="submit">${icon(mine ? "pencil" : "send")}${mine ? t("feed.update") : t("feed.offer")}</button>
         </form>`;
     }
 
@@ -67,30 +68,29 @@
       const list = document.getElementById("list");
       if (!orders.length) {
         list.classList.remove("reveal");
-        list.innerHTML = emptyState("inbox", "Новых заказов пока нет",
-          "Заказы появляются в категориях ваших услуг. Добавьте больше услуг в профиль, чтобы видеть больше заказов.",
-          `<a class="btn" href="master-profile-edit.html">${icon("settings-2")}Мои услуги</a>`);
+        list.innerHTML = emptyState("inbox", t("feed.emptyTitle"), t("feed.emptyText"),
+          `<a class="btn" href="master-profile-edit.html">${icon("settings-2")}${t("feed.myServices")}</a>`);
         return;
       }
       list.classList.add("reveal");
       list.innerHTML = orders.map(o => {
-        const cat = categories[o.category_id] || "Заказ";
+        const cat = categories[o.category_id] || "";
         return `
           <div class="order-card">
             <div class="top">
-              <span class="title">${categoryBadge(cat)}${esc(cat)}</span>
+              <span class="title">${categoryBadge(cat)}${esc(cat ? catName(cat) : t("common.order"))}</span>
               <span class="num">#${o.id}</span>
               <span class="spacer"></span>
-              ${o.my_offer ? `<span class="status-pill ok">Вы предложили ${formatPrice(o.my_offer.price)}</span>` : '<span class="status-pill info">Новый</span>'}
+              ${o.my_offer ? `<span class="status-pill ok">${t("feed.youOffered", { price: formatPrice(o.my_offer.price) })}</span>` : `<span class="status-pill info">${t("feed.new")}</span>`}
             </div>
             <div class="desc">${esc(o.description)}</div>
             ${o.photos.length ? `<div class="photo-grid" style="margin:14px 0 0;grid-template-columns:repeat(auto-fill,minmax(84px,1fr))">${o.photos.map(p =>
-              `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото к заказу" loading="lazy" /></a>`).join("")}</div>` : ""}
+              `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="${t("detail.photoAlt")}" loading="lazy" /></a>`).join("")}</div>` : ""}
             <div class="foot">
               <span>${icon("clock")}${formatDate(o.created_at, true)}</span>
-              ${o.date ? `<span>${icon("calendar")}Нужно ${formatDate(o.date)}${o.time ? ", " + esc(o.time) : ""}</span>` : ""}
-              ${o.price ? `<span>${icon("wallet")}Бюджет <b>${formatPrice(o.price)}</b></span>` : ""}
-              <span>${icon("users")}${o.offers_count} ${pluralize(o.offers_count, "предложение", "предложения", "предложений")}</span>
+              ${o.date ? `<span>${icon("calendar")}${t("feed.needBy", { date: formatDate(o.date) + (o.time ? ", " + esc(o.time) : "") })}</span>` : ""}
+              ${o.price ? `<span>${icon("wallet")}${t("feed.budget", { price: formatPrice(o.price) })}</span>` : ""}
+              <span>${icon("users")}${plural(o.offers_count, "p.offers")}</span>
             </div>
             ${offerForm(o)}
           </div>`;
@@ -103,8 +103,8 @@
       try {
         const me = await api.me();
         if (me.role !== "master") {
-          list.innerHTML = emptyState("briefcase", "Эта страница для мастеров",
-            "Зарегистрируйтесь как мастер, чтобы получать заказы.", `<a class="btn" href="masters.html">Найти мастера</a>`);
+          list.innerHTML = emptyState("briefcase", t("feed.onlyMasters"), t("feed.onlyMastersText"),
+            `<a class="btn" href="masters.html">${t("nav.find")}</a>`);
           return;
         }
         const [feed, cats] = await Promise.all([api.orderFeed(), api.categories()]);
@@ -112,7 +112,7 @@
         categories = Object.fromEntries(cats.map(c => [c.id, c.name]));
         render();
       } catch (e) {
-        list.innerHTML = emptyState("triangle-alert", "Не удалось загрузить заказы", esc(e.message));
+        list.innerHTML = emptyState("triangle-alert", t("orders.loadError"), esc(e.message));
       }
     }
 
@@ -121,10 +121,10 @@
       const comment = document.getElementById(`comment-${orderId}`).value.trim() || null;
       try {
         await api.makeOffer(orderId, { price, comment });
-        toast("Предложение отправлено клиенту");
+        toast(t("feed.sent"));
         load();
       } catch (e) {
-        toast("Ошибка: " + e.message);
+        toast(t("common.error") + e.message);
       }
     }
 

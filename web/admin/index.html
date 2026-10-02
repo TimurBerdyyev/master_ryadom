@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Админ-панель — Мастер рядом</title>
+  <title data-i18n="admin.title">Админ-панель — Мастер рядом</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
@@ -14,20 +14,21 @@
   </header>
 
   <main class="wide">
-    <h1>Админ-панель</h1>
+    <h1 data-i18n="admin.title">Админ-панель</h1>
     <div class="admin-tabs">
-      <a href="index.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Дашборд</a>
-      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg>Пользователи</a>
-      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg>Мастера</a>
-      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg>Заказы</a>
-      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg>Жалобы</a>
-      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg>Категории</a>
+      <a href="index.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="admin.tabDashboard">Дашборд</span></a>
+      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg><span data-i18n="admin.tabUsers">Пользователи</span></a>
+      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="admin.tabMasters">Мастера</span></a>
+      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg><span data-i18n="admin.tabOrders">Заказы</span></a>
+      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg><span data-i18n="admin.tabComplaints">Жалобы</span></a>
+      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="admin.tabCategories">Категории</span></a>
     </div>
 
     <div id="stats" class="stat-grid"></div>
   </main>
 
   <script src="../js/icons.js"></script>
+  <script src="../js/i18n.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
@@ -37,15 +38,15 @@
       try {
         const s = await api.adminStats();
         const tiles = [
-          ["Всего пользователей", s.users_total, "users"],
-          ["Клиентов", s.clients_total, "user"],
-          [`Мастеров (${s.masters_verified} проверено)`, s.masters_total, "briefcase"],
-          ["Активных заказов", s.orders_active, "timer"],
-          ["Завершённых заказов", s.orders_completed, "circle-check"],
-          ["Отменённых заказов", s.orders_cancelled, "circle-x"],
-          ["Оборот", formatPrice(s.revenue_total), "wallet"],
-          ["Комиссия сервиса (10%)", formatPrice(s.commission_total), "hand-coins"],
-          ["Открытых жалоб", s.complaints_open, "flag"],
+          [t("admin.statUsers"), s.users_total, "users"],
+          [t("admin.statClients"), s.clients_total, "user"],
+          [t("admin.statMasters", { n: s.masters_verified }), s.masters_total, "briefcase"],
+          [t("admin.statActive"), s.orders_active, "timer"],
+          [t("admin.statCompleted"), s.orders_completed, "circle-check"],
+          [t("admin.statCancelled"), s.orders_cancelled, "circle-x"],
+          [t("admin.statRevenue"), formatPrice(s.revenue_total), "wallet"],
+          [t("admin.statCommission"), formatPrice(s.commission_total), "hand-coins"],
+          [t("admin.statComplaints"), s.complaints_open, "flag"],
         ];
         grid.classList.add("reveal");
         grid.innerHTML = tiles.map(([label, value, iconName]) => `
@@ -56,7 +57,7 @@
           </div>
         `).join("");
       } catch (e) {
-        grid.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        grid.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
       }
     }
 

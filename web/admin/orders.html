@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Заказы — Админ-панель</title>
+  <title data-i18n="admin.tabOrders">Заказы — Админ-панель</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
@@ -14,66 +14,56 @@
   </header>
 
   <main class="wide">
-    <h1>Заказы</h1>
+    <h1 data-i18n="admin.tabOrders">Заказы</h1>
     <div class="admin-tabs">
-      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Дашборд</a>
-      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg>Пользователи</a>
-      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg>Мастера</a>
-      <a href="orders.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg>Заказы</a>
-      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg>Жалобы</a>
-      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg>Категории</a>
+      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="admin.tabDashboard">Дашборд</span></a>
+      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg><span data-i18n="admin.tabUsers">Пользователи</span></a>
+      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="admin.tabMasters">Мастера</span></a>
+      <a href="orders.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg><span data-i18n="admin.tabOrders">Заказы</span></a>
+      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg><span data-i18n="admin.tabComplaints">Жалобы</span></a>
+      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="admin.tabCategories">Категории</span></a>
     </div>
 
     <div class="filters">
-      <select id="statusFilter">
-        <option value="">Все статусы</option>
-        <option value="created">Создан</option>
-        <option value="searching">Ищем мастера</option>
-        <option value="offers_received">Получены предложения</option>
-        <option value="master_selected">Мастер выбран</option>
-        <option value="in_progress">Работа начата</option>
-        <option value="completed">Завершён</option>
-        <option value="reviewed">С отзывом</option>
-        <option value="cancelled">Отменён</option>
+      <select id="statusFilter" data-i18n-aria="admin.status">
+        <option value="" data-i18n="admin.allStatuses">Все статусы</option>
+        <option value="searching" data-i18n="status.searching"></option>
+        <option value="offers_received" data-i18n="status.offers_received"></option>
+        <option value="master_selected" data-i18n="status.master_selected"></option>
+        <option value="master_confirmed" data-i18n="status.master_confirmed"></option>
+        <option value="master_en_route" data-i18n="status.master_en_route"></option>
+        <option value="in_progress" data-i18n="status.in_progress"></option>
+        <option value="completed" data-i18n="status.completed"></option>
+        <option value="reviewed" data-i18n="status.reviewed"></option>
+        <option value="cancelled" data-i18n="status.cancelled"></option>
       </select>
-      <button class="btn secondary" onclick="load()">Применить</button>
+      <button class="btn secondary" onclick="load()" data-i18n="admin.apply">Применить</button>
     </div>
 
-    <div id="content"><p class="muted">Загрузка…</p></div>
+    <div id="content"><p class="muted" data-i18n="common.loading">Загрузка…</p></div>
   </main>
 
   <script src="../js/icons.js"></script>
+  <script src="../js/i18n.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
   <script>
-    const statusLabels = {
-      created: "Создан",
-      searching: "Ищем мастера",
-      offers_received: "Получены предложения",
-      master_selected: "Мастер выбран",
-      master_confirmed: "Мастер подтвердил",
-      master_en_route: "Мастер в пути",
-      in_progress: "Работа начата",
-      completed: "Завершён",
-      reviewed: "С отзывом",
-      cancelled: "Отменён",
-    };
 
     async function load() {
       const content = document.getElementById("content");
-      content.innerHTML = `<p class="muted">Загрузка…</p>`;
+      content.innerHTML = `<p class="muted">${t("common.loading")}</p>`;
       const statusValue = document.getElementById("statusFilter").value;
       try {
         const orders = await api.adminOrders(statusValue ? { status: statusValue } : {});
         if (!orders.length) {
-          content.innerHTML = `<p class="muted">Заказов не найдено</p>`;
+          content.innerHTML = `<p class="muted">${t("admin.noOrders")}</p>`;
           return;
         }
         content.innerHTML = `
           <div class="table-wrap"><table class="admin-table">
             <thead>
-              <tr><th>#</th><th>Описание</th><th>Адрес</th><th>Цена</th><th>Фото</th><th>Статус</th><th>Создан</th></tr>
+              <tr><th>#</th><th>${t("admin.description")}</th><th>${t("common.address")}</th><th>${t("detail.price")}</th><th>${t("admin.photo")}</th><th>${t("admin.status")}</th><th>${t("detail.created")}</th></tr>
             </thead>
             <tbody>
               ${orders.map(o => `
@@ -81,17 +71,17 @@
                   <td>${o.id}</td>
                   <td>${esc(o.description.slice(0, 60))}</td>
                   <td>${o.address ? esc(o.address) : "—"}</td>
-                  <td>${o.price ? o.price + " сом" : "—"}</td>
+                  <td>${o.price ? formatPrice(o.price) : "—"}</td>
                   <td>${o.photos.length ? o.photos.map(p => `<a href="${esc(uploadUrl(p.url))}" target="_blank"><img class="photo-thumb" style="width:32px;height:32px;display:inline-block" src="${esc(uploadUrl(p.url))}" /></a>`).join(" ") : "—"}</td>
-                  <td>${statusLabels[o.status] || o.status}</td>
-                  <td>${new Date(o.created_at).toLocaleDateString("ru-RU")}</td>
+                  <td>${statusPillHtml(o.status)}</td>
+                  <td>${formatDate(o.created_at)}</td>
                 </tr>
               `).join("")}
             </tbody>
           </table></div>
         `;
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        content.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
       }
     }
 

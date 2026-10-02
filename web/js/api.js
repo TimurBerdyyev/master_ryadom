@@ -79,7 +79,7 @@ function avatarHtml(name, cls = "avatar") {
 function starsHtml(rating) {
   const full = Math.round(Number(rating) || 0);
   const star = on => `<svg class="i ${on ? "" : "off"}" aria-hidden="true"><use href="#i-star"></use></svg>`;
-  return `<span class="stars" aria-label="Оценка ${full} из 5">${[1, 2, 3, 4, 5].map(n => star(n <= full)).join("")}</span>`;
+  return `<span class="stars" aria-label="${t("common.ratingOf", { n: full })}">${[1, 2, 3, 4, 5].map(n => star(n <= full)).join("")}</span>`;
 }
 
 function ratingHtml(rating) {
@@ -87,7 +87,7 @@ function ratingHtml(rating) {
 }
 
 function verifiedBadge() {
-  return `<span class="badge">${icon("badge-check")}Проверен</span>`;
+  return `<span class="badge">${icon("badge-check")}${t("common.verified")}</span>`;
 }
 
 function emptyState(iconName, title, text, actionHtml = "") {
@@ -101,22 +101,31 @@ function emptyState(iconName, title, text, actionHtml = "") {
 }
 
 function formatPrice(value) {
-  return `${Number(value).toLocaleString("ru-RU", { maximumFractionDigits: 0 })} сом`;
+  const locale = LANG === "en" ? "en-GB" : "ru-RU";  // ky has no browser locale data; it groups digits like ru
+  return `${Number(value).toLocaleString(locale, { maximumFractionDigits: 0 })} ${t("cur")}`;
+}
+
+// "от 600 сом" / "600 сомдон баштап" / "from 600 som"
+function priceFrom(value) {
+  return t("price.from", { price: formatPrice(value) });
+}
+
+function priceFromHtml(value) {
+  return t("price.fromHtml", { price: formatPrice(value) });
 }
 
 function formatDate(value, withTime = false) {
   if (!value) return "";
   const d = new Date(value.endsWith("Z") || value.includes("+") ? value : value + "Z");
+  if (LANG === "ky") {
+    // Browsers ship no Kyrgyz date data (they fall back to Russian), so format by hand: "1-октябрь, 12:52"
+    const months = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
+    const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return `${d.getDate()}-${months[d.getMonth()]}${withTime ? ", " + time : ""}`;
+  }
   const opts = { day: "numeric", month: "long" };
   if (withTime) Object.assign(opts, { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleString("ru-RU", opts);
-}
-
-function pluralize(n, one, few, many) {
-  const mod10 = n % 10, mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
+  return d.toLocaleString(langLocale(), opts);
 }
 
 function waLink(phone) {
@@ -127,22 +136,24 @@ function telLink(phone) {
   return `tel:${String(phone).replace(/[^\d+]/g, "")}`;
 }
 
-const ORDER_STATUS = {
-  created: { label: "Создан", cls: "" },
-  searching: { label: "Ищем мастера", cls: "info" },
-  offers_received: { label: "Есть предложения", cls: "warn" },
-  master_selected: { label: "Мастер выбран", cls: "info" },
-  master_confirmed: { label: "Мастер подтвердил", cls: "info" },
-  master_en_route: { label: "Мастер в пути", cls: "info" },
-  in_progress: { label: "В работе", cls: "info" },
-  completed: { label: "Выполнен", cls: "ok" },
-  reviewed: { label: "Завершён", cls: "ok" },
-  cancelled: { label: "Отменён", cls: "bad" },
+const ORDER_STATUS_CLASS = {
+  searching: "info",
+  offers_received: "warn",
+  master_selected: "info",
+  master_confirmed: "info",
+  master_en_route: "info",
+  in_progress: "info",
+  completed: "ok",
+  reviewed: "ok",
+  cancelled: "bad",
 };
 
+function statusLabel(status) {
+  return I18N[`status.${status}`] ? t(`status.${status}`) : status;
+}
+
 function statusPillHtml(status) {
-  const s = ORDER_STATUS[status] || { label: status, cls: "" };
-  return `<span class="status-pill ${s.cls}">${esc(s.label)}</span>`;
+  return `<span class="status-pill ${ORDER_STATUS_CLASS[status] || ""}">${esc(statusLabel(status))}</span>`;
 }
 
 function toast(message) {
@@ -186,9 +197,9 @@ function clearToken() {
 // FastAPI returns a string for our own errors but a list of {loc, msg} for validation errors.
 function errorDetail(body) {
   if (!body || !body.detail) return null;
-  if (typeof body.detail === "string") return body.detail;
+  if (typeof body.detail === "string") return tServer(body.detail);
   if (Array.isArray(body.detail)) {
-    return body.detail.map(d => String(d.msg || "").replace(/^Value error, /, "")).join("; ");
+    return body.detail.map(d => tServer(String(d.msg || "").replace(/^Value error, /, ""))).join("; ");
   }
   return null;
 }
@@ -198,7 +209,12 @@ async function apiRequest(path, options = {}) {
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  } catch (e) {
+    throw new Error(t("srv.network"));
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -220,7 +236,12 @@ async function apiUpload(path, files) {
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: formData });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body: formData });
+  } catch (e) {
+    throw new Error(t("srv.network"));
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {

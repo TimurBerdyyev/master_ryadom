@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Профиль мастера — Мастер рядом</title>
+  <title data-i18n="master.docTitle">Профиль мастера — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -19,6 +19,7 @@
   </main>
 
   <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -29,39 +30,38 @@
       const orderHref = `order.html${categoryId ? `?category_id=${categoryId}` : ""}`;
       const phoneBlock = master.user.phone
         ? `
-          <a class="btn secondary block" href="${esc(telLink(master.user.phone))}">${icon("phone")}Позвонить</a>
-          <a class="btn whatsapp block" href="${esc(waLink(master.user.phone))}" target="_blank" rel="noopener noreferrer">${icon("message-circle")}Написать в WhatsApp</a>`
-        : `<a class="btn secondary block" href="login.html?next=${encodeURIComponent("master.html?id=" + master.id)}">${icon("lock")}Войдите, чтобы увидеть номер</a>`;
+          <a class="btn secondary block" href="${esc(telLink(master.user.phone))}">${icon("phone")}${t("common.call")}</a>
+          <a class="btn whatsapp block" href="${esc(waLink(master.user.phone))}" target="_blank" rel="noopener noreferrer">${icon("message-circle")}${t("master.whatsapp")}</a>`
+        : `<a class="btn secondary block" href="login.html?next=${encodeURIComponent("master.html?id=" + master.id)}">${icon("lock")}${t("master.loginToSee")}</a>`;
       return `
         <div class="card-box">
           <div class="stats-row">
-            <div><b>${master.rating.toFixed(1)}</b><span>рейтинг</span></div>
-            <div><b>${master.completed_orders}</b><span>заказов</span></div>
-            <div><b>${master.experience_years || "—"}</b><span>лет опыта</span></div>
+            <div><b>${master.rating.toFixed(1)}</b><span>${t("master.statRating")}</span></div>
+            <div><b>${master.completed_orders}</b><span>${t("master.statOrders")}</span></div>
+            <div><b>${master.experience_years || "—"}</b><span>${t("master.statYears")}</span></div>
           </div>
           <div class="contact-actions">
-            <a class="btn accent block large" href="${orderHref}">${icon("plus")}Создать заказ</a>
+            <a class="btn accent block large" href="${orderHref}">${icon("plus")}${t("nav.createOrder")}</a>
             ${phoneBlock}
           </div>
-          <p class="aside-note">${icon("shield-check")}<span>Создайте заказ — мастер увидит его и предложит цену. Договариваетесь напрямую, без посредников.</span></p>
+          <p class="aside-note">${icon("shield-check")}<span>${t("master.note")}</span></p>
         </div>`;
     }
 
     async function load() {
       const content = document.getElementById("content");
+      const notFound = (title, text) => emptyState("search-x", title, text,
+        `<a class="btn" href="masters.html">${t("master.toSearch")}</a>`);
       if (!/^\d+$/.test(masterId || "")) {
-        content.innerHTML = emptyState("search-x", "Мастер не найден", "Возможно, ссылка устарела.",
-          `<a class="btn" href="masters.html">К поиску мастеров</a>`);
+        content.innerHTML = notFound(t("master.notFound"), t("master.linkOld"));
         return;
       }
       try {
         const [master, reviews] = await Promise.all([api.getMaster(masterId), api.masterReviews(masterId)]);
         document.title = `${master.user.name} — Мастер рядом`;
-        const reviewsWord = `${reviews.length} ${pluralize(reviews.length, "отзыв", "отзыва", "отзывов")}`;
-        const ordersWord = `${master.completed_orders} ${pluralize(master.completed_orders, "заказ", "заказа", "заказов")}`;
 
         content.innerHTML = `
-          <a class="back-link" href="masters.html">${icon("arrow-left", "sm")}Все мастера</a>
+          <a class="back-link" href="masters.html">${icon("arrow-left", "sm")}${t("home.allMasters")}</a>
           <div class="profile-cover">
             <div class="profile-header">
               ${avatarHtml(master.user.name)}
@@ -69,8 +69,8 @@
                 <h1>${esc(master.user.name)} ${master.verified ? verifiedBadge() : ""}</h1>
                 <div class="meta">
                   ${ratingHtml(master.rating)}
-                  <span>${icon("message-circle")}${reviewsWord}</span>
-                  <span>${icon("briefcase")}${ordersWord}</span>
+                  <span>${icon("message-circle")}${plural(reviews.length, "p.reviews")}</span>
+                  <span>${icon("briefcase")}${plural(master.completed_orders, "p.orders")}</span>
                   ${master.city ? `<span>${icon("map-pin")}${esc(master.city)}${master.district ? ", " + esc(master.district) : ""}</span>` : ""}
                 </div>
               </div>
@@ -81,37 +81,37 @@
             <div class="reveal">
               ${master.description ? `
                 <div class="card-box">
-                  <h2>О мастере</h2>
+                  <h2>${t("master.about")}</h2>
                   <div style="white-space:pre-wrap;color:var(--ink-2)">${esc(master.description)}</div>
                 </div>` : ""}
 
-              <div class="section-title">Услуги и цены</div>
+              <div class="section-title">${t("master.services")}</div>
               <div class="card-box" style="padding-top:4px;padding-bottom:4px">
                 ${master.services.length
-                  ? master.services.map(s => `<div class="service-row"><span>${esc(s.title)}</span><span class="price">от ${formatPrice(s.price_from)}</span></div>`).join("")
-                  : '<p class="muted">Мастер пока не добавил услуги</p>'}
+                  ? master.services.map(s => `<div class="service-row"><span>${esc(s.title)}</span><span class="price">${priceFrom(s.price_from)}</span></div>`).join("")
+                  : `<p class="muted">${t("master.noServices")}</p>`}
               </div>
 
               ${master.photos.length ? `
-                <div class="section-title">Фото работ</div>
+                <div class="section-title">${t("master.photos")}</div>
                 <div class="photo-grid">
-                  ${master.photos.map(p => `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото работы" loading="lazy" /></a>`).join("")}
+                  ${master.photos.map(p => `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="${t("master.photoAlt")}" loading="lazy" /></a>`).join("")}
                 </div>` : ""}
 
-              <div class="section-title">Отзывы ${reviews.length ? `<span class="muted" style="font-family:var(--font-text);font-weight:500">· ${reviews.length}</span>` : ""}</div>
+              <div class="section-title">${t("master.reviews")} ${reviews.length ? `<span class="muted" style="font-family:var(--font-text);font-weight:500">· ${reviews.length}</span>` : ""}</div>
               ${reviews.length
                 ? reviews.map(r => `
                   <div class="review">
                     <div class="row">${starsHtml(r.rating)}<span class="spacer"></span><span class="date">${formatDate(r.created_at)}</span></div>
                     ${r.text ? `<div style="margin-top:8px;white-space:pre-wrap">${esc(r.text)}</div>` : ""}
                   </div>`).join("")
-                : emptyState("message-circle", "Отзывов пока нет", "Отзыв появится после первого выполненного заказа.")}
+                : emptyState("message-circle", t("master.noReviews"), t("master.noReviewsText"))}
             </div>
             <aside>${contactBlock(master)}</aside>
           </div>
         `;
       } catch (e) {
-        content.innerHTML = emptyState("search-x", esc(e.message), "", `<a class="btn" href="masters.html">К поиску мастеров</a>`);
+        content.innerHTML = notFound(esc(e.message), "");
       }
     }
 

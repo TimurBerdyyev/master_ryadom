@@ -1,0 +1,601 @@
+// Interface translations: Russian (default), Kyrgyz, English.
+//
+// Static markup:  <h1 data-i18n="home.title"></h1>          → textContent
+//                 data-i18n-html (trusted markup from this file only), data-i18n-ph (placeholder),
+//                 data-i18n-aria (aria-label), data-i18n-title (title attribute)
+// From JS:        t("key", { name: "..." })  — values are inserted as-is, escape user data with esc() yourself
+//                 plural(5, "p.orders")       → "5 заказов" / "5 буйрутма" / "5 orders"
+// Server texts (errors, notifications) are Russian; tServer() translates the known ones.
+//
+// Each entry is [ru, ky, en]. A missing key logs console.error and shows the key itself.
+
+const LANGS = [
+  { code: "ru", label: "Русский", short: "RU", locale: "ru-RU" },
+  { code: "ky", label: "Кыргызча", short: "KG", locale: "ky-KG" },
+  { code: "en", label: "English", short: "EN", locale: "en-GB" },
+];
+
+const I18N = {
+  // ---------- common ----------
+  "brand": ["Мастер рядом", "Мастер рядом", "Мастер рядом"],
+  "cur": ["сом", "сом", "som"],
+  "price.from": ["от {price}", "{price}дон баштап", "from {price}"],
+  "price.fromHtml": ["<small>от</small> {price}", "{price}дон <small>баштап</small>", "<small>from</small> {price}"],
+  "common.loading": ["Загрузка…", "Жүктөлүүдө…", "Loading…"],
+  "common.error": ["Ошибка: ", "Ката: ", "Error: "],
+  "common.verified": ["Проверен", "Текшерилген", "Verified"],
+  "common.profile": ["Профиль", "Профиль", "Profile"],
+  "common.order": ["Заказ", "Буйрутма", "Order"],
+  "common.orderNum": ["Заказ #{id}", "Буйрутма #{id}", "Order #{id}"],
+  "common.ratingOf": ["Оценка {n} из 5", "5тен {n} баа", "Rated {n} of 5"],
+  "common.phone": ["Телефон", "Телефон", "Phone"],
+  "common.city": ["Город", "Шаар", "City"],
+  "common.address": ["Адрес", "Дарек", "Address"],
+  "common.delete": ["Удалить", "Өчүрүү", "Delete"],
+  "common.call": ["Позвонить", "Чалуу", "Call"],
+  "lang.label": ["Язык", "Тил", "Language"],
+
+  // ---------- plurals: ru [one, few, many], ky [form], en [one, other] ----------
+  "p.orders": [["заказ", "заказа", "заказов"], ["буйрутма"], ["order", "orders"]],
+  "p.masters": [["мастер", "мастера", "мастеров"], ["уста"], ["pro", "pros"]],
+  "p.years": [["год", "года", "лет"], ["жыл"], ["year", "years"]],
+  "p.reviews": [["отзыв", "отзыва", "отзывов"], ["пикир"], ["review", "reviews"]],
+  "p.offers": [["предложение", "предложения", "предложений"], ["сунуш"], ["offer", "offers"]],
+
+  // ---------- nav ----------
+  "nav.find": ["Найти мастера", "Уста табуу", "Find a pro"],
+  "nav.becomeMaster": ["Стать мастером", "Уста болуу", "Become a pro"],
+  "nav.login": ["Войти", "Кирүү", "Log in"],
+  "nav.createOrder": ["Создать заказ", "Буйрутма берүү", "Create an order"],
+  "nav.feed": ["Новые заказы", "Жаңы буйрутмалар", "New orders"],
+  "nav.myJobs": ["Мои работы", "Менин иштерим", "My jobs"],
+  "nav.myOrders": ["Мои заказы", "Менин буйрутмаларым", "My orders"],
+  "nav.admin": ["Админка", "Админ панель", "Admin"],
+  "nav.notifications": ["Уведомления", "Билдирмелер", "Notifications"],
+  "nav.logout": ["Выйти", "Чыгуу", "Log out"],
+  "nav.menu": ["Меню", "Меню", "Menu"],
+
+  // ---------- order statuses ----------
+  "status.created": ["Создан", "Түзүлдү", "Created"],
+  "status.searching": ["Ищем мастера", "Уста изделүүдө", "Looking for a pro"],
+  "status.offers_received": ["Есть предложения", "Сунуштар бар", "Offers received"],
+  "status.master_selected": ["Мастер выбран", "Уста тандалды", "Pro selected"],
+  "status.master_confirmed": ["Мастер подтвердил", "Уста ырастады", "Pro confirmed"],
+  "status.master_en_route": ["Мастер в пути", "Уста жолдо", "Pro on the way"],
+  "status.in_progress": ["В работе", "Аткарылууда", "In progress"],
+  "status.completed": ["Выполнен", "Аткарылды", "Completed"],
+  "status.reviewed": ["Завершён", "Аяктады", "Closed"],
+  "status.cancelled": ["Отменён", "Жокко чыгарылды", "Cancelled"],
+
+  // ---------- categories (names come from the DB in Russian) ----------
+  "cat.Сантехника": ["Сантехника", "Сантехника", "Plumbing"],
+  "cat.Электрика": ["Электрика", "Электрик иштери", "Electrical"],
+  "cat.Строительство": ["Строительство", "Курулуш", "Construction"],
+  "cat.Ремонт": ["Ремонт", "Оңдоо", "Renovation"],
+  "cat.Уборка": ["Уборка", "Тазалоо", "Cleaning"],
+  "cat.Компьютеры": ["Компьютеры", "Компьютерлер", "Computers"],
+  "cat.Ремонт телефонов": ["Ремонт телефонов", "Телефон оңдоо", "Phone repair"],
+  "cat.Автомастера": ["Автомастера", "Авто устачылар", "Car repair"],
+  "cat.Красота": ["Красота", "Сулуулук", "Beauty"],
+  "cat.Парикмахеры": ["Парикмахеры", "Чачтарачтар", "Hairdressers"],
+  "cat.Грузчики": ["Грузчики", "Жүк ташуучулар", "Movers"],
+  "cat.Перевозки": ["Перевозки", "Ташуу кызматы", "Delivery & transport"],
+  "cat.Ремонт бытовой техники": ["Ремонт бытовой техники", "Тиричилик техникасын оңдоо", "Appliance repair"],
+  "cat.Другое": ["Другое", "Башка", "Other"],
+
+  // ---------- home ----------
+  "home.docTitle": ["Мастер рядом — найдите специалиста рядом с вами", "Мастер рядом — жакын жердеги устаны табыңыз", "Мастер рядом — find a pro near you"],
+  "home.pill": ["Проверенные мастера в вашем городе", "Шаарыңыздагы текшерилген усталар", "Verified pros in your city"],
+  "home.h1": ["Мастер рядом —<br /><span class=\"hl\">быстро и по честной цене</span>",
+              "Жакын жердеги уста —<br /><span class=\"hl\">тез жана адилет баада</span>",
+              "A pro nearby —<br /><span class=\"hl\">fast and at a fair price</span>"],
+  "home.lead": ["Опишите задачу за минуту. Мастера сами предложат цену, а вы выберете лучшего по рейтингу и отзывам.",
+                "Тапшырманы бир мүнөттө сүрөттөп бериңиз. Усталар өздөрү баа сунушташат, а сиз рейтинг жана пикирлер боюнча эң жакшысын тандайсыз.",
+                "Describe the job in a minute. Pros will offer their price, and you choose the best one by rating and reviews."],
+  "home.searchPh": ["Например: заменить смеситель", "Мисалы: смесителди алмаштыруу", "For example: replace a faucet"],
+  "home.searchAria": ["Что нужно сделать", "Эмне кылуу керек", "What needs to be done"],
+  "home.popular": ["Часто ищут:", "Көп изделет:", "Popular:"],
+  "home.chip1": ["смеситель", "смеситель", "faucet"],
+  "home.chip2": ["розетка", "розетка", "socket"],
+  "home.chip3": ["уборка", "тазалоо", "cleaning"],
+  "home.chip4": ["кондиционер", "кондиционер", "air conditioner"],
+  "home.mockTitle": ["Течёт смеситель на кухне", "Ашканадагы смеситель агып жатат", "Kitchen faucet is leaking"],
+  "home.mockText": ["Нужно заменить смеситель, новый уже куплен. Сегодня после 18:00.",
+                    "Смесителди алмаштыруу керек, жаңысы алынган. Бүгүн 18:00дөн кийин.",
+                    "Need to replace the faucet, the new one is already bought. Today after 18:00."],
+  "home.mockStats1": ["4.9 · 87 заказов", "4.9 · 87 буйрутма", "4.9 · 87 orders"],
+  "home.mockStats2": ["4.7 · 31 заказ", "4.7 · 31 буйрутма", "4.7 · 31 orders"],
+  "home.mockPrice1": ["900 сом", "900 сом", "900 som"],
+  "home.mockPrice2": ["1 100 сом", "1 100 сом", "1,100 som"],
+  "home.mockToast": ["2 новых предложения", "2 жаңы сунуш", "2 new offers"],
+  "home.trust1": ["Проверенные мастера", "Текшерилген усталар", "Verified pros"],
+  "home.trust1s": ["Отметка «Проверен» от модератора", "Модератордон «Текшерилген» белгиси", "“Verified” badge from a moderator"],
+  "home.trust2": ["Цена заранее", "Баа алдын ала", "Price upfront"],
+  "home.trust2s": ["До того, как мастер выедет", "Уста жолго чыкканга чейин", "Before the pro heads out"],
+  "home.trust3": ["Честные отзывы", "Чынчыл пикирлер", "Honest reviews"],
+  "home.trust3s": ["Только после выполненного заказа", "Аткарылган буйрутмадан кийин гана", "Only after a completed order"],
+  "home.trust4": ["Связь напрямую", "Түз байланыш", "Direct contact"],
+  "home.trust4s": ["Звонок или WhatsApp", "Чалуу же WhatsApp", "Call or WhatsApp"],
+  "home.catsTitle": ["Категории услуг", "Кызмат категориялары", "Service categories"],
+  "home.catsSub": ["Выберите, что нужно сделать — покажем мастеров рядом", "Эмне кылуу керектигин тандаңыз — жакын жердеги усталарды көрсөтөбүз", "Choose what needs to be done — we'll show pros nearby"],
+  "home.allMasters": ["Все мастера", "Бардык усталар", "All pros"],
+  "home.howTitle": ["Как это работает", "Бул кантип иштейт", "How it works"],
+  "home.howSub": ["От заявки до готовой работы — четыре простых шага", "Арыздан даяр ишке чейин — төрт жөнөкөй кадам", "From request to finished job — four simple steps"],
+  "home.step1": ["Опишите задачу", "Тапшырманы сүрөттөңүз", "Describe the job"],
+  "home.step1s": ["Расскажите, что случилось, приложите фото и удобное время.", "Эмне болгонун айтып, сүрөт жана ыңгайлуу убакытты кошуңуз.", "Tell us what happened, add photos and a convenient time."],
+  "home.step2": ["Получите предложения", "Сунуштарды алыңыз", "Get offers"],
+  "home.step2s": ["Мастера вашей категории пришлют свои цены и сроки.", "Тиешелүү категориядагы усталар бааларын жана мөөнөттөрүн жөнөтүшөт.", "Pros in your category will send their prices and timing."],
+  "home.step3": ["Выберите мастера", "Устаны тандаңыз", "Choose a pro"],
+  "home.step3s": ["Сравните цену, рейтинг и отзывы — и получите его номер.", "Бааны, рейтингди жана пикирлерди салыштырып, анын номерин алыңыз.", "Compare price, rating and reviews — and get their number."],
+  "home.step4": ["Оцените работу", "Ишке баа бериңиз", "Rate the work"],
+  "home.step4s": ["Ваш отзыв помогает другим клиентам и честным мастерам.", "Сиздин пикириңиз башка кардарларга жана чынчыл усталарга жардам берет.", "Your review helps other clients and honest pros."],
+  "home.topTitle": ["Лучшие мастера", "Мыкты усталар", "Top pros"],
+  "home.topSub": ["С самым высоким рейтингом среди клиентов", "Кардарлар арасында эң жогорку рейтинги барлар", "Highest rated by clients"],
+  "home.seeAll": ["Смотреть всех", "Баарын көрүү", "See all"],
+  "home.ctaTitle": ["Вы мастер? Получайте заказы рядом с домом", "Сиз устасызбы? Үйүңүзгө жакын буйрутмаларды алыңыз", "Are you a pro? Get jobs close to home"],
+  "home.ctaText": ["Создайте профиль, добавьте услуги и цены — клиенты из вашего города увидят вас в поиске.",
+                   "Профиль түзүп, кызматтарыңызды жана бааларды кошуңуз — шаарыңыздагы кардарлар сизди издөөдөн көрүшөт.",
+                   "Create a profile, add your services and prices — clients in your city will find you in search."],
+  "footer.about": ["Сервис, который помогает быстро найти проверенного мастера рядом с домом и договориться о честной цене.",
+                   "Үйгө жакын текшерилген устаны тез таап, адилет баага макулдашууга жардам берген кызмат.",
+                   "A service that helps you quickly find a verified pro near home and agree on a fair price."],
+  "footer.clients": ["Клиентам", "Кардарларга", "For clients"],
+  "footer.masters": ["Мастерам", "Усталарга", "For pros"],
+
+  // ---------- search ----------
+  "search.docTitle": ["Поиск мастеров — Мастер рядом", "Усталарды издөө — Мастер рядом", "Find pros — Мастер рядом"],
+  "search.title": ["Все мастера", "Бардык усталар", "All pros"],
+  "search.query": ["Поиск: «{q}»", "Издөө: «{q}»", "Search: “{q}”"],
+  "search.found": ["Найдено {count}", "Табылды: {count}", "Found {count}"],
+  "search.allCats": ["Все категории", "Бардык категориялар", "All categories"],
+  "search.catsAria": ["Категории", "Категориялар", "Categories"],
+  "search.ph": ["Имя, услуга или описание", "Аты же кызматы", "Name or service"],
+  "search.aria": ["Поиск", "Издөө", "Search"],
+  "search.anyRating": ["Любой рейтинг", "Каалаган рейтинг", "Any rating"],
+  "search.ratingAria": ["Рейтинг", "Рейтинг", "Rating"],
+  "search.allMasters": ["Все мастера", "Бардык усталар", "All pros"],
+  "search.verifiedOnly": ["Проверенные", "Текшерилгендер", "Verified only"],
+  "search.verifiedAria": ["Проверка", "Текшерүү", "Verification"],
+  "search.sortRating": ["По рейтингу", "Рейтинг боюнча", "By rating"],
+  "search.sortOrders": ["По опыту", "Тажрыйба боюнча", "By experience"],
+  "search.sortAria": ["Сортировка", "Иреттөө", "Sort"],
+  "search.submit": ["Найти", "Табуу", "Search"],
+  "search.exp": ["{years} опыта", "{years} тажрыйба", "{years} experience"],
+  "search.emptyTitle": ["Мастера не найдены", "Усталар табылган жок", "No pros found"],
+  "search.emptyText": ["Измените запрос или фильтры — или создайте заказ, и подходящие мастера сами откликнутся.",
+                       "Суроо-талапты же чыпкаларды өзгөртүңүз — же буйрутма түзүңүз, ылайыктуу усталар өздөрү жооп беришет.",
+                       "Change your search or filters — or create an order and suitable pros will respond."],
+  "search.loadError": ["Не удалось загрузить мастеров", "Усталарды жүктөө мүмкүн болгон жок", "Couldn't load pros"],
+
+  // ---------- master profile ----------
+  "master.docTitle": ["Профиль мастера — Мастер рядом", "Устанын профили — Мастер рядом", "Pro profile — Мастер рядом"],
+  "master.about": ["О мастере", "Уста жөнүндө", "About"],
+  "master.services": ["Услуги и цены", "Кызматтар жана баалар", "Services and prices"],
+  "master.noServices": ["Мастер пока не добавил услуги", "Уста азырынча кызмат кошо элек", "This pro hasn't added services yet"],
+  "master.photos": ["Фото работ", "Иштердин сүрөттөрү", "Work photos"],
+  "master.photoAlt": ["Фото работы", "Иштин сүрөтү", "Work photo"],
+  "master.reviews": ["Отзывы", "Пикирлер", "Reviews"],
+  "master.noReviews": ["Отзывов пока нет", "Азырынча пикир жок", "No reviews yet"],
+  "master.noReviewsText": ["Отзыв появится после первого выполненного заказа.", "Пикир биринчи аткарылган буйрутмадан кийин пайда болот.", "A review will appear after the first completed order."],
+  "master.statRating": ["рейтинг", "рейтинг", "rating"],
+  "master.statOrders": ["заказов", "буйрутма", "orders"],
+  "master.statYears": ["лет опыта", "жыл тажрыйба", "years exp."],
+  "master.whatsapp": ["Написать в WhatsApp", "WhatsApp'ка жазуу", "Message on WhatsApp"],
+  "master.loginToSee": ["Войдите, чтобы увидеть номер", "Номерди көрүү үчүн кириңиз", "Log in to see the number"],
+  "master.note": ["Создайте заказ — мастер увидит его и предложит цену. Договариваетесь напрямую, без посредников.",
+                  "Буйрутма түзүңүз — уста аны көрүп, баа сунуштайт. Ортомчусуз, түз макулдашасыз.",
+                  "Create an order — the pro will see it and offer a price. You agree directly, no middlemen."],
+  "master.notFound": ["Мастер не найден", "Уста табылган жок", "Pro not found"],
+  "master.linkOld": ["Возможно, ссылка устарела.", "Шилтеме эскирген болушу мүмкүн.", "The link may be outdated."],
+  "master.toSearch": ["К поиску мастеров", "Усталарды издөөгө", "Back to search"],
+
+  // ---------- auth ----------
+  "login.docTitle": ["Вход — Мастер рядом", "Кирүү — Мастер рядом", "Log in — Мастер рядом"],
+  "login.title": ["С возвращением", "Кайра кош келиңиз", "Welcome back"],
+  "login.sub": ["Войдите, чтобы создавать заказы и видеть контакты мастеров", "Буйрутма берүү жана усталардын байланыштарын көрүү үчүн кириңиз", "Log in to create orders and see pros' contacts"],
+  "login.password": ["Пароль", "Сырсөз", "Password"],
+  "login.noAccount": ["Нет аккаунта?", "Аккаунтуңуз жокпу?", "No account?"],
+  "login.fail": ["Не удалось войти: ", "Кирүү мүмкүн болгон жок: ", "Couldn't log in: "],
+  "reg.docTitle": ["Регистрация — Мастер рядом", "Каттоо — Мастер рядом", "Sign up — Мастер рядом"],
+  "reg.title": ["Создать аккаунт", "Аккаунт түзүү", "Create an account"],
+  "reg.sub": ["Это займёт меньше минуты", "Бул бир мүнөткө жетпеген убакытты алат", "It takes less than a minute"],
+  "reg.roleAria": ["Тип аккаунта", "Аккаунттун түрү", "Account type"],
+  "reg.roleClient": ["Ищу мастера", "Уста издейм", "I need a pro"],
+  "reg.roleClientS": ["Создаю заказы", "Буйрутма берем", "I create orders"],
+  "reg.roleMaster": ["Я мастер", "Мен устамын", "I'm a pro"],
+  "reg.roleMasterS": ["Получаю заказы", "Буйрутма алам", "I get orders"],
+  "reg.name": ["Имя", "Аты", "Name"],
+  "reg.namePh": ["Как к вам обращаться", "Сизге кантип кайрылалы", "What should we call you"],
+  "reg.pwHint": ["Минимум 6 символов", "Кеминде 6 белги", "At least 6 characters"],
+  "reg.submit": ["Зарегистрироваться", "Катталуу", "Sign up"],
+  "reg.haveAccount": ["Уже есть аккаунт?", "Аккаунтуңуз барбы?", "Already have an account?"],
+  "reg.fail": ["Не удалось зарегистрироваться: ", "Катталуу мүмкүн болгон жок: ", "Couldn't sign up: "],
+
+  // ---------- new order ----------
+  "neworder.docTitle": ["Новый заказ — Мастер рядом", "Жаңы буйрутма — Мастер рядом", "New order — Мастер рядом"],
+  "neworder.title": ["Новый заказ", "Жаңы буйрутма", "New order"],
+  "neworder.sub": ["Заявку увидят мастера выбранной категории — они предложат цену, а вы выберете лучшее предложение.",
+                   "Арызды тандалган категориядагы усталар көрүшөт — алар баа сунушташат, а сиз эң жакшы сунушту тандайсыз.",
+                   "Pros in the selected category will see your request — they'll offer prices and you'll pick the best."],
+  "neworder.what": ["Что нужно сделать", "Эмне кылуу керек", "What needs to be done"],
+  "neworder.category": ["Категория", "Категория", "Category"],
+  "neworder.describe": ["Опишите задачу", "Тапшырманы сүрөттөңүз", "Describe the job"],
+  "neworder.describePh": ["Например: течёт кран на кухне, нужен новый смеситель", "Мисалы: ашканада кран агып жатат, жаңы смеситель керек", "For example: the kitchen tap is leaking, need a new faucet"],
+  "neworder.describeHint": ["Чем подробнее — тем точнее мастера назовут цену", "Канчалык толук жазсаңыз, усталар ошончолук так баа айтышат", "The more detail, the more accurate the prices"],
+  "neworder.where": ["Где и когда", "Кайда жана качан", "Where and when"],
+  "neworder.addressPh": ["Город, улица, дом", "Шаар, көчө, үй", "City, street, building"],
+  "neworder.addressHint": ["Мастер увидит адрес только после того, как вы его выберете", "Уста даректи сиз аны тандагандан кийин гана көрөт", "The pro will see the address only after you choose them"],
+  "neworder.date": ["Дата", "Күнү", "Date"],
+  "neworder.time": ["Время", "Убакыт", "Time"],
+  "neworder.budgetTitle": ["Бюджет и фото", "Бюджет жана сүрөттөр", "Budget and photos"],
+  "neworder.budget": ["Ваш бюджет, сом", "Сиздин бюджет, сом", "Your budget, som"],
+  "neworder.budgetPh": ["Необязательно — мастера предложат цену сами", "Милдеттүү эмес — усталар бааны өздөрү сунушташат", "Optional — pros will offer their price"],
+  "neworder.photos": ["Фото (до 5 штук)", "Сүрөттөр (5ке чейин)", "Photos (up to 5)"],
+  "neworder.photosHint": ["JPEG, PNG или WebP — помогают мастеру оценить работу", "JPEG, PNG же WebP — устага ишти баалоого жардам берет", "JPEG, PNG or WebP — help the pro assess the job"],
+  "neworder.submit": ["Отправить заявку", "Арызды жөнөтүү", "Send request"],
+  "neworder.maxPhotos": ["Можно приложить не больше 5 фото", "5тен ашык сүрөт тиркөөгө болбойт", "You can attach up to 5 photos"],
+  "neworder.chooseCat": ["Выберите категорию", "Категорияны тандаңыз", "Choose a category"],
+  "neworder.catError": ["Не удалось загрузить категории: ", "Категорияларды жүктөө мүмкүн болгон жок: ", "Couldn't load categories: "],
+  "neworder.sendError": ["Не удалось отправить заявку: ", "Арызды жөнөтүү мүмкүн болгон жок: ", "Couldn't send the request: "],
+
+  // ---------- order created ----------
+  "success.docTitle": ["Заявка отправлена — Мастер рядом", "Арыз жөнөтүлдү — Мастер рядом", "Request sent — Мастер рядом"],
+  "success.title": ["Заявка отправлена", "Арыз жөнөтүлдү", "Request sent"],
+  "success.text": ["Заказ <strong>{id}</strong> создан. Мастера уже видят его — мы пришлём уведомление, как только появятся предложения.",
+                   "<strong>{id}</strong> буйрутма түзүлдү. Усталар аны көрүп жатышат — сунуштар келээри менен билдирүү жөнөтөбүз.",
+                   "Order <strong>{id}</strong> has been created. Pros can already see it — we'll notify you as soon as offers arrive."],
+  "success.photoError": ["Не все фото удалось загрузить — заказ при этом создан.", "Бардык сүрөттөр жүктөлгөн жок — бирок буйрутма түзүлдү.", "Not all photos were uploaded — the order was still created."],
+  "success.open": ["Открыть заказ", "Буйрутманы ачуу", "Open order"],
+  "success.home": ["На главную", "Башкы бетке", "Home"],
+
+  // ---------- my orders ----------
+  "orders.docTitle": ["Мои заказы — Мастер рядом", "Менин буйрутмаларым — Мастер рядом", "My orders — Мастер рядом"],
+  "orders.subClient": ["Следите за предложениями мастеров и статусом работ", "Усталардын сунуштарын жана иштин абалын көзөмөлдөңүз", "Track offers from pros and job status"],
+  "orders.subMaster": ["Заказы, на которые вас выбрали клиенты", "Кардарлар сизди тандаган буйрутмалар", "Orders where clients chose you"],
+  "orders.tabActive": ["Активные", "Активдүү", "Active"],
+  "orders.tabDone": ["Завершённые", "Аяктагандар", "Completed"],
+  "orders.tabCancelled": ["Отменённые", "Жокко чыгарылгандар", "Cancelled"],
+  "orders.new": ["Новый заказ", "Жаңы буйрутма", "New order"],
+  "orders.chooseMaster": ["Выбрать мастера", "Устаны тандоо", "Choose a pro"],
+  "orders.leaveReview": ["Оставить отзыв", "Пикир калтыруу", "Leave a review"],
+  "orders.emptyTitle": ["Здесь пока пусто", "Азырынча бош", "Nothing here yet"],
+  "orders.emptyMaster": ["Заказы появятся, когда клиент выберет ваше предложение.", "Кардар сиздин сунушуңузду тандаганда буйрутмалар пайда болот.", "Orders will appear when a client chooses your offer."],
+  "orders.emptyClient": ["Опишите задачу — мастера сами предложат цену.", "Тапшырманы сүрөттөңүз — усталар бааны өздөрү сунушташат.", "Describe the job — pros will offer their price."],
+  "orders.seeNew": ["Смотреть новые заказы", "Жаңы буйрутмаларды көрүү", "See new orders"],
+  "orders.loadError": ["Не удалось загрузить заказы", "Буйрутмаларды жүктөө мүмкүн болгон жок", "Couldn't load orders"],
+
+  // ---------- order detail ----------
+  "detail.docTitle": ["Заказ — Мастер рядом", "Буйрутма — Мастер рядом", "Order — Мастер рядом"],
+  "detail.stageAria": ["Этап заказа", "Буйрутманын этабы", "Order stage"],
+  "detail.stSearch": ["Поиск", "Издөө", "Search"],
+  "detail.stSelected": ["Мастер выбран", "Уста тандалды", "Pro chosen"],
+  "detail.stConfirmed": ["Подтвердил", "Ырастады", "Confirmed"],
+  "detail.stRoute": ["В пути", "Жолдо", "On the way"],
+  "detail.stWork": ["В работе", "Иште", "Working"],
+  "detail.stDone": ["Готово", "Даяр", "Done"],
+  "detail.confirmOrder": ["Подтвердить заказ", "Буйрутманы ырастоо", "Confirm order"],
+  "detail.onMyWay": ["Я выехал", "Жолго чыктым", "I'm on my way"],
+  "detail.startWork": ["Начал работу", "Ишти баштадым", "Started work"],
+  "detail.workDone": ["Работа выполнена", "Иш аткарылды", "Work completed"],
+  "detail.when": ["Когда", "Качан", "When"],
+  "detail.price": ["Цена", "Баа", "Price"],
+  "detail.budget": ["Бюджет", "Бюджет", "Budget"],
+  "detail.created": ["Создан", "Түзүлгөн", "Created"],
+  "detail.yourMaster": ["Ваш мастер", "Сиздин устаңыз", "Your pro"],
+  "detail.client": ["Клиент", "Кардар", "Client"],
+  "detail.waitTitle": ["Ждём предложения мастеров", "Усталардын сунуштарын күтүүдөбүз", "Waiting for offers"],
+  "detail.waitText": ["Мастера этой категории уже видят заказ. Мы пришлём уведомление, как только кто-то предложит цену.",
+                      "Бул категориядагы усталар буйрутманы көрүп жатышат. Кимдир бирөө баа сунуштаганда билдирүү жөнөтөбүз.",
+                      "Pros in this category can already see the order. We'll notify you as soon as someone makes an offer."],
+  "detail.offersTitle": ["Предложения мастеров", "Усталардын сунуштары", "Offers from pros"],
+  "detail.yourOffer": ["Ваше предложение", "Сиздин сунушуңуз", "Your offer"],
+  "detail.bestPrice": ["Лучшая цена", "Эң жакшы баа", "Best price"],
+  "detail.choose": ["Выбрать", "Тандоо", "Choose"],
+  "detail.chosen": ["Выбран", "Тандалды", "Chosen"],
+  "detail.notChosen": ["Не выбран", "Тандалган жок", "Not chosen"],
+  "detail.awaiting": ["Ожидает ответа", "Жоопту күтүүдө", "Awaiting reply"],
+  "detail.updateStatus": ["Обновите статус", "Абалын жаңыртыңыз", "Update status"],
+  "detail.clientNotified": ["Клиент получит уведомление.", "Кардар билдирүү алат.", "The client will be notified."],
+  "detail.doneQ": ["Мастер закончил работу?", "Уста ишин бүтүрдүбү?", "Has the pro finished?"],
+  "detail.doneText": ["Подтвердите — и сможете оставить отзыв.", "Ырастаңыз — анан пикир калтыра аласыз.", "Confirm it and you'll be able to leave a review."],
+  "detail.rateTitle": ["Оцените работу мастера", "Устанын ишине баа бериңиз", "Rate the pro's work"],
+  "detail.ratingAria": ["Оценка", "Баа", "Rating"],
+  "detail.nOf5": ["{n} из 5", "5тен {n}", "{n} of 5"],
+  "detail.reviewLabel": ["Отзыв (необязательно)", "Пикир (милдеттүү эмес)", "Review (optional)"],
+  "detail.reviewPh": ["Что понравилось, что можно улучшить", "Эмне жакты, эмнени жакшыртса болот", "What you liked, what could be better"],
+  "detail.sendReview": ["Отправить отзыв", "Пикир жөнөтүү", "Send review"],
+  "detail.report": ["Пожаловаться", "Даттануу", "Report"],
+  "detail.cancel": ["Отменить заказ", "Буйрутманы жокко чыгаруу", "Cancel order"],
+  "detail.reportTitle": ["Жалоба администратору", "Администраторго даттануу", "Report to admin"],
+  "detail.reportLabel": ["Опишите проблему", "Көйгөйдү сүрөттөңүз", "Describe the problem"],
+  "detail.sendReport": ["Отправить жалобу", "Даттанууну жөнөтүү", "Send report"],
+  "detail.notFound": ["Заказ не найден", "Буйрутма табылган жок", "Order not found"],
+  "detail.toOrders": ["К заказам", "Буйрутмаларга", "Back to orders"],
+  "detail.confirmAccept": ["Выбрать этого мастера за {price}? Остальные предложения будут отклонены.", "Бул устаны {price} баада тандайсызбы? Калган сунуштар четке кагылат.", "Choose this pro for {price}? Other offers will be declined."],
+  "detail.chosenToast": ["Мастер выбран — свяжитесь с ним", "Уста тандалды — аны менен байланышыңыз", "Pro chosen — get in touch with them"],
+  "detail.statusUpdated": ["Статус обновлён", "Абалы жаңыртылды", "Status updated"],
+  "detail.confirmCancel": ["Отменить заказ?", "Буйрутманы жокко чыгарасызбы?", "Cancel the order?"],
+  "detail.cancelled": ["Заказ отменён", "Буйрутма жокко чыгарылды", "Order cancelled"],
+  "detail.thanks": ["Спасибо за отзыв!", "Пикириңиз үчүн рахмат!", "Thanks for your review!"],
+  "detail.reportSent": ["Жалоба отправлена администратору", "Даттануу администраторго жөнөтүлдү", "Report sent to the admin"],
+  "detail.photoAlt": ["Фото к заказу", "Буйрутманын сүрөтү", "Order photo"],
+
+  // ---------- master feed ----------
+  "feed.docTitle": ["Новые заказы — Мастер рядом", "Жаңы буйрутмалар — Мастер рядом", "New orders — Мастер рядом"],
+  "feed.sub": ["Открытые заказы в ваших категориях. Адрес и телефон клиента откроются, когда он выберет вас.",
+               "Сиздин категориялардагы ачык буйрутмалар. Кардардын дареги жана телефону ал сизди тандагандан кийин ачылат.",
+               "Open orders in your categories. The client's address and phone open up once they choose you."],
+  "feed.refresh": ["Обновить", "Жаңыртуу", "Refresh"],
+  "feed.youOffered": ["Вы предложили {price}", "Сиз {price} сунуштадыңыз", "You offered {price}"],
+  "feed.new": ["Новый", "Жаңы", "New"],
+  "feed.needBy": ["Нужно {date}", "Керек: {date}", "Needed {date}"],
+  "feed.budget": ["Бюджет <b>{price}</b>", "Бюджет <b>{price}</b>", "Budget <b>{price}</b>"],
+  "feed.pricePh": ["Цена, сом", "Баа, сом", "Price, som"],
+  "feed.priceAria": ["Ваша цена", "Сиздин баа", "Your price"],
+  "feed.commentPh": ["Комментарий: когда сможете приехать", "Комментарий: качан келе аласыз", "Comment: when can you come"],
+  "feed.commentAria": ["Комментарий", "Комментарий", "Comment"],
+  "feed.offer": ["Предложить", "Сунуштоо", "Offer"],
+  "feed.update": ["Изменить", "Өзгөртүү", "Update"],
+  "feed.emptyTitle": ["Новых заказов пока нет", "Азырынча жаңы буйрутмалар жок", "No new orders yet"],
+  "feed.emptyText": ["Заказы появляются в категориях ваших услуг. Добавьте больше услуг в профиль, чтобы видеть больше заказов.",
+                     "Буйрутмалар сиздин кызмат категорияларыңызда пайда болот. Көбүрөөк буйрутма көрүү үчүн профилиңизге кызмат кошуңуз.",
+                     "Orders appear in your service categories. Add more services to your profile to see more orders."],
+  "feed.myServices": ["Мои услуги", "Менин кызматтарым", "My services"],
+  "feed.onlyMasters": ["Эта страница для мастеров", "Бул барак усталар үчүн", "This page is for pros"],
+  "feed.onlyMastersText": ["Зарегистрируйтесь как мастер, чтобы получать заказы.", "Буйрутма алуу үчүн уста катары катталыңыз.", "Sign up as a pro to receive orders."],
+  "feed.sent": ["Предложение отправлено клиенту", "Сунуш кардарга жөнөтүлдү", "Offer sent to the client"],
+
+  // ---------- notifications ----------
+  "notif.docTitle": ["Уведомления — Мастер рядом", "Билдирмелер — Мастер рядом", "Notifications — Мастер рядом"],
+  "notif.sub": ["Новые предложения и изменения статуса ваших заказов", "Жаңы сунуштар жана буйрутмаларыңыздын абалынын өзгөрүүлөрү", "New offers and status changes for your orders"],
+  "notif.emptyTitle": ["Уведомлений пока нет", "Азырынча билдирмелер жок", "No notifications yet"],
+  "notif.emptyText": ["Здесь появятся новые предложения и изменения статуса заказов.", "Бул жерде жаңы сунуштар жана буйрутмалардын абалынын өзгөрүүлөрү пайда болот.", "New offers and order status changes will appear here."],
+  "notif.loadError": ["Не удалось загрузить уведомления", "Билдирмелерди жүктөө мүмкүн болгон жок", "Couldn't load notifications"],
+
+  // ---------- master profile editor ----------
+  "edit.docTitle": ["Мой профиль мастера — Мастер рядом", "Менин уста профилим — Мастер рядом", "My pro profile — Мастер рядом"],
+  "edit.title": ["Мой профиль мастера", "Менин уста профилим", "My pro profile"],
+  "edit.sub": ["Эти данные видят клиенты в поиске. Заполните их, чтобы получать заказы.", "Бул маалыматты кардарлар издөөдө көрүшөт. Буйрутма алуу үчүн толтуруңуз.", "Clients see this in search. Fill it in to receive orders."],
+  "edit.viewPublic": ["Как видят клиенты", "Кардарлар кантип көрөт", "View as a client"],
+  "edit.welcome": ["Добро пожаловать! Заполните профиль и добавьте хотя бы одну услугу — после этого вы начнёте видеть заказы в разделе «Новые заказы».",
+                   "Кош келиңиз! Профилди толтуруп, жок дегенде бир кызмат кошуңуз — андан кийин «Жаңы буйрутмалар» бөлүмүндө буйрутмаларды көрө баштайсыз.",
+                   "Welcome! Fill in your profile and add at least one service — then you'll start seeing orders under “New orders”."],
+  "edit.about": ["О себе", "Өзүм жөнүндө", "About me"],
+  "edit.description": ["Описание", "Сүрөттөмө", "Description"],
+  "edit.descriptionPh": ["Например: опытный сантехник, работаю быстро и аккуратно", "Мисалы: тажрыйбалуу сантехник, тез жана тыкан иштейм", "For example: experienced plumber, fast and tidy work"],
+  "edit.experience": ["Опыт работы (лет)", "Иш тажрыйбасы (жыл)", "Experience (years)"],
+  "edit.cityPh": ["Бишкек", "Бишкек", "Bishkek"],
+  "edit.district": ["Район", "Район", "District"],
+  "edit.districtPh": ["Центр", "Борбор", "Center"],
+  "edit.save": ["Сохранить", "Сактоо", "Save"],
+  "edit.servicesTitle": ["Мои услуги и цены", "Менин кызматтарым жана баалар", "My services and prices"],
+  "edit.addService": ["Добавить услугу", "Кызмат кошуу", "Add a service"],
+  "edit.serviceName": ["Название услуги", "Кызматтын аталышы", "Service name"],
+  "edit.serviceNamePh": ["Например: замена смесителя", "Мисалы: смесителди алмаштыруу", "For example: faucet replacement"],
+  "edit.priceFrom": ["Цена от, сом", "Баасы, сомдон баштап", "Price from, som"],
+  "edit.photosTitle": ["Фото работ", "Иштердин сүрөттөрү", "Work photos"],
+  "edit.addPhoto": ["Добавить фото", "Сүрөт кошуу", "Add photos"],
+  "edit.noServices": ["Вы пока не добавили ни одной услуги — без них клиенты не найдут вас в категории.",
+                      "Сиз азырынча бир да кызмат кошо элексиз — аларсыз кардарлар сизди категориядан таба алышпайт.",
+                      "You haven't added any services yet — without them clients won't find you in a category."],
+  "edit.deleteService": ["Удалить услугу", "Кызматты өчүрүү", "Delete service"],
+  "edit.deletePhoto": ["Удалить фото", "Сүрөттү өчүрүү", "Delete photo"],
+  "edit.photoDeleteError": ["Не удалось удалить фото: ", "Сүрөттү өчүрүү мүмкүн болгон жок: ", "Couldn't delete the photo: "],
+  "edit.photoUploadError": ["Не удалось загрузить фото: ", "Сүрөттү жүктөө мүмкүн болгон жок: ", "Couldn't upload photos: "],
+  "edit.serviceDeleteError": ["Не удалось удалить услугу: ", "Кызматты өчүрүү мүмкүн болгон жок: ", "Couldn't delete the service: "],
+  "edit.saved": ["Профиль сохранён", "Профиль сакталды", "Profile saved"],
+  "edit.saveError": ["Не удалось сохранить: ", "Сактоо мүмкүн болгон жок: ", "Couldn't save: "],
+  "edit.serviceAdded": ["Услуга добавлена", "Кызмат кошулду", "Service added"],
+  "edit.serviceAddError": ["Не удалось добавить услугу: ", "Кызмат кошуу мүмкүн болгон жок: ", "Couldn't add the service: "],
+  "edit.loadError": ["Не удалось загрузить профиль: ", "Профилди жүктөө мүмкүн болгон жок: ", "Couldn't load the profile: "],
+  "edit.clientOnly": ["Вы вошли как клиент. Чтобы получать заказы, зарегистрируйте отдельный аккаунт мастера.",
+                      "Сиз кардар катары кирдиңиз. Буйрутма алуу үчүн өзүнчө уста аккаунтун каттаңыз.",
+                      "You're logged in as a client. To receive orders, register a separate pro account."],
+
+  // ---------- admin ----------
+  "admin.title": ["Админ-панель", "Админ панель", "Admin panel"],
+  "admin.tabDashboard": ["Дашборд", "Башкы такта", "Dashboard"],
+  "admin.tabUsers": ["Пользователи", "Колдонуучулар", "Users"],
+  "admin.tabMasters": ["Мастера", "Усталар", "Pros"],
+  "admin.tabOrders": ["Заказы", "Буйрутмалар", "Orders"],
+  "admin.tabComplaints": ["Жалобы", "Даттануулар", "Reports"],
+  "admin.tabCategories": ["Категории", "Категориялар", "Categories"],
+  "admin.statUsers": ["Всего пользователей", "Бардык колдонуучулар", "Total users"],
+  "admin.statClients": ["Клиентов", "Кардарлар", "Clients"],
+  "admin.statMasters": ["Мастеров ({n} проверено)", "Усталар ({n} текшерилген)", "Pros ({n} verified)"],
+  "admin.statActive": ["Активных заказов", "Активдүү буйрутмалар", "Active orders"],
+  "admin.statCompleted": ["Завершённых заказов", "Аяктаган буйрутмалар", "Completed orders"],
+  "admin.statCancelled": ["Отменённых заказов", "Жокко чыгарылган буйрутмалар", "Cancelled orders"],
+  "admin.statRevenue": ["Оборот", "Жүгүртүү", "Turnover"],
+  "admin.statCommission": ["Комиссия сервиса (10%)", "Кызматтын комиссиясы (10%)", "Service fee (10%)"],
+  "admin.statComplaints": ["Открытых жалоб", "Ачык даттануулар", "Open reports"],
+  "admin.name": ["Имя", "Аты", "Name"],
+  "admin.role": ["Роль", "Ролу", "Role"],
+  "admin.status": ["Статус", "Абалы", "Status"],
+  "admin.registered": ["Регистрация", "Катталган күнү", "Registered"],
+  "admin.roleClient": ["Клиент", "Кардар", "Client"],
+  "admin.roleMaster": ["Мастер", "Уста", "Pro"],
+  "admin.roleAdmin": ["Админ", "Админ", "Admin"],
+  "admin.blocked": ["Заблокирован", "Бөгөттөлгөн", "Blocked"],
+  "admin.active": ["Активен", "Активдүү", "Active"],
+  "admin.unblock": ["Разблокировать", "Бөгөттөн чыгаруу", "Unblock"],
+  "admin.block": ["Заблокировать", "Бөгөттөө", "Block"],
+  "admin.statusError": ["Не удалось изменить статус: ", "Абалын өзгөртүү мүмкүн болгон жок: ", "Couldn't change status: "],
+  "admin.master": ["Мастер", "Уста", "Pro"],
+  "admin.rating": ["Рейтинг", "Рейтинг", "Rating"],
+  "admin.orders": ["Заказов", "Буйрутмалар", "Orders"],
+  "admin.notVerified": ["Не проверен", "Текшерилген эмес", "Not verified"],
+  "admin.unverify": ["Снять отметку", "Белгини алып салуу", "Remove badge"],
+  "admin.verify": ["Подтвердить", "Ырастоо", "Verify"],
+  "admin.allStatuses": ["Все статусы", "Бардык абалдар", "All statuses"],
+  "admin.apply": ["Применить", "Колдонуу", "Apply"],
+  "admin.description": ["Описание", "Сүрөттөмө", "Description"],
+  "admin.photo": ["Фото", "Сүрөт", "Photo"],
+  "admin.noOrders": ["Заказов не найдено", "Буйрутмалар табылган жок", "No orders found"],
+  "admin.cOpen": ["Открыта", "Ачык", "Open"],
+  "admin.cResolved": ["Решена", "Чечилди", "Resolved"],
+  "admin.cDismissed": ["Отклонена", "Четке кагылды", "Dismissed"],
+  "admin.noComplaints": ["Жалоб пока нет", "Азырынча даттануулар жок", "No reports yet"],
+  "admin.author": ["Автор #{id}", "Автор #{id}", "Author #{id}"],
+  "admin.againstUser": [", на пользователя #{id}", ", колдонуучуга #{id}", ", against user #{id}"],
+  "admin.inOrder": [", заказ #{id}", ", буйрутма #{id}", ", order #{id}"],
+  "admin.resolve": ["Решить", "Чечүү", "Resolve"],
+  "admin.dismiss": ["Отклонить", "Четке кагуу", "Dismiss"],
+  "admin.catName": ["Название", "Аталышы", "Name"],
+  "admin.catConfirm": ["Удалить категорию? Это также затронет связанные услуги.", "Категорияны өчүрөсүзбү? Бул байланышкан кызматтарга да таасир этет.", "Delete this category? It will also affect related services."],
+  "admin.deleteError": ["Не удалось удалить: ", "Өчүрүү мүмкүн болгон жок: ", "Couldn't delete: "],
+  "admin.newCatLabel": ["Название категории", "Категориянын аталышы", "Category name"],
+  "admin.newCatPh": ["Например: Клининг", "Мисалы: Клининг", "For example: Cleaning"],
+  "admin.addCat": ["Добавить категорию", "Категория кошуу", "Add category"],
+  "admin.addError": ["Не удалось добавить: ", "Кошуу мүмкүн болгон жок: ", "Couldn't add: "],
+
+  // ---------- texts that come from the server (Russian) ----------
+  "srv.Аккаунт заблокирован": ["Аккаунт заблокирован", "Аккаунт бөгөттөлгөн", "Account is blocked"],
+  "srv.Добавьте в профиль услугу этой категории, чтобы откликаться на такие заказы": ["Добавьте в профиль услугу этой категории, чтобы откликаться на такие заказы", "Мындай буйрутмаларга жооп берүү үчүн профилиңизге ушул категориядагы кызматты кошуңуз", "Add a service in this category to your profile to respond to such orders"],
+  "srv.Допустимы только изображения JPEG, PNG или WebP": ["Допустимы только изображения JPEG, PNG или WebP", "JPEG, PNG же WebP сүрөттөрү гана уруксат", "Only JPEG, PNG or WebP images are allowed"],
+  "srv.Доступно только администратору": ["Доступно только администратору", "Администратор үчүн гана", "Admins only"],
+  "srv.Доступно только мастерам": ["Доступно только мастерам", "Усталар үчүн гана", "Pros only"],
+  "srv.Заказ больше не принимает предложения": ["Заказ больше не принимает предложения", "Буйрутма мындан ары сунуш кабыл албайт", "This order no longer accepts offers"],
+  "srv.Заказ не найден": ["Заказ не найден", "Буйрутма табылган жок", "Order not found"],
+  "srv.Заказ уже не принимает выбор предложения": ["Заказ уже не принимает выбор предложения", "Буйрутма үчүн сунуш тандоо мүмкүн эмес", "An offer can no longer be chosen for this order"],
+  "srv.Имя не может быть пустым": ["Имя не может быть пустым", "Аты бош болбошу керек", "Name can't be empty"],
+  "srv.Мастер не найден": ["Мастер не найден", "Уста табылган жок", "Pro not found"],
+  "srv.Не удалось подтвердить учётные данные": ["Не удалось подтвердить учётные данные", "Кирүү маалыматын ырастоо мүмкүн болгон жок", "Couldn't verify credentials"],
+  "srv.Неверный телефон или пароль": ["Неверный телефон или пароль", "Телефон же сырсөз туура эмес", "Wrong phone or password"],
+  "srv.Недопустимая смена статуса": ["Недопустимая смена статуса", "Абалды мындай өзгөртүүгө болбойт", "This status change isn't allowed"],
+  "srv.Нельзя предложить цену на свой заказ": ["Нельзя предложить цену на свой заказ", "Өз буйрутмаңызга баа сунуштоого болбойт", "You can't make an offer on your own order"],
+  "srv.Нет доступа к этому заказу": ["Нет доступа к этому заказу", "Бул буйрутмага кирүү укугуңуз жок", "You don't have access to this order"],
+  "srv.Отзыв можно оставить только для завершённого заказа": ["Отзыв можно оставить только для завершённого заказа", "Пикирди аяктаган буйрутмага гана калтырууга болот", "You can only review a completed order"],
+  "srv.Пользователь не найден": ["Пользователь не найден", "Колдонуучу табылган жок", "User not found"],
+  "srv.Пользователь с таким телефоном уже существует": ["Пользователь с таким телефоном уже существует", "Бул телефон менен колдонуучу мурунтан бар", "A user with this phone already exists"],
+  "srv.Предложение не найдено": ["Предложение не найдено", "Сунуш табылган жок", "Offer not found"],
+  "srv.Пустой файл": ["Пустой файл", "Файл бош", "Empty file"],
+  "srv.Слишком много попыток, попробуйте позже": ["Слишком много попыток, попробуйте позже", "Аракеттер өтө көп, кийинчерээк кайталаңыз", "Too many attempts, please try later"],
+  "srv.Статус можно менять только вперёд": ["Статус можно менять только вперёд", "Абалды алдыга гана өзгөртүүгө болот", "Status can only move forward"],
+  "srv.Такая категория уже есть": ["Такая категория уже есть", "Мындай категория мурунтан бар", "This category already exists"],
+  "srv.Телефон должен содержать от 9 до 15 цифр, например +996700000000": ["Телефон должен содержать от 9 до 15 цифр, например +996700000000", "Телефон 9дан 15ке чейин цифрадан турушу керек, мисалы +996700000000", "Phone must have 9 to 15 digits, e.g. +996700000000"],
+  "srv.Только мастер может предложить цену": ["Только мастер может предложить цену", "Бааны уста гана сунуштай алат", "Only a pro can make an offer"],
+  "srv.Файл не похож на изображение JPEG, PNG или WebP": ["Файл не похож на изображение JPEG, PNG или WebP", "Файл JPEG, PNG же WebP сүрөтүнө окшобойт", "The file doesn't look like a JPEG, PNG or WebP image"],
+  "srv.Это не ваш заказ": ["Это не ваш заказ", "Бул сиздин буйрутмаңыз эмес", "This isn't your order"],
+  "srv.Это предложение уже обработано": ["Это предложение уже обработано", "Бул сунуш мурунтан каралган", "This offer has already been processed"],
+  "srv.Этот заказ нельзя отменить": ["Этот заказ нельзя отменить", "Бул буйрутманы жокко чыгарууга болбойт", "This order can't be cancelled"],
+  "srv.Нельзя удалить категорию, пока к ней привязаны услуги или заказы": ["Нельзя удалить категорию, пока к ней привязаны услуги или заказы", "Кызматтар же буйрутмалар байланышып турганда категорияны өчүрүүгө болбойт", "Can't delete a category that still has services or orders"],
+  "srv.Новое предложение по заказу": ["Новое предложение по заказу", "Буйрутмага жаңы сунуш", "New offer on your order"],
+  "srv.Мастер изменил предложение": ["Мастер изменил предложение", "Уста сунушун өзгөрттү", "A pro updated their offer"],
+  "srv.Вас выбрали для заказа": ["Вас выбрали для заказа", "Сизди буйрутмага тандашты", "You were chosen for an order"],
+  "srv.Мастер подтвердил заказ": ["Мастер подтвердил заказ", "Уста буйрутманы ырастады", "The pro confirmed the order"],
+  "srv.Мастер выехал к вам": ["Мастер выехал к вам", "Уста сизге жолго чыкты", "The pro is on the way"],
+  "srv.Мастер приступил к работе": ["Мастер приступил к работе", "Уста ишти баштады", "The pro started work"],
+  "srv.Заказ выполнен": ["Заказ выполнен", "Буйрутма аткарылды", "Order completed"],
+  "srv.Клиент отменил заказ": ["Клиент отменил заказ", "Кардар буйрутманы жокко чыгарды", "The client cancelled the order"],
+  "srv.offerText": ["{name} предлагает {price} за заказ #{id}", "{name} #{id} буйрутма үчүн {price} сунуштайт", "{name} offers {price} for order #{id}"],
+  "srv.chosenText": ["Клиент выбрал ваше предложение по заказу #{id}", "Кардар #{id} буйрутма боюнча сунушуңузду тандады", "The client chose your offer for order #{id}"],
+  "srv.orderN": ["Заказ #{id}", "Буйрутма #{id}", "Order #{id}"],
+  "srv.orderReview": ["Заказ #{id} — оставьте, пожалуйста, отзыв о мастере", "Буйрутма #{id} — сураныч, уста жөнүндө пикир калтырыңыз", "Order #{id} — please leave a review for the pro"],
+  "srv.orderCancelled": ["Заказ #{id} отменён", "Буйрутма #{id} жокко чыгарылды", "Order #{id} was cancelled"],
+  "srv.maxMasterPhotos": ["Максимум {max} фотографий работ (уже загружено {n})", "Иштердин эң көп {max} сүрөтү (жүктөлгөнү: {n})", "Up to {max} work photos (already uploaded {n})"],
+  "srv.maxOrderPhotos": ["Максимум {max} фотографий на заказ (уже загружено {n})", "Буйрутмага эң көп {max} сүрөт (жүктөлгөнү: {n})", "Up to {max} photos per order (already uploaded {n})"],
+  "srv.fileTooBig": ["Файл слишком большой (максимум {mb} МБ)", "Файл өтө чоң (эң көп {mb} МБ)", "File is too large (max {mb} MB)"],
+  "srv.minLength": ["Минимум {n} символов", "Кеминде {n} белги", "At least {n} characters"],
+  "srv.required": ["Заполните обязательные поля", "Милдеттүү талааларды толтуруңуз", "Please fill in the required fields"],
+  "srv.network": ["Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.", "Сервер менен байланыш жок. Интернетти текшерип, кайра аракет кылыңыз.", "Can't reach the server. Check your connection and try again."],
+};
+
+// Server messages with variable parts: [regex, key, (match) => vars]
+const SERVER_PATTERNS = [
+  [/^(.+) предлагает ([\d.]+) сом за заказ #(\d+)$/, "srv.offerText", m => ({ name: m[1], price: formatPrice(m[2]), id: m[3] })],
+  [/^Клиент выбрал ваше предложение по заказу #(\d+)$/, "srv.chosenText", m => ({ id: m[1] })],
+  [/^Заказ #(\d+) — оставьте, пожалуйста, отзыв о мастере$/, "srv.orderReview", m => ({ id: m[1] })],
+  [/^Заказ #(\d+) отменён$/, "srv.orderCancelled", m => ({ id: m[1] })],
+  [/^Заказ #(\d+)$/, "srv.orderN", m => ({ id: m[1] })],
+  [/^Максимум (\d+) фотографий работ \(уже загружено (\d+)\)$/, "srv.maxMasterPhotos", m => ({ max: m[1], n: m[2] })],
+  [/^Максимум (\d+) фотографий на заказ \(уже загружено (\d+)\)$/, "srv.maxOrderPhotos", m => ({ max: m[1], n: m[2] })],
+  [/^Файл слишком большой \(максимум (\d+) МБ\)$/, "srv.fileTooBig", m => ({ mb: m[1] })],
+  // Pydantic's own (English) validation messages
+  [/^String should have at least (\d+) characters?$/, "srv.minLength", m => ({ n: m[1] })],
+  [/^Field required$/, "srv.required", () => ({})],
+  [/^Failed to fetch$|^NetworkError|^Load failed$/, "srv.network", () => ({})],
+];
+
+const LANG_INDEX = { ru: 0, ky: 1, en: 2 };
+
+function getLang() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem("lang");
+  } catch (e) {
+    /* storage unavailable */
+  }
+  if (saved && saved in LANG_INDEX) return saved;
+  const browser = (navigator.language || "ru").slice(0, 2).toLowerCase();
+  return browser in LANG_INDEX ? browser : "ru";
+}
+
+const LANG = getLang();
+
+function setLang(code) {
+  if (!(code in LANG_INDEX) || code === LANG) return;
+  try {
+    localStorage.setItem("lang", code);
+  } catch (e) {
+    /* storage unavailable */
+  }
+  location.reload();
+}
+
+function langLocale() {
+  return LANGS.find(l => l.code === LANG).locale;
+}
+
+function t(key, vars) {
+  const entry = I18N[key];
+  if (!entry) {
+    console.error(`i18n: missing key "${key}"`);
+    return key;
+  }
+  let text = entry[LANG_INDEX[LANG]];
+  if (vars) {
+    for (const [name, value] of Object.entries(vars)) text = text.split(`{${name}}`).join(String(value));
+  }
+  return text;
+}
+
+// "5 заказов" / "5 буйрутма" / "5 orders"
+function plural(n, key) {
+  const forms = I18N[key][LANG_INDEX[LANG]];
+  if (LANG === "ky") return `${n} ${forms[0]}`;
+  if (LANG === "en") return `${n} ${n === 1 ? forms[0] : forms[1]}`;
+  const mod10 = n % 10, mod100 = n % 100;
+  const form = mod10 === 1 && mod100 !== 11 ? forms[0]
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? forms[1] : forms[2];
+  return `${n} ${form}`;
+}
+
+// Category names are stored in Russian; admin-added ones without a translation stay as they are.
+function catName(name) {
+  const entry = I18N[`cat.${name}`];
+  return entry ? entry[LANG_INDEX[LANG]] : name;
+}
+
+// Translate a Russian message produced by the server (error detail or notification text).
+function tServer(message) {
+  if (!message) return message;
+  if (I18N[`srv.${message}`]) return t(`srv.${message}`);
+  for (const [re, key, vars] of SERVER_PATTERNS) {
+    const m = re.exec(message);
+    if (m) return t(key, vars(m));
+  }
+  return message;
+}
+
+function applyI18n(root = document) {
+  document.documentElement.lang = LANG;
+  root.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  root.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  root.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  root.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+  root.querySelectorAll("[data-i18n-title]").forEach(el => { el.title = t(el.dataset.i18nTitle); });
+}
+
+// Pages load this script after their markup, so static text can be translated right away.
+applyI18n();

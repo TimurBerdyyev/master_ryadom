@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Новый заказ — Мастер рядом</title>
+  <title data-i18n="neworder.docTitle">Новый заказ — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
   <style>
@@ -74,58 +74,59 @@
   <main class="narrow">
     <div class="page-head">
       <div>
-        <h1>Новый заказ</h1>
-        <p class="muted">Заявку увидят мастера выбранной категории — они предложат цену, а вы выберете лучшее предложение.</p>
+        <h1 data-i18n="neworder.title">Новый заказ</h1>
+        <p class="muted" data-i18n="neworder.sub">Заявку увидят мастера выбранной категории — они предложат цену, а вы выберете лучшее предложение.</p>
       </div>
     </div>
 
     <form class="card reveal" id="orderForm" style="max-width:none">
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Что нужно сделать</h2>
-      <div class="fieldset-title" id="catLabel">Категория</div>
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="neworder.what">Что нужно сделать</span></h2>
+      <div class="fieldset-title" id="catLabel" data-i18n="neworder.category">Категория</div>
       <div class="cat-picker" id="categoryPicker" role="radiogroup" aria-labelledby="catLabel"></div>
 
       <label>
-        Опишите задачу
-        <textarea id="description" rows="4" required maxlength="2000" placeholder="Например: течёт кран на кухне, нужен новый смеситель"></textarea>
-        <span class="hint">Чем подробнее — тем точнее мастера назовут цену</span>
+        <span data-i18n="neworder.describe">Опишите задачу</span>
+        <textarea id="description" rows="4" required maxlength="2000" data-i18n-ph="neworder.describePh"></textarea>
+        <span class="hint" data-i18n="neworder.describeHint">Чем подробнее — тем точнее мастера назовут цену</span>
       </label>
 
-      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg>Где и когда</h2>
+      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="neworder.where">Где и когда</span></h2>
       <label>
-        Адрес
-        <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-house"></use></svg><input id="address" type="text" maxlength="500" placeholder="Город, улица, дом" /></span>
-        <span class="hint">Мастер увидит адрес только после того, как вы его выберете</span>
+        <span data-i18n="common.address">Адрес</span>
+        <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-house"></use></svg><input id="address" type="text" maxlength="500" data-i18n-ph="neworder.addressPh" /></span>
+        <span class="hint" data-i18n="neworder.addressHint">Мастер увидит адрес только после того, как вы его выберете</span>
       </label>
 
       <div class="form-grid">
         <label>
-          Дата
+          <span data-i18n="neworder.date">Дата</span>
           <input id="date" type="date" />
         </label>
         <label>
-          Время
+          <span data-i18n="neworder.time">Время</span>
           <input id="time" type="time" />
         </label>
       </div>
 
-      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-wallet"></use></svg>Бюджет и фото</h2>
+      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-wallet"></use></svg><span data-i18n="neworder.budgetTitle">Бюджет и фото</span></h2>
       <label>
-        Ваш бюджет, сом
-        <input id="price" type="number" min="0" max="10000000" placeholder="Необязательно — мастера предложат цену сами" />
+        <span data-i18n="neworder.budget">Ваш бюджет, сом</span>
+        <input id="price" type="number" min="0" max="10000000" data-i18n-ph="neworder.budgetPh" />
       </label>
 
       <label>
-        Фото (до 5 штук)
+        <span data-i18n="neworder.photos">Фото (до 5 штук)</span>
         <input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
-        <span class="hint">JPEG, PNG или WebP — помогают мастеру оценить работу</span>
+        <span class="hint" data-i18n="neworder.photosHint">JPEG, PNG или WebP — помогают мастеру оценить работу</span>
       </label>
 
       <div id="formError" class="error" role="alert"></div>
-      <button class="btn accent large" type="submit" id="submitBtn"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg>Отправить заявку</button>
+      <button class="btn accent large" type="submit" id="submitBtn"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span data-i18n="neworder.submit">Отправить заявку</span></button>
     </form>
   </main>
 
   <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -140,16 +141,16 @@
         const categories = await api.categories();
         picker.innerHTML = categories.map((c, i) => `
           <input type="radio" name="category" id="cat${c.id}" value="${c.id}" ${String(c.id) === preselectCategory || (!preselectCategory && i === 0) ? "checked" : ""} required />
-          <label for="cat${c.id}">${categoryBadge(c.name)}<span>${esc(c.name)}</span></label>
+          <label for="cat${c.id}">${categoryBadge(c.name)}<span>${esc(catName(c.name))}</span></label>
         `).join("");
       } catch (e) {
-        document.getElementById("formError").textContent = "Не удалось загрузить категории: " + e.message;
+        document.getElementById("formError").textContent = t("neworder.catError") + e.message;
       }
     }
 
     document.getElementById("photos").addEventListener("change", (e) => {
       if (e.target.files.length > 5) {
-        document.getElementById("formError").textContent = "Можно приложить не больше 5 фото";
+        document.getElementById("formError").textContent = t("neworder.maxPhotos");
         e.target.value = "";
       }
     });
@@ -162,7 +163,7 @@
 
       const checked = document.querySelector('input[name="category"]:checked');
       if (!checked) {
-        errorBox.textContent = "Выберите категорию";
+        errorBox.textContent = t("neworder.chooseCat");
         return;
       }
 
@@ -193,7 +194,7 @@
         }
         location.href = `order-success.html?id=${order.id}${photoWarning}`;
       } catch (e) {
-        errorBox.textContent = "Не удалось отправить заявку: " + e.message;
+        errorBox.textContent = t("neworder.sendError") + e.message;
         button.disabled = false;
       }
     });

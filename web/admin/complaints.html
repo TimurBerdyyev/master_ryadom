@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Жалобы — Админ-панель</title>
+  <title data-i18n="admin.tabComplaints">Жалобы — Админ-панель</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
@@ -14,25 +14,26 @@
   </header>
 
   <main class="wide">
-    <h1>Жалобы</h1>
+    <h1 data-i18n="admin.tabComplaints">Жалобы</h1>
     <div class="admin-tabs">
-      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Дашборд</a>
-      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg>Пользователи</a>
-      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg>Мастера</a>
-      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg>Заказы</a>
-      <a href="complaints.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg>Жалобы</a>
-      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg>Категории</a>
+      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="admin.tabDashboard">Дашборд</span></a>
+      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg><span data-i18n="admin.tabUsers">Пользователи</span></a>
+      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="admin.tabMasters">Мастера</span></a>
+      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg><span data-i18n="admin.tabOrders">Заказы</span></a>
+      <a href="complaints.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg><span data-i18n="admin.tabComplaints">Жалобы</span></a>
+      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="admin.tabCategories">Категории</span></a>
     </div>
 
-    <div id="content"><p class="muted">Загрузка…</p></div>
+    <div id="content"><p class="muted" data-i18n="common.loading">Загрузка…</p></div>
   </main>
 
   <script src="../js/icons.js"></script>
+  <script src="../js/i18n.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
   <script>
-    const statusLabels = { open: "Открыта", resolved: "Решена", dismissed: "Отклонена" };
+    const statusLabels = { open: t("admin.cOpen"), resolved: t("admin.cResolved"), dismissed: t("admin.cDismissed") };
     const statusClass = { open: "warn", resolved: "ok", dismissed: "bad" };
 
     async function load() {
@@ -40,29 +41,29 @@
       try {
         const complaints = await api.adminComplaints();
         if (!complaints.length) {
-          content.innerHTML = `<p class="muted">Жалоб пока нет</p>`;
+          content.innerHTML = emptyState("flag", t("admin.noComplaints"), "");
           return;
         }
         content.innerHTML = complaints.map(c => `
           <div class="review">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
               <span class="status-pill ${statusClass[c.status]}">${statusLabels[c.status]}</span>
-              <span class="muted">${new Date(c.created_at).toLocaleDateString("ru-RU")}</span>
+              <span class="muted">${formatDate(c.created_at)}</span>
             </div>
             <div>${esc(c.text)}</div>
             <div class="muted" style="margin-top:6px">
-              Автор #${c.author_id}${c.target_user_id ? `, на пользователя #${c.target_user_id}` : ""}${c.order_id ? `, заказ #${c.order_id}` : ""}
+              ${t("admin.author", { id: c.author_id })}${c.target_user_id ? t("admin.againstUser", { id: c.target_user_id }) : ""}${c.order_id ? t("admin.inOrder", { id: c.order_id }) : ""}
             </div>
             ${c.status === "open" ? `
               <div class="contact-actions">
-                <button class="btn small" onclick="setStatus(${c.id}, 'resolved')">Решить</button>
-                <button class="btn small secondary" onclick="setStatus(${c.id}, 'dismissed')">Отклонить</button>
+                <button class="btn small" onclick="setStatus(${c.id}, 'resolved')">${t("admin.resolve")}</button>
+                <button class="btn small secondary" onclick="setStatus(${c.id}, 'dismissed')">${t("admin.dismiss")}</button>
               </div>
             ` : ""}
           </div>
         `).join("");
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        content.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
       }
     }
 
@@ -71,7 +72,7 @@
         await api.adminSetComplaintStatus(id, status);
         load();
       } catch (e) {
-        toast("Не удалось изменить статус: " + e.message);
+        toast(t("admin.statusError") + e.message);
       }
     }
 

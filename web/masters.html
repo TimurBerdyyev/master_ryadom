@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Поиск мастеров — Мастер рядом</title>
+  <title data-i18n="search.docTitle">Поиск мастеров — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -16,43 +16,44 @@
   <main>
     <div class="page-head">
       <div>
-        <h1 id="title">Мастера</h1>
+        <h1 id="title" data-i18n="search.title">Все мастера</h1>
         <p class="muted" id="subtitle">&nbsp;</p>
       </div>
-      <a class="btn accent" id="orderBtn" href="order.html"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg>Создать заказ</a>
+      <a class="btn accent" id="orderBtn" href="order.html"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="nav.createOrder">Создать заказ</span></a>
     </div>
 
-    <div class="chips" id="categoryChips" role="tablist" aria-label="Категории"></div>
+    <div class="chips" id="categoryChips" role="tablist" data-i18n-aria="search.catsAria"></div>
 
     <form class="filters" onsubmit="event.preventDefault(); applyFilters();">
       <div class="input-icon">
         <svg class="i" aria-hidden="true"><use href="#i-search"></use></svg>
-        <input id="searchInput" type="search" maxlength="100" placeholder="Имя, услуга или описание" aria-label="Поиск" />
+        <input id="searchInput" type="search" maxlength="100" data-i18n-ph="search.ph" data-i18n-aria="search.aria" />
       </div>
       <div class="input-icon">
         <svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg>
-        <input id="cityFilter" type="text" maxlength="100" placeholder="Город" aria-label="Город" />
+        <input id="cityFilter" type="text" maxlength="100" data-i18n-ph="common.city" data-i18n-aria="common.city" />
       </div>
-      <select id="ratingFilter" aria-label="Рейтинг">
-        <option value="">Любой рейтинг</option>
-        <option value="4">Рейтинг 4.0+</option>
-        <option value="4.5">Рейтинг 4.5+</option>
+      <select id="ratingFilter" data-i18n-aria="search.ratingAria">
+        <option value="" data-i18n="search.anyRating">Любой рейтинг</option>
+        <option value="4">★ 4.0+</option>
+        <option value="4.5">★ 4.5+</option>
       </select>
-      <select id="verifiedFilter" aria-label="Проверка">
-        <option value="">Все мастера</option>
-        <option value="true">Проверенные</option>
+      <select id="verifiedFilter" data-i18n-aria="search.verifiedAria">
+        <option value="" data-i18n="search.allMasters">Все мастера</option>
+        <option value="true" data-i18n="search.verifiedOnly">Проверенные</option>
       </select>
-      <select id="sortFilter" aria-label="Сортировка">
-        <option value="rating">По рейтингу</option>
-        <option value="orders">По опыту</option>
+      <select id="sortFilter" data-i18n-aria="search.sortAria">
+        <option value="rating" data-i18n="search.sortRating">По рейтингу</option>
+        <option value="orders" data-i18n="search.sortOrders">По опыту</option>
       </select>
-      <button class="btn" type="submit">Найти</button>
+      <button class="btn" type="submit" data-i18n="search.submit">Найти</button>
     </form>
 
     <div id="masterList" class="master-list"></div>
   </main>
 
   <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -71,8 +72,8 @@
       const chip = (id, label, iconHtml, style = "") => `
         <button type="button" role="tab" class="chip ${String(id) === String(categoryId) ? "active" : ""}"
                 style="${style}" onclick="pickCategory('${id}')">${iconHtml}${label}</button>`;
-      document.getElementById("categoryChips").innerHTML = [chip("", "Все категории", icon("layout-grid"))]
-        .concat(categories.map(c => chip(c.id, esc(c.name), categoryIcon(c.name), categoryStyle(c.name).style)))
+      document.getElementById("categoryChips").innerHTML = [chip("", esc(t("search.allCats")), icon("layout-grid"))]
+        .concat(categories.map(c => chip(c.id, esc(catName(c.name)), categoryIcon(c.name), categoryStyle(c.name).style)))
         .join("");
     }
 
@@ -97,7 +98,6 @@
       const prices = m.services.map(s => s.price_from);
       const minPrice = prices.length ? Math.min(...prices) : null;
       const tags = [...new Set(m.services.map(s => s.title))].slice(0, 4);
-      const orders = `${m.completed_orders} ${pluralize(m.completed_orders, "заказ", "заказа", "заказов")}`;
       return `
         <a class="master-card" href="master.html?id=${m.id}">
           ${avatarHtml(m.user.name)}
@@ -105,16 +105,16 @@
             <div class="name">${esc(m.user.name)} ${m.verified ? verifiedBadge() : ""}</div>
             <div class="meta">
               ${ratingHtml(m.rating)}
-              <span>${icon("briefcase")}${orders}</span>
-              ${m.experience_years ? `<span>${icon("timer")}${m.experience_years} ${pluralize(m.experience_years, "год", "года", "лет")} опыта</span>` : ""}
+              <span>${icon("briefcase")}${plural(m.completed_orders, "p.orders")}</span>
+              ${m.experience_years ? `<span>${icon("timer")}${t("search.exp", { years: plural(m.experience_years, "p.years") })}</span>` : ""}
               ${m.city ? `<span>${icon("map-pin")}${esc(m.city)}</span>` : ""}
             </div>
             ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ""}
-            ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
+            ${tags.length ? `<div class="tags">${tags.map(tag => `<span class="tag">${esc(tag)}</span>`).join("")}</div>` : ""}
           </div>
           <div class="side">
-            ${minPrice !== null ? `<div class="price-from"><small>от</small> ${formatPrice(minPrice)}</div>` : "<span></span>"}
-            <span class="btn small secondary">Профиль ${icon("arrow-right")}</span>
+            ${minPrice !== null ? `<div class="price-from">${priceFromHtml(minPrice)}</div>` : "<span></span>"}
+            <span class="btn small secondary">${t("common.profile")} ${icon("arrow-right")}</span>
           </div>
         </a>`;
     }
@@ -125,8 +125,8 @@
       list.innerHTML = skeletons(4, 132);
 
       const q = document.getElementById("searchInput").value.trim();
-      const name = categoryName(categoryId) || params.get("name");
-      document.getElementById("title").textContent = q ? `Поиск: «${q}»` : (categoryId && name ? name : "Все мастера");
+      const name = categoryName(categoryId);
+      document.getElementById("title").textContent = q ? t("search.query", { q }) : (categoryId && name ? catName(name) : t("search.title"));
       document.getElementById("orderBtn").href = categoryId ? `order.html?category_id=${encodeURIComponent(categoryId)}` : "order.html";
 
       const query = { sort: document.getElementById("sortFilter").value };
@@ -141,19 +141,17 @@
 
       try {
         const masters = await api.searchMasters(query);
-        document.getElementById("subtitle").textContent =
-          `Найдено ${masters.length} ${pluralize(masters.length, "мастер", "мастера", "мастеров")}`;
+        document.getElementById("subtitle").textContent = t("search.found", { count: plural(masters.length, "p.masters") });
         if (masters.length === 0) {
           const href = `order.html${categoryId ? `?category_id=${encodeURIComponent(categoryId)}` : ""}`;
-          list.innerHTML = emptyState("search-x", "Мастера не найдены",
-            "Измените запрос или фильтры — или создайте заказ, и подходящие мастера сами откликнутся.",
-            `<a class="btn accent" href="${href}">${icon("plus")}Создать заказ</a>`);
+          list.innerHTML = emptyState("search-x", t("search.emptyTitle"), t("search.emptyText"),
+            `<a class="btn accent" href="${href}">${icon("plus")}${t("nav.createOrder")}</a>`);
           return;
         }
         list.classList.add("reveal");
         list.innerHTML = masters.map(masterCard).join("");
       } catch (e) {
-        list.innerHTML = emptyState("triangle-alert", "Не удалось загрузить мастеров", esc(e.message));
+        list.innerHTML = emptyState("triangle-alert", t("search.loadError"), esc(e.message));
       }
     }
 

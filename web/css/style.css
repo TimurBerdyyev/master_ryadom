@@ -2853,3 +2853,150 @@ input[type="file"]::file-selector-button:hover {
   color: #fff;
   box-shadow: none;
 }
+
+/* ---------- Language switch ---------- */
+
+.lang-switch {
+  position: relative;
+  order: 3;
+}
+
+header.topbar nav {
+  order: 2;
+  margin-left: auto;
+}
+
+.lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+}
+
+.lang-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.lang-btn .i {
+  width: 17px;
+  height: 17px;
+}
+
+.lang-btn .i.sm {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+}
+
+.lang-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  min-width: 190px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  animation: fade-down .15s var(--ease);
+}
+
+.lang-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lang-menu button:hover {
+  background: var(--surface-2);
+}
+
+.lang-menu button.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.lang-menu button .i {
+  margin-left: auto;
+}
+
+.lang-menu .code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lang-menu button.active .code {
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+@media (min-width: 881px) {
+  .lang-switch {
+    margin-left: 6px;
+  }
+}
+
+@media (max-width: 880px) {
+  .lang-switch {
+    order: 1;
+    margin-left: auto;
+  }
+
+  .nav-toggle {
+    order: 2;
+  }
+
+  header.topbar nav {
+    order: 3;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  header.topbar {
+    gap: 8px;
+  }
+
+  .lang-btn {
+    padding: 0 10px;
+    height: 44px;
+  }
+
+  .lang-btn .i.sm {
+    display: none;
+  }
+
+  header.topbar .logo {
+    font-size: 15px;
+    gap: 8px;
+  }
+}

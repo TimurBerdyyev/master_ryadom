@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Категории — Админ-панель</title>
+  <title data-i18n="admin.tabCategories">Категории — Админ-панель</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
@@ -14,29 +14,30 @@
   </header>
 
   <main class="wide">
-    <h1>Категории</h1>
+    <h1 data-i18n="admin.tabCategories">Категории</h1>
     <div class="admin-tabs">
-      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Дашборд</a>
-      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg>Пользователи</a>
-      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg>Мастера</a>
-      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg>Заказы</a>
-      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg>Жалобы</a>
-      <a href="categories.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg>Категории</a>
+      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="admin.tabDashboard">Дашборд</span></a>
+      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg><span data-i18n="admin.tabUsers">Пользователи</span></a>
+      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="admin.tabMasters">Мастера</span></a>
+      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg><span data-i18n="admin.tabOrders">Заказы</span></a>
+      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg><span data-i18n="admin.tabComplaints">Жалобы</span></a>
+      <a href="categories.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="admin.tabCategories">Категории</span></a>
     </div>
 
-    <div id="content"><p class="muted">Загрузка…</p></div>
+    <div id="content"><p class="muted" data-i18n="common.loading">Загрузка…</p></div>
 
     <form class="card" id="addForm" style="margin-top:20px">
       <label>
-        Название категории
-        <input id="categoryName" type="text" required placeholder="Например: Клининг" />
+        <span data-i18n="admin.newCatLabel">Название категории</span>
+        <input id="categoryName" type="text" required data-i18n-ph="admin.newCatPh" />
       </label>
       <div id="formError" class="error"></div>
-      <button class="btn secondary" type="submit">Добавить категорию</button>
+      <button class="btn secondary" type="submit" data-i18n="admin.addCat">Добавить категорию</button>
     </form>
   </main>
 
   <script src="../js/icons.js"></script>
+  <script src="../js/i18n.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
@@ -47,29 +48,29 @@
         const categories = await api.adminCategories();
         content.innerHTML = `
           <div class="table-wrap"><table class="admin-table">
-            <thead><tr><th>Название</th><th></th></tr></thead>
+            <thead><tr><th>${t("admin.catName")}</th><th></th></tr></thead>
             <tbody>
               ${categories.map(c => `
                 <tr>
-                  <td>${esc(c.name)}</td>
-                  <td><button class="btn small danger-soft" onclick="removeCategory(${c.id})">Удалить</button></td>
+                  <td><span class="row" style="gap:10px;flex-wrap:nowrap">${categoryBadge(c.name)}${esc(catName(c.name))}</span></td>
+                  <td><button class="btn small danger-soft" onclick="removeCategory(${c.id})">${t("common.delete")}</button></td>
                 </tr>
               `).join("")}
             </tbody>
           </table></div>
         `;
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        content.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
       }
     }
 
     async function removeCategory(id) {
-      if (!confirm("Удалить категорию? Это также затронет связанные услуги.")) return;
+      if (!confirm(t("admin.catConfirm"))) return;
       try {
         await api.adminDeleteCategory(id);
         load();
       } catch (e) {
-        toast("Не удалось удалить: " + e.message);
+        toast(t("admin.deleteError") + e.message);
       }
     }
 
@@ -82,7 +83,7 @@
         document.getElementById("categoryName").value = "";
         load();
       } catch (e) {
-        errorBox.textContent = "Не удалось добавить: " + e.message;
+        errorBox.textContent = t("admin.addError") + e.message;
       }
     });
 

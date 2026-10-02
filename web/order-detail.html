@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Заказ — Мастер рядом</title>
+  <title data-i18n="detail.docTitle">Заказ — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -19,6 +19,7 @@
   </main>
 
   <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -26,22 +27,22 @@
     const loggedIn = requireLogin(`order-detail.html?id=${encodeURIComponent(orderId || "")}`);
 
     const PROGRESS = [
-      ["searching", "Поиск"],
-      ["master_selected", "Мастер выбран"],
-      ["master_confirmed", "Подтвердил"],
-      ["master_en_route", "В пути"],
-      ["in_progress", "В работе"],
-      ["completed", "Готово"],
+      ["searching", t("detail.stSearch")],
+      ["master_selected", t("detail.stSelected")],
+      ["master_confirmed", t("detail.stConfirmed")],
+      ["master_en_route", t("detail.stRoute")],
+      ["in_progress", t("detail.stWork")],
+      ["completed", t("detail.stDone")],
     ];
     const PROGRESS_INDEX = { created: 0, searching: 0, offers_received: 0, reviewed: 5 };
     PROGRESS.forEach(([s], i) => { if (!(s in PROGRESS_INDEX)) PROGRESS_INDEX[s] = i; });
 
     // Next steps the assigned master can report.
     const MASTER_NEXT = {
-      master_selected: [["master_confirmed", "Подтвердить заказ", "circle-check"]],
-      master_confirmed: [["master_en_route", "Я выехал", "car"], ["in_progress", "Начал работу", "hammer"]],
-      master_en_route: [["in_progress", "Начал работу", "hammer"]],
-      in_progress: [["completed", "Работа выполнена", "circle-check"]],
+      master_selected: [["master_confirmed", t("detail.confirmOrder"), "circle-check"]],
+      master_confirmed: [["master_en_route", t("detail.onMyWay"), "car"], ["in_progress", t("detail.startWork"), "hammer"]],
+      master_en_route: [["in_progress", t("detail.startWork"), "hammer"]],
+      in_progress: [["completed", t("detail.workDone"), "circle-check"]],
     };
 
     let me, order, offers, categoryName;
@@ -50,7 +51,7 @@
     function stepperHtml(status) {
       if (status === "cancelled") return "";
       const idx = PROGRESS_INDEX[status] ?? 0;
-      return `<div class="stepper" aria-label="Этап заказа">${PROGRESS.map(([, label], i) => `
+      return `<div class="stepper" aria-label="${t("detail.stageAria")}">${PROGRESS.map(([, label], i) => `
         <div class="st ${i <= idx ? "done" : ""} ${i === idx ? "current" : ""}">
           <span class="dot">${i <= idx ? icon("check") : ""}</span>${label}
         </div>`).join("")}</div>`;
@@ -70,8 +71,8 @@
             <div class="muted">${esc(contact.phone)}</div>
           </div>
           <div class="row">
-            ${profileHref ? `<a class="btn small secondary" href="${profileHref}">${icon("user")}Профиль</a>` : ""}
-            <a class="btn small secondary" href="${esc(telLink(contact.phone))}">${icon("phone")}Позвонить</a>
+            ${profileHref ? `<a class="btn small secondary" href="${profileHref}">${icon("user")}${t("common.profile")}</a>` : ""}
+            <a class="btn small secondary" href="${esc(telLink(contact.phone))}">${icon("phone")}${t("common.call")}</a>
             <a class="btn small whatsapp" href="${esc(waLink(contact.phone))}" target="_blank" rel="noopener noreferrer">${icon("message-circle")}WhatsApp</a>
           </div>
         </div>`;
@@ -82,12 +83,11 @@
       const canAccept = isOwner && ["searching", "offers_received"].includes(order.status);
       if (!offers.length) {
         return canAccept
-          ? `<div style="margin-top:16px">${emptyState("timer", "Ждём предложения мастеров",
-              "Мастера этой категории уже видят заказ. Мы пришлём уведомление, как только кто-то предложит цену.")}</div>`
+          ? `<div style="margin-top:16px">${emptyState("timer", t("detail.waitTitle"), t("detail.waitText"))}</div>`
           : "";
       }
       return `
-        <div class="section-title">${isOwner ? `Предложения мастеров <span class="muted" style="font-family:var(--font-text);font-weight:500">· ${offers.length}</span>` : "Ваше предложение"}</div>
+        <div class="section-title">${isOwner ? `${t("detail.offersTitle")} <span class="muted" style="font-family:var(--font-text);font-weight:500">· ${offers.length}</span>` : t("detail.yourOffer")}</div>
         <div class="stack reveal">
           ${offers.map((o, i) => `
             <div class="offer-card ${o.status}">
@@ -96,17 +96,17 @@
                 <div class="row" style="gap:8px">
                   <a href="master.html?id=${o.master.id}" style="font-weight:700;font-size:16px">${esc(o.master.name)}</a>
                   ${o.master.verified ? verifiedBadge() : ""}
-                  ${canAccept && i === 0 && offers.length > 1 ? '<span class="status-pill info">Лучшая цена</span>' : ""}
+                  ${canAccept && i === 0 && offers.length > 1 ? `<span class="status-pill info">${t("detail.bestPrice")}</span>` : ""}
                 </div>
-                <div class="meta">${ratingHtml(o.master.rating)}<span>${icon("briefcase")}${o.master.completed_orders} ${pluralize(o.master.completed_orders, "заказ", "заказа", "заказов")}</span></div>
+                <div class="meta">${ratingHtml(o.master.rating)}<span>${icon("briefcase")}${plural(o.master.completed_orders, "p.orders")}</span></div>
                 ${o.comment ? `<div class="comment">${esc(o.comment)}</div>` : ""}
               </div>
               <div class="offer-side">
                 <div class="price">${formatPrice(o.price)}</div>
                 ${canAccept && o.status === "pending"
-                  ? `<button class="btn small success" onclick="accept(${o.id}, ${o.price})">${icon("check")}Выбрать</button>`
-                  : o.status === "accepted" ? '<span class="status-pill ok">Выбран</span>'
-                  : o.status === "rejected" ? '<span class="status-pill">Не выбран</span>' : '<span class="status-pill info">Ожидает ответа</span>'}
+                  ? `<button class="btn small success" onclick="accept(${o.id}, ${o.price})">${icon("check")}${t("detail.choose")}</button>`
+                  : o.status === "accepted" ? `<span class="status-pill ok">${t("detail.chosen")}</span>`
+                  : o.status === "rejected" ? `<span class="status-pill">${t("detail.notChosen")}</span>` : `<span class="status-pill info">${t("detail.awaiting")}</span>`}
               </div>
             </div>`).join("")}
         </div>`;
@@ -120,8 +120,8 @@
       if (isAssigned && MASTER_NEXT[order.status]) {
         parts.push(`
           <div class="card-box">
-            <h2 class="form-section-title">${icon("refresh-cw")}Обновите статус</h2>
-            <p class="muted" style="margin:6px 0 16px">Клиент получит уведомление.</p>
+            <h2 class="form-section-title">${icon("refresh-cw")}${t("detail.updateStatus")}</h2>
+            <p class="muted" style="margin:6px 0 16px">${t("detail.clientNotified")}</p>
             <div class="row">${MASTER_NEXT[order.status].map(([s, label, ic], i) =>
               `<button class="btn ${i ? "secondary" : ""}" onclick="setStatus('${s}')">${icon(ic)}${label}</button>`).join("")}</div>
           </div>`);
@@ -130,38 +130,38 @@
       if (isOwner && ["master_confirmed", "master_en_route", "in_progress"].includes(order.status)) {
         parts.push(`
           <div class="card-box row">
-            <div style="flex:1;min-width:200px"><b>Мастер закончил работу?</b><div class="muted">Подтвердите — и сможете оставить отзыв.</div></div>
-            <button class="btn success" onclick="setStatus('completed')">${icon("circle-check")}Работа выполнена</button>
+            <div style="flex:1;min-width:200px"><b>${t("detail.doneQ")}</b><div class="muted">${t("detail.doneText")}</div></div>
+            <button class="btn success" onclick="setStatus('completed')">${icon("circle-check")}${t("detail.workDone")}</button>
           </div>`);
       }
 
       if (isOwner && order.status === "completed") {
         parts.push(`
           <form class="card" id="reviewForm" style="max-width:none" onsubmit="event.preventDefault(); sendReview();">
-            <h2 class="form-section-title">${icon("thumbs-up")}Оцените работу мастера</h2>
-            <div class="star-input" id="starInput" role="radiogroup" aria-label="Оценка">${[1, 2, 3, 4, 5].map(n =>
-              `<button type="button" data-n="${n}" aria-label="${n} из 5" onclick="setRating(${n})">${icon("star")}</button>`).join("")}</div>
-            <label>Отзыв (необязательно)
-              <textarea id="reviewText" rows="3" maxlength="2000" placeholder="Что понравилось, что можно улучшить"></textarea>
+            <h2 class="form-section-title">${icon("thumbs-up")}${t("detail.rateTitle")}</h2>
+            <div class="star-input" id="starInput" role="radiogroup" aria-label="${t("detail.ratingAria")}">${[1, 2, 3, 4, 5].map(n =>
+              `<button type="button" data-n="${n}" aria-label="${t("detail.nOf5", { n })}" onclick="setRating(${n})">${icon("star")}</button>`).join("")}</div>
+            <label>${t("detail.reviewLabel")}
+              <textarea id="reviewText" rows="3" maxlength="2000" placeholder="${t("detail.reviewPh")}"></textarea>
             </label>
             <div class="error" id="reviewError"></div>
-            <button class="btn" type="submit">${icon("send")}Отправить отзыв</button>
+            <button class="btn" type="submit">${icon("send")}${t("detail.sendReview")}</button>
           </form>`);
       }
 
       const cancellable = isOwner && !["completed", "reviewed", "cancelled"].includes(order.status);
       parts.push(`
         <div class="row" style="justify-content:flex-end">
-          <button class="btn small ghost" onclick="toggleComplaint()">${icon("flag")}Пожаловаться</button>
-          ${cancellable ? `<button class="btn small secondary" onclick="cancelOrder()">${icon("circle-x")}Отменить заказ</button>` : ""}
+          <button class="btn small ghost" onclick="toggleComplaint()">${icon("flag")}${t("detail.report")}</button>
+          ${cancellable ? `<button class="btn small secondary" onclick="cancelOrder()">${icon("circle-x")}${t("detail.cancel")}</button>` : ""}
         </div>
         <form class="card" id="complaintForm" hidden style="max-width:none" onsubmit="event.preventDefault(); sendComplaint();">
-          <h2 class="form-section-title">${icon("flag")}Жалоба администратору</h2>
-          <label>Опишите проблему
+          <h2 class="form-section-title">${icon("flag")}${t("detail.reportTitle")}</h2>
+          <label>${t("detail.reportLabel")}
             <textarea id="complaintText" rows="3" maxlength="2000" required></textarea>
           </label>
           <div class="error" id="complaintError"></div>
-          <button class="btn danger" type="submit">Отправить жалобу</button>
+          <button class="btn danger" type="submit">${t("detail.sendReport")}</button>
         </form>`);
       return parts.join("");
     }
@@ -169,20 +169,20 @@
     function render() {
       const isOwner = order.client_id === me.id;
       const tiles = [
-        order.date ? metaTile("calendar", "Когда", `${formatDate(order.date)}${order.time ? ", " + esc(order.time) : ""}`) : "",
-        order.address ? metaTile("map-pin", "Адрес", esc(order.address)) : "",
-        order.price ? metaTile("wallet", order.master_id ? "Цена" : "Бюджет", formatPrice(order.price)) : "",
-        metaTile("clock", "Создан", formatDate(order.created_at, true)),
+        order.date ? metaTile("calendar", t("detail.when"), `${formatDate(order.date)}${order.time ? ", " + esc(order.time) : ""}`) : "",
+        order.address ? metaTile("map-pin", t("common.address"), esc(order.address)) : "",
+        order.price ? metaTile("wallet", order.master_id ? t("detail.price") : t("detail.budget"), formatPrice(order.price)) : "",
+        metaTile("clock", t("detail.created"), formatDate(order.created_at, true)),
       ].join("");
 
       document.getElementById("content").innerHTML = `
-        <a class="back-link" href="orders.html">${icon("arrow-left", "sm")}${isOwner ? "Мои заказы" : "Мои работы"}</a>
+        <a class="back-link" href="orders.html">${icon("arrow-left", "sm")}${isOwner ? t("nav.myOrders") : t("nav.myJobs")}</a>
         <div class="card-box">
           <div class="row" style="gap:14px">
             ${categoryBadge(categoryName, "cat-dot lg")}
             <div style="flex:1;min-width:150px">
-              <h1 style="margin:0;font-size:22px;overflow-wrap:anywhere">${esc(categoryName)}</h1>
-              <div class="muted">Заказ #${order.id}</div>
+              <h1 style="margin:0;font-size:22px;overflow-wrap:anywhere">${esc(catName(categoryName))}</h1>
+              <div class="muted">${t("common.orderNum", { id: order.id })}</div>
             </div>
             ${statusPillHtml(order.status)}
           </div>
@@ -190,11 +190,11 @@
           <p style="white-space:pre-wrap;margin:22px 0 0;font-size:16px">${esc(order.description)}</p>
           <div class="order-meta-grid">${tiles}</div>
           ${order.photos.length ? `<div class="photo-grid" style="margin:16px 0 0">${order.photos.map(p =>
-            `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото к заказу" loading="lazy" /></a>`).join("")}</div>` : ""}
+            `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="${t("detail.photoAlt")}" loading="lazy" /></a>`).join("")}</div>` : ""}
         </div>
 
-        ${order.master_contact ? `<div style="margin-top:16px">${contactHtml(order.master_contact, "Ваш мастер", `master.html?id=${order.master_id}`)}</div>` : ""}
-        ${order.client_contact ? `<div style="margin-top:16px">${contactHtml(order.client_contact, "Клиент", null)}</div>` : ""}
+        ${order.master_contact ? `<div style="margin-top:16px">${contactHtml(order.master_contact, t("detail.yourMaster"), `master.html?id=${order.master_id}`)}</div>` : ""}
+        ${order.client_contact ? `<div style="margin-top:16px">${contactHtml(order.client_contact, t("detail.client"), null)}</div>` : ""}
 
         ${offersHtml()}
         <div class="stack" style="margin-top:16px">${actionsHtml()}</div>
@@ -204,20 +204,20 @@
 
     async function load() {
       if (!/^\d+$/.test(orderId || "")) {
-        document.getElementById("content").innerHTML = emptyState("search-x", "Заказ не найден", "",
-          `<a class="btn" href="orders.html">К заказам</a>`);
+        document.getElementById("content").innerHTML = emptyState("search-x", t("detail.notFound"), "",
+          `<a class="btn" href="orders.html">${t("detail.toOrders")}</a>`);
         return;
       }
       try {
         const [user, o, cats] = await Promise.all([api.me(), api.getOrder(orderId), api.categories()]);
         me = user;
         order = o;
-        categoryName = cats.find(c => c.id === o.category_id)?.name || "Заказ";
+        categoryName = cats.find(c => c.id === o.category_id)?.name || t("common.order");
         offers = await api.orderOffers(orderId);
         render();
       } catch (e) {
         document.getElementById("content").innerHTML = emptyState("lock", esc(e.message), "",
-          `<a class="btn" href="orders.html">К заказам</a>`);
+          `<a class="btn" href="orders.html">${t("detail.toOrders")}</a>`);
       }
     }
 
@@ -228,22 +228,22 @@
         await load();
         refreshUnread();
       } catch (e) {
-        toast("Ошибка: " + e.message);
+        toast(t("common.error") + e.message);
       }
     }
 
     function accept(offerId, price) {
-      if (!confirm(`Выбрать этого мастера за ${formatPrice(price)}? Остальные предложения будут отклонены.`)) return;
-      run(() => api.acceptOffer(orderId, offerId), "Мастер выбран — свяжитесь с ним");
+      if (!confirm(t("detail.confirmAccept", { price: formatPrice(price) }))) return;
+      run(() => api.acceptOffer(orderId, offerId), t("detail.chosenToast"));
     }
 
     function setStatus(status) {
-      run(() => api.setOrderStatus(orderId, status), "Статус обновлён");
+      run(() => api.setOrderStatus(orderId, status), t("detail.statusUpdated"));
     }
 
     function cancelOrder() {
-      if (!confirm("Отменить заказ?")) return;
-      run(() => api.cancelOrder(orderId), "Заказ отменён");
+      if (!confirm(t("detail.confirmCancel"))) return;
+      run(() => api.cancelOrder(orderId), t("detail.cancelled"));
     }
 
     function setRating(n) {
@@ -254,7 +254,7 @@
     async function sendReview() {
       try {
         await api.leaveReview(orderId, { rating: reviewRating, text: document.getElementById("reviewText").value.trim() || null });
-        toast("Спасибо за отзыв!");
+        toast(t("detail.thanks"));
         load();
       } catch (e) {
         document.getElementById("reviewError").textContent = e.message;
@@ -269,7 +269,7 @@
     async function sendComplaint() {
       try {
         await api.fileComplaint({ text: document.getElementById("complaintText").value.trim(), order_id: Number(orderId) });
-        toast("Жалоба отправлена администратору");
+        toast(t("detail.reportSent"));
         document.getElementById("complaintForm").hidden = true;
       } catch (e) {
         document.getElementById("complaintError").textContent = e.message;

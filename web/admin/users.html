@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Пользователи — Админ-панель</title>
+  <title data-i18n="admin.tabUsers">Пользователи — Админ-панель</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
@@ -14,31 +14,32 @@
   </header>
 
   <main class="wide">
-    <h1>Пользователи</h1>
+    <h1 data-i18n="admin.tabUsers">Пользователи</h1>
     <div class="admin-tabs">
-      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Дашборд</a>
-      <a href="users.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg>Пользователи</a>
-      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg>Мастера</a>
-      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg>Заказы</a>
-      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg>Жалобы</a>
-      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg>Категории</a>
+      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="admin.tabDashboard">Дашборд</span></a>
+      <a href="users.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg><span data-i18n="admin.tabUsers">Пользователи</span></a>
+      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="admin.tabMasters">Мастера</span></a>
+      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg><span data-i18n="admin.tabOrders">Заказы</span></a>
+      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg><span data-i18n="admin.tabComplaints">Жалобы</span></a>
+      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="admin.tabCategories">Категории</span></a>
     </div>
 
-    <div id="content"><p class="muted">Загрузка…</p></div>
+    <div id="content"><p class="muted" data-i18n="common.loading">Загрузка…</p></div>
   </main>
 
   <script src="../js/icons.js"></script>
+  <script src="../js/i18n.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
   <script>
     function statusPill(status) {
       return status === "blocked"
-        ? '<span class="status-pill bad">Заблокирован</span>'
-        : '<span class="status-pill ok">Активен</span>';
+        ? `<span class="status-pill bad">${t("admin.blocked")}</span>`
+        : `<span class="status-pill ok">${t("admin.active")}</span>`;
     }
 
-    const roleLabels = { client: "Клиент", master: "Мастер", admin: "Админ" };
+    const roleLabels = { client: t("admin.roleClient"), master: t("admin.roleMaster"), admin: t("admin.roleAdmin") };
 
     async function load() {
       const content = document.getElementById("content");
@@ -47,7 +48,7 @@
         content.innerHTML = `
           <div class="table-wrap"><table class="admin-table">
             <thead>
-              <tr><th>Имя</th><th>Телефон</th><th>Роль</th><th>Статус</th><th>Регистрация</th><th></th></tr>
+              <tr><th>${t("admin.name")}</th><th>${t("common.phone")}</th><th>${t("admin.role")}</th><th>${t("admin.status")}</th><th>${t("admin.registered")}</th><th></th></tr>
             </thead>
             <tbody>
               ${users.map(u => `
@@ -56,11 +57,11 @@
                   <td>${esc(u.phone)}</td>
                   <td>${roleLabels[u.role] || u.role}</td>
                   <td>${statusPill(u.status)}</td>
-                  <td>${new Date(u.created_at).toLocaleDateString("ru-RU")}</td>
+                  <td>${formatDate(u.created_at)}</td>
                   <td>
                     ${u.role === "admin" ? "" : u.status === "blocked"
-                      ? `<button class="btn small secondary" onclick="setStatus(${u.id}, 'active')">Разблокировать</button>`
-                      : `<button class="btn small danger-soft" onclick="setStatus(${u.id}, 'blocked')">Заблокировать</button>`}
+                      ? `<button class="btn small secondary" onclick="setStatus(${u.id}, 'active')">${t("admin.unblock")}</button>`
+                      : `<button class="btn small danger-soft" onclick="setStatus(${u.id}, 'blocked')">${t("admin.block")}</button>`}
                   </td>
                 </tr>
               `).join("")}
@@ -68,7 +69,7 @@
           </table></div>
         `;
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        content.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
       }
     }
 
@@ -77,7 +78,7 @@
         await api.adminSetUserStatus(id, status);
         load();
       } catch (e) {
-        toast("Не удалось изменить статус: " + e.message);
+        toast(t("admin.statusError") + e.message);
       }
     }
 

@@ -12,7 +12,7 @@ function ensureNavToggle(nav) {
   toggle.id = "navToggle";
   toggle.className = "nav-toggle";
   toggle.type = "button";
-  toggle.setAttribute("aria-label", "Меню");
+  toggle.setAttribute("aria-label", t("nav.menu"));
   toggle.innerHTML = icon("menu", "lg");
   toggle.addEventListener("click", () => {
     const open = nav.classList.toggle("open");
@@ -22,16 +22,50 @@ function ensureNavToggle(nav) {
   nav.parentNode.insertBefore(toggle, nav);
 }
 
+function ensureLangSwitch(nav) {
+  if (document.getElementById("langSwitch")) return;
+  const current = LANGS.find(l => l.code === LANG);
+  const box = document.createElement("div");
+  box.id = "langSwitch";
+  box.className = "lang-switch";
+  box.innerHTML = `
+    <button type="button" class="lang-btn" aria-haspopup="true" aria-expanded="false" aria-label="${t("lang.label")}">
+      ${icon("globe")}<span>${current.short}</span>${icon("chevron-down", "sm")}
+    </button>
+    <div class="lang-menu" role="menu" hidden>
+      ${LANGS.map(l => `
+        <button type="button" role="menuitemradio" aria-checked="${l.code === LANG}" class="${l.code === LANG ? "active" : ""}" data-lang="${l.code}">
+          <span class="code">${l.short}</span>${l.label}${l.code === LANG ? icon("check", "sm") : ""}
+        </button>`).join("")}
+    </div>`;
+  const button = box.querySelector(".lang-btn");
+  const menu = box.querySelector(".lang-menu");
+  const close = () => { menu.hidden = true; button.setAttribute("aria-expanded", "false"); };
+  button.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    button.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  menu.addEventListener("click", (e) => {
+    const item = e.target.closest("[data-lang]");
+    if (item) setLang(item.dataset.lang);
+  });
+  document.addEventListener("click", close);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  nav.parentNode.insertBefore(box, nav);
+}
+
 async function renderNav() {
   const nav = document.getElementById("nav");
   if (!nav) return;
+  ensureLangSwitch(nav);
   ensureNavToggle(nav);
 
   const guestNav = `
-    ${navLink("masters.html", "Найти мастера", "search")}
-    ${navLink("register.html?role=master", "Стать мастером", "briefcase")}
-    ${navLink("login.html", "Войти", "user")}
-    <a class="btn small accent" href="${ROOT}order.html">${icon("plus")}Создать заказ</a>
+    ${navLink("masters.html", t("nav.find"), "search")}
+    ${navLink("register.html?role=master", t("nav.becomeMaster"), "briefcase")}
+    ${navLink("login.html", t("nav.login"), "user")}
+    <a class="btn small accent" href="${ROOT}order.html">${icon("plus")}${t("nav.createOrder")}</a>
   `;
 
   if (!getToken()) {
@@ -42,20 +76,20 @@ async function renderNav() {
     const user = await api.me();
     const links = [];
     if (user.role === "master") {
-      links.push(navLink("feed.html", "Новые заказы", "inbox"));
-      links.push(navLink("orders.html", "Мои работы", "clipboard-list"));
-      links.push(navLink("master-profile-edit.html", "Профиль", "settings-2"));
+      links.push(navLink("feed.html", t("nav.feed"), "inbox"));
+      links.push(navLink("orders.html", t("nav.myJobs"), "clipboard-list"));
+      links.push(navLink("master-profile-edit.html", t("common.profile"), "settings-2"));
     } else {
-      links.push(navLink("masters.html", "Найти мастера", "search"));
-      links.push(navLink("orders.html", "Мои заказы", "clipboard-list"));
+      links.push(navLink("masters.html", t("nav.find"), "search"));
+      links.push(navLink("orders.html", t("nav.myOrders"), "clipboard-list"));
     }
-    if (user.role === "admin") links.push(navLink("admin/index.html", "Админка", "shield-check"));
+    if (user.role === "admin") links.push(navLink("admin/index.html", t("nav.admin"), "shield-check"));
 
     nav.innerHTML = `
       ${links.join("")}
-      <a class="nav-bell" href="${ROOT}notifications.html" title="Уведомления" aria-label="Уведомления">${icon("bell", "lg")}<span class="label">Уведомления</span><span class="count" id="unreadCount" hidden></span></a>
+      <a class="nav-bell" href="${ROOT}notifications.html" title="${t("nav.notifications")}" aria-label="${t("nav.notifications")}">${icon("bell", "lg")}<span class="label">${t("nav.notifications")}</span><span class="count" id="unreadCount" hidden></span></a>
       <span class="nav-user">${esc(user.name)}${avatarHtml(user.name, "avatar-xs")}</span>
-      <a class="nav-link" href="#" onclick="logout(); return false;" title="Выйти">${icon("log-out")}<span class="nav-logout-label">Выйти</span></a>
+      <a class="nav-link" href="#" onclick="logout(); return false;" title="${t("nav.logout")}">${icon("log-out")}<span class="nav-logout-label">${t("nav.logout")}</span></a>
     `;
     refreshUnread();
   } catch (e) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Мои заказы — Мастер рядом</title>
+  <title data-i18n="orders.docTitle">Мои заказы — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -16,22 +16,23 @@
   <main class="narrow">
     <div class="page-head">
       <div>
-        <h1 id="title">Мои заказы</h1>
+        <h1 id="title" data-i18n="nav.myOrders">Мои заказы</h1>
         <p class="muted" id="subtitle">&nbsp;</p>
       </div>
       <a class="btn accent" id="headerAction" href="order.html" hidden></a>
     </div>
 
     <div class="chips" role="tablist">
-      <button class="chip active" data-tab="active" onclick="setTab('active')"><svg class="i" aria-hidden="true"><use href="#i-timer"></use></svg>Активные <span id="cnt-active"></span></button>
-      <button class="chip" data-tab="done" onclick="setTab('done')"><svg class="i" aria-hidden="true"><use href="#i-circle-check"></use></svg>Завершённые <span id="cnt-done"></span></button>
-      <button class="chip" data-tab="cancelled" onclick="setTab('cancelled')"><svg class="i" aria-hidden="true"><use href="#i-circle-x"></use></svg>Отменённые <span id="cnt-cancelled"></span></button>
+      <button class="chip active" data-tab="active" onclick="setTab('active')"><svg class="i" aria-hidden="true"><use href="#i-timer"></use></svg><span data-i18n="orders.tabActive">Активные</span> <span id="cnt-active"></span></button>
+      <button class="chip" data-tab="done" onclick="setTab('done')"><svg class="i" aria-hidden="true"><use href="#i-circle-check"></use></svg><span data-i18n="orders.tabDone">Завершённые</span> <span id="cnt-done"></span></button>
+      <button class="chip" data-tab="cancelled" onclick="setTab('cancelled')"><svg class="i" aria-hidden="true"><use href="#i-circle-x"></use></svg><span data-i18n="orders.tabCancelled">Отменённые</span> <span id="cnt-cancelled"></span></button>
     </div>
 
     <div id="list" class="stack"></div>
   </main>
 
   <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -63,23 +64,23 @@
       if (!visible.length) {
         list.classList.remove("reveal");
         list.innerHTML = isMaster
-          ? emptyState("briefcase", "Здесь пока пусто", "Заказы появятся, когда клиент выберет ваше предложение.",
-              `<a class="btn" href="feed.html">${icon("inbox")}Смотреть новые заказы</a>`)
-          : emptyState("clipboard-list", "Здесь пока пусто", "Опишите задачу — мастера сами предложат цену.",
-              `<a class="btn accent" href="order.html">${icon("plus")}Создать заказ</a>`);
+          ? emptyState("briefcase", t("orders.emptyTitle"), t("orders.emptyMaster"),
+              `<a class="btn" href="feed.html">${icon("inbox")}${t("orders.seeNew")}</a>`)
+          : emptyState("clipboard-list", t("orders.emptyTitle"), t("orders.emptyClient"),
+              `<a class="btn accent" href="order.html">${icon("plus")}${t("nav.createOrder")}</a>`);
         return;
       }
       list.classList.add("reveal");
       list.innerHTML = visible.map(o => {
-        const cat = categories[o.category_id] || "Заказ";
-        const action = !isMaster && o.status === "offers_received" ? `<span class="btn small accent">Выбрать мастера ${icon("arrow-right")}</span>`
-          : !isMaster && o.status === "completed" ? `<span class="btn small">Оставить отзыв ${icon("arrow-right")}</span>` : "";
+        const cat = categories[o.category_id] || "";
+        const action = !isMaster && o.status === "offers_received" ? `<span class="btn small accent">${t("orders.chooseMaster")} ${icon("arrow-right")}</span>`
+          : !isMaster && o.status === "completed" ? `<span class="btn small">${t("orders.leaveReview")} ${icon("arrow-right")}</span>` : "";
         const who = isMaster && o.client_contact ? `<span>${icon("user")}${esc(o.client_contact.name)}</span>`
           : !isMaster && o.master_contact ? `<span>${icon("briefcase")}${esc(o.master_contact.name)}</span>` : "";
         return `
           <a class="order-card" href="order-detail.html?id=${o.id}">
             <div class="top">
-              <span class="title">${categoryBadge(cat)}${esc(cat)}</span>
+              <span class="title">${categoryBadge(cat)}${esc(cat ? catName(cat) : t("common.order"))}</span>
               <span class="num">#${o.id}</span>
               <span class="spacer"></span>
               ${statusPillHtml(o.status)}
@@ -103,18 +104,16 @@
         isMaster = me.role === "master";
         orders = list;
         categories = Object.fromEntries(cats.map(c => [c.id, c.name]));
-        document.getElementById("title").textContent = isMaster ? "Мои работы" : "Мои заказы";
-        document.getElementById("subtitle").textContent = isMaster
-          ? "Заказы, на которые вас выбрали клиенты"
-          : "Следите за предложениями мастеров и статусом работ";
+        document.getElementById("title").textContent = isMaster ? t("nav.myJobs") : t("nav.myOrders");
+        document.getElementById("subtitle").textContent = isMaster ? t("orders.subMaster") : t("orders.subClient");
         const action = document.getElementById("headerAction");
-        action.innerHTML = isMaster ? `${icon("inbox")}Новые заказы` : `${icon("plus")}Новый заказ`;
+        action.innerHTML = isMaster ? `${icon("inbox")}${t("nav.feed")}` : `${icon("plus")}${t("orders.new")}`;
         action.href = isMaster ? "feed.html" : "order.html";
         action.className = isMaster ? "btn" : "btn accent";
         action.hidden = false;
         render();
       } catch (e) {
-        document.getElementById("list").innerHTML = emptyState("triangle-alert", "Не удалось загрузить заказы", esc(e.message));
+        document.getElementById("list").innerHTML = emptyState("triangle-alert", t("orders.loadError"), esc(e.message));
       }
     }
 

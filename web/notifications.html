@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Уведомления — Мастер рядом</title>
+  <title data-i18n="notif.docTitle">Уведомления — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -16,14 +16,15 @@
   <main class="narrow">
     <div class="page-head">
       <div>
-        <h1>Уведомления</h1>
-        <p class="muted">Новые предложения и изменения статуса ваших заказов</p>
+        <h1 data-i18n="nav.notifications">Уведомления</h1>
+        <p class="muted" data-i18n="notif.sub">Новые предложения и изменения статуса ваших заказов</p>
       </div>
     </div>
     <div id="list"></div>
   </main>
 
   <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -51,7 +52,7 @@
       try {
         const items = await api.notifications();
         if (!items.length) {
-          list.innerHTML = emptyState("bell", "Уведомлений пока нет", "Здесь появятся новые предложения и изменения статуса заказов.");
+          list.innerHTML = emptyState("bell", t("notif.emptyTitle"), t("notif.emptyText"));
           return;
         }
         list.innerHTML = `<div class="card-box reveal" style="padding:0;overflow:hidden">${items.map(n => {
@@ -59,8 +60,8 @@
           const body = `
             <span class="n-ico">${icon(notificationIcon(n.title))}</span>
             <div style="flex:1;min-width:0">
-              <div style="font-weight:700">${esc(n.title)}</div>
-              ${n.text ? `<div class="muted" style="font-size:15px">${esc(n.text)}</div>` : ""}
+              <div style="font-weight:700">${esc(tServer(n.title))}</div>
+              ${n.text ? `<div class="muted" style="font-size:15px">${esc(tServer(n.text))}</div>` : ""}
               <div class="muted" style="font-size:13px;margin-top:4px">${formatDate(n.created_at, true)}</div>
             </div>
             <span class="dot"></span>`;
@@ -73,7 +74,7 @@
           refreshUnread();
         }
       } catch (e) {
-        list.innerHTML = emptyState("triangle-alert", "Не удалось загрузить уведомления", esc(e.message));
+        list.innerHTML = emptyState("triangle-alert", t("notif.loadError"), esc(e.message));
       }
     }
 

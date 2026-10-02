@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Мастера — Админ-панель</title>
+  <title data-i18n="admin.tabMasters">Мастера — Админ-панель</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
@@ -14,20 +14,21 @@
   </header>
 
   <main class="wide">
-    <h1>Мастера</h1>
+    <h1 data-i18n="admin.tabMasters">Мастера</h1>
     <div class="admin-tabs">
-      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Дашборд</a>
-      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg>Пользователи</a>
-      <a href="masters.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg>Мастера</a>
-      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg>Заказы</a>
-      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg>Жалобы</a>
-      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg>Категории</a>
+      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="admin.tabDashboard">Дашборд</span></a>
+      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg><span data-i18n="admin.tabUsers">Пользователи</span></a>
+      <a href="masters.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="admin.tabMasters">Мастера</span></a>
+      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg><span data-i18n="admin.tabOrders">Заказы</span></a>
+      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg><span data-i18n="admin.tabComplaints">Жалобы</span></a>
+      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="admin.tabCategories">Категории</span></a>
     </div>
 
-    <div id="content"><p class="muted">Загрузка…</p></div>
+    <div id="content"><p class="muted" data-i18n="common.loading">Загрузка…</p></div>
   </main>
 
   <script src="../js/icons.js"></script>
+  <script src="../js/i18n.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
@@ -39,7 +40,7 @@
         content.innerHTML = `
           <div class="table-wrap"><table class="admin-table">
             <thead>
-              <tr><th>Мастер</th><th>Телефон</th><th>Город</th><th>Рейтинг</th><th>Заказов</th><th>Статус</th><th></th></tr>
+              <tr><th>${t("admin.master")}</th><th>${t("common.phone")}</th><th>${t("common.city")}</th><th>${t("admin.rating")}</th><th>${t("admin.orders")}</th><th>${t("admin.status")}</th><th></th></tr>
             </thead>
             <tbody>
               ${masters.map(m => `
@@ -50,12 +51,12 @@
                   <td>${ratingHtml(m.rating)}</td>
                   <td>${m.completed_orders}</td>
                   <td>${m.verified
-                    ? '<span class="status-pill ok">Проверен</span>'
-                    : '<span class="status-pill warn">Не проверен</span>'}</td>
+                    ? `<span class="status-pill ok">${t("common.verified")}</span>`
+                    : `<span class="status-pill warn">${t("admin.notVerified")}</span>`}</td>
                   <td>
                     ${m.verified
-                      ? `<button class="btn small secondary" onclick="setVerified(${m.id}, false)">Снять отметку</button>`
-                      : `<button class="btn small" onclick="setVerified(${m.id}, true)">Подтвердить</button>`}
+                      ? `<button class="btn small secondary" onclick="setVerified(${m.id}, false)">${t("admin.unverify")}</button>`
+                      : `<button class="btn small" onclick="setVerified(${m.id}, true)">${t("admin.verify")}</button>`}
                   </td>
                 </tr>
               `).join("")}
@@ -63,7 +64,7 @@
           </table></div>
         `;
       } catch (e) {
-        content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        content.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
       }
     }
 
@@ -72,7 +73,7 @@
         await api.adminVerifyMaster(id, verified);
         load();
       } catch (e) {
-        toast("Не удалось изменить статус: " + e.message);
+        toast(t("admin.statusError") + e.message);
       }
     }
 
