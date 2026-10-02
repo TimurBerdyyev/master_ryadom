@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -16,6 +16,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+def utcnow() -> datetime:
+    """Naive UTC timestamp (columns are timezone-naive); replaces deprecated datetime.utcnow()."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class UserRole(str, enum.Enum):
@@ -65,7 +70,7 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.client)
     photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus), default=UserStatus.active)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     master: Mapped["Master"] = relationship(back_populates="user", uselist=False)
     addresses: Mapped[list["Address"]] = relationship(back_populates="user")
@@ -86,7 +91,7 @@ class Master(Base):
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     user: Mapped["User"] = relationship(back_populates="master")
     services: Mapped[list["Service"]] = relationship(back_populates="master")
@@ -111,8 +116,8 @@ class Service(Base):
     __tablename__ = "services"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"))
-    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"), index=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), index=True)
     title: Mapped[str] = mapped_column(String(255))
     price_from: Mapped[float] = mapped_column(Numeric(10, 2))
 
@@ -124,9 +129,9 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    client_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
-    master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), index=True)
+    master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True, index=True)
     description: Mapped[str] = mapped_column(Text)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -134,10 +139,11 @@ class Order(Base):
     price: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
     date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     time: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.created)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.created, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     category: Mapped["Category"] = relationship(back_populates="orders")
+    client: Mapped["User"] = relationship(foreign_keys=[client_id])
     master: Mapped["Master"] = relationship(back_populates="orders")
     offers: Mapped[list["OrderOffer"]] = relationship(back_populates="order")
     photos: Mapped[list["Photo"]] = relationship(back_populates="order")
@@ -148,14 +154,15 @@ class OrderOffer(Base):
     __tablename__ = "order_offers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
-    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"))
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"), index=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2))
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[OfferStatus] = mapped_column(Enum(OfferStatus), default=OfferStatus.pending)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     order: Mapped["Order"] = relationship(back_populates="offers")
+    master: Mapped["Master"] = relationship()
 
 
 class Review(Base):
@@ -163,11 +170,11 @@ class Review(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), unique=True)
-    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"))
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"), index=True)
     client_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     rating: Mapped[int] = mapped_column(Integer)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     order: Mapped["Order"] = relationship(back_populates="review")
     master: Mapped["Master"] = relationship(back_populates="reviews")
@@ -177,23 +184,23 @@ class Message(Base):
     __tablename__ = "messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
     sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Photo(Base):
     __tablename__ = "photos"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True)
-    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True)
+    master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True, index=True)
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True, index=True)
     url: Mapped[str] = mapped_column(String(500))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     master: Mapped["Master"] = relationship(back_populates="photos")
     order: Mapped["Order"] = relationship(back_populates="photos")
@@ -228,11 +235,11 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String(255))
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     user: Mapped["User"] = relationship(back_populates="notifications")
 
@@ -244,7 +251,7 @@ class Payment(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
     amount: Mapped[float] = mapped_column(Numeric(10, 2))
     commission: Mapped[float] = mapped_column(Numeric(10, 2))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Complaint(Base):
@@ -256,4 +263,4 @@ class Complaint(Base):
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True)
     text: Mapped[str] = mapped_column(Text)
     status: Mapped[ComplaintStatus] = mapped_column(Enum(ComplaintStatus), default=ComplaintStatus.open)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

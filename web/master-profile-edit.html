@@ -4,54 +4,68 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Мой профиль мастера — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
-  <main>
-    <h1>Мой профиль мастера</h1>
-    <p class="muted">Эти данные видят клиенты в поиске. Заполните их, чтобы получать заказы.</p>
+  <main class="narrow">
+    <div class="page-head">
+      <div>
+        <h1>Мой профиль мастера</h1>
+        <p class="muted">Эти данные видят клиенты в поиске. Заполните их, чтобы получать заказы.</p>
+      </div>
+      <a class="btn secondary" id="publicLink" href="#" hidden>Как видят клиенты →</a>
+    </div>
 
-    <form class="card" id="profileForm">
+    <div class="notice success" id="welcome" hidden style="margin-bottom:16px">
+      🎉 Добро пожаловать! Заполните профиль и добавьте хотя бы одну услугу — после этого вы начнёте видеть заказы в разделе «Новые заказы».
+    </div>
+
+    <form class="card" id="profileForm" style="max-width:none">
+      <h2 style="margin:0">О себе</h2>
       <label>
-        О себе
-        <textarea id="description" rows="3" placeholder="Например: опытный сантехник, работаю быстро и аккуратно"></textarea>
+        Описание
+        <textarea id="description" rows="3" maxlength="2000" placeholder="Например: опытный сантехник, работаю быстро и аккуратно"></textarea>
       </label>
-      <label>
-        Опыт работы (лет)
-        <input id="experience_years" type="number" min="0" />
-      </label>
-      <label>
-        Город
-        <input id="city" type="text" placeholder="Бишкек" />
-      </label>
+      <div class="form-grid">
+        <label>
+          Опыт работы (лет)
+          <input id="experience_years" type="number" min="0" max="80" />
+        </label>
+        <label>
+          Город
+          <input id="city" type="text" maxlength="255" placeholder="Бишкек" />
+        </label>
+      </div>
       <label>
         Район
-        <input id="district" type="text" placeholder="Центр" />
+        <input id="district" type="text" maxlength="255" placeholder="Центр" />
       </label>
       <div id="profileError" class="error"></div>
       <button class="btn" type="submit">Сохранить</button>
     </form>
 
     <div class="section-title">Мои услуги и цены</div>
-    <div id="servicesList" class="master-list"></div>
+    <div id="servicesList" class="card-box" style="padding-top:6px;padding-bottom:6px"></div>
 
-    <form class="card" id="serviceForm" style="margin-top:16px">
+    <form class="card" id="serviceForm" style="margin-top:16px;max-width:none">
+      <h2 style="margin:0">Добавить услугу</h2>
       <label>
         Категория
         <select id="serviceCategory" required></select>
       </label>
       <label>
         Название услуги
-        <input id="serviceTitle" type="text" placeholder="Например: замена смесителя" required />
+        <input id="serviceTitle" type="text" maxlength="255" placeholder="Например: замена смесителя" required />
       </label>
       <label>
         Цена от (сом)
-        <input id="servicePrice" type="number" min="0" required />
+        <input id="servicePrice" type="number" min="0" max="10000000" required />
       </label>
       <div id="serviceError" class="error"></div>
       <button class="btn secondary" type="submit">Добавить услугу</button>
@@ -59,8 +73,8 @@
 
     <div class="section-title">Фото работ</div>
     <div id="photosGrid" class="photo-grid"></div>
-    <label class="btn secondary" style="display:inline-flex; cursor:pointer;">
-      Добавить фото
+    <label class="btn secondary" style="cursor:pointer;">
+      📷 Добавить фото
       <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" />
     </label>
     <div id="photoError" class="error"></div>
@@ -69,9 +83,8 @@
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
-    if (!getToken()) {
-      location.href = `login.html?next=${encodeURIComponent(location.pathname)}`;
-    }
+    const loggedIn = requireLogin("master-profile-edit.html");
+    if (new URLSearchParams(location.search).get("welcome")) document.getElementById("welcome").hidden = false;
 
     let categories = [];
 
@@ -83,6 +96,9 @@
         document.getElementById("city").value = master.city || "";
         document.getElementById("district").value = master.district || "";
         renderServices(master.services);
+        const link = document.getElementById("publicLink");
+        link.href = `master.html?id=${master.id}`;
+        link.hidden = false;
         renderPhotos(master.photos);
       } catch (e) {
         document.getElementById("profileError").textContent = "Не удалось загрузить профиль: " + e.message;
@@ -95,15 +111,20 @@
         list.innerHTML = `<p class="muted">Вы пока не добавили ни одной услуги — без них клиенты не найдут вас в категории.</p>`;
         return;
       }
-      list.innerHTML = services.map(s => `
-        <div class="master-card" style="align-items:center">
-          <div class="info">
-            <div class="name">${esc(s.title)}</div>
-            <div class="meta">от ${s.price_from} сом</div>
+      list.innerHTML = services.map(s => {
+        const cat = categories.find(c => c.id === s.category_id)?.name || "";
+        return `
+        <div class="service-row" style="align-items:center">
+          <div>
+            <div style="font-weight:600">${esc(s.title)}</div>
+            <div class="muted" style="font-size:13px">${categoryIcon(cat)} ${esc(cat)}</div>
           </div>
-          <button class="btn secondary" onclick="removeService(${s.id})">Удалить</button>
-        </div>
-      `).join("");
+          <div class="row">
+            <span class="price">от ${formatPrice(s.price_from)}</span>
+            <button class="btn small secondary" onclick="removeService(${s.id})">Удалить</button>
+          </div>
+        </div>`;
+      }).join("");
     }
 
     function renderPhotos(photos) {
@@ -121,7 +142,7 @@
         await api.deleteMyPhoto(id);
         loadProfile();
       } catch (e) {
-        alert("Не удалось удалить фото: " + e.message);
+        toast("Не удалось удалить фото: " + e.message);
       }
     }
 
@@ -144,14 +165,14 @@
         await api.deleteMyService(id);
         loadProfile();
       } catch (e) {
-        alert("Не удалось удалить услугу: " + e.message);
+        toast("Не удалось удалить услугу: " + e.message);
       }
     }
 
     async function loadCategories() {
       categories = await api.categories();
       document.getElementById("serviceCategory").innerHTML =
-        categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+        categories.map(c => `<option value="${c.id}">${categoryIcon(c.name)} ${esc(c.name)}</option>`).join("");
     }
 
     document.getElementById("profileForm").addEventListener("submit", async (e) => {
@@ -165,13 +186,8 @@
           city: document.getElementById("city").value || null,
           district: document.getElementById("district").value || null,
         });
-        errorBox.textContent = "";
-        errorBox.classList.remove("error");
-        errorBox.classList.add("muted");
-        errorBox.textContent = "Сохранено ✓";
+        toast("Профиль сохранён ✓");
       } catch (e) {
-        errorBox.classList.remove("muted");
-        errorBox.classList.add("error");
         errorBox.textContent = "Не удалось сохранить: " + e.message;
       }
     });
@@ -188,14 +204,30 @@
         });
         document.getElementById("serviceTitle").value = "";
         document.getElementById("servicePrice").value = "";
+        toast("Услуга добавлена");
         loadProfile();
       } catch (e) {
         errorBox.textContent = "Не удалось добавить услугу: " + e.message;
       }
     });
 
-    loadCategories();
-    loadProfile();
+    async function init() {
+      const me = await api.me();
+      if (me.role !== "master") {
+        document.querySelector("main").innerHTML = `
+          <div class="empty">
+            <div class="emoji">🧰</div>
+            <h3>Эта страница для мастеров</h3>
+            <p>Вы вошли как клиент. Чтобы получать заказы, зарегистрируйте отдельный аккаунт мастера.</p>
+            <a class="btn" href="orders.html">Мои заказы</a>
+          </div>`;
+        return;
+      }
+      await loadCategories().catch(() => {});
+      loadProfile();
+    }
+
+    if (loggedIn) init().catch(e => toast("Ошибка: " + e.message));
     renderNav();
   </script>
 </body>

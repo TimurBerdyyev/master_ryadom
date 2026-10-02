@@ -4,62 +4,72 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Регистрация — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main>
-    <h1>Регистрация</h1>
+    <div class="auth-wrap">
+      <h1>Создать аккаунт</h1>
+      <p class="muted">Это займёт меньше минуты</p>
 
-    <form class="card" id="registerForm">
-      <label>
-        Кто вы?
-        <select id="role">
-          <option value="client">Я ищу мастера</option>
-          <option value="master">Я мастер</option>
-        </select>
-      </label>
-      <label>
-        Имя
-        <input id="name" type="text" required />
-      </label>
-      <label>
-        Телефон
-        <input id="phone" type="tel" placeholder="+996 700 000 000" required />
-      </label>
-      <label>
-        Пароль
-        <input id="password" type="password" required minlength="6" />
-      </label>
-      <div id="formError" class="error"></div>
-      <button class="btn" type="submit">Зарегистрироваться</button>
-      <p class="muted">Уже есть аккаунт? <a href="login.html">Войти</a></p>
-    </form>
+      <form class="card" id="registerForm">
+        <div class="role-picker">
+          <input type="radio" name="role" id="roleClient" value="client" checked />
+          <label for="roleClient"><span class="emoji">🏠</span>Ищу мастера<small>Создаю заказы</small></label>
+          <input type="radio" name="role" id="roleMaster" value="master" />
+          <label for="roleMaster"><span class="emoji">🧰</span>Я мастер<small>Получаю заказы</small></label>
+        </div>
+        <label>
+          Имя
+          <input id="name" type="text" autocomplete="name" required maxlength="255" />
+        </label>
+        <label>
+          Телефон
+          <input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" />
+        </label>
+        <label>
+          Пароль
+          <input id="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" />
+          <span class="hint">Минимум 6 символов</span>
+        </label>
+        <div id="formError" class="error"></div>
+        <button class="btn block" type="submit" id="submitBtn">Зарегистрироваться</button>
+        <p class="muted" style="text-align:center;margin:0">Уже есть аккаунт? <a href="login.html">Войти</a></p>
+      </form>
+    </div>
   </main>
 
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
+    const params = new URLSearchParams(location.search);
+    if (params.get("role") === "master") document.getElementById("roleMaster").checked = true;
+
     document.getElementById("registerForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const errorBox = document.getElementById("formError");
+      const button = document.getElementById("submitBtn");
+      const role = document.querySelector('input[name="role"]:checked').value;
       errorBox.textContent = "";
+      button.disabled = true;
       try {
         const { access_token } = await api.register({
           name: document.getElementById("name").value,
           phone: document.getElementById("phone").value,
           password: document.getElementById("password").value,
-          role: document.getElementById("role").value,
+          role,
         });
         setToken(access_token);
-        const role = document.getElementById("role").value;
-        location.href = role === "master" ? "master-profile-edit.html" : "index.html";
+        location.href = role === "master" ? "master-profile-edit.html?welcome=1" : safeNext(params.get("next"));
       } catch (e) {
         errorBox.textContent = "Не удалось зарегистрироваться: " + e.message;
+        button.disabled = false;
       }
     });
 

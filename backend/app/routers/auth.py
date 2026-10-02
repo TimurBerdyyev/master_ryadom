@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
@@ -25,12 +26,21 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         role=data.role,
     )
     db.add(user)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Пользователь с таким телефоном уже существует")
 
     if data.role == UserRole.master:
         db.add(Master(user_id=user.id))
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Two simultaneous sign-ups with the same phone: the unique index catches the loser.
+        db.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Пользователь с таким телефоном уже существует")
     db.refresh(user)
     return Token(access_token=create_access_token(user.id))
 

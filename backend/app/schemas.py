@@ -1,13 +1,25 @@
+import re
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import ComplaintStatus, OfferStatus, OrderStatus, UserRole, UserStatus
 
 # bcrypt silently ignores bytes past 72; reject earlier with a clear error instead of a
 # confusing login mismatch for passwords that differ only after that point.
 PASSWORD_MAX_LENGTH = 72
+
+PHONE_RE = re.compile(r"^\+?\d{9,15}$")
+
+
+def normalize_phone(value: str) -> str:
+    """Strip formatting so "+996 700-00-00-01" and "+996700000001" are the same account."""
+    return re.sub(r"[\s\-()]", "", value.strip())
+
+
+Latitude = Annotated[float, Field(ge=-90, le=90)]
+Longitude = Annotated[float, Field(ge=-180, le=180)]
 
 
 class UserRegister(BaseModel):
@@ -16,10 +28,31 @@ class UserRegister(BaseModel):
     password: str = Field(min_length=6, max_length=PASSWORD_MAX_LENGTH)
     role: Literal[UserRole.client, UserRole.master] = UserRole.client
 
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Имя не может быть пустым")
+        return value
+
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, value: str) -> str:
+        value = normalize_phone(value)
+        if not PHONE_RE.match(value):
+            raise ValueError("Телефон должен содержать от 9 до 15 цифр, например +996700000000")
+        return value
+
 
 class UserLogin(BaseModel):
     phone: str = Field(min_length=1, max_length=32)
     password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
+
+    @field_validator("phone")
+    @classmethod
+    def clean_phone(cls, value: str) -> str:
+        return normalize_phone(value)
 
 
 class Token(BaseModel):
@@ -83,8 +116,8 @@ class MasterRegister(BaseModel):
     experience_years: int | None = Field(None, ge=0, le=80)
     city: str | None = Field(None, max_length=255)
     district: str | None = Field(None, max_length=255)
-    latitude: float | None = None
-    longitude: float | None = None
+    latitude: Latitude | None = None
+    longitude: Longitude | None = None
 
 
 class MasterProfileUpdate(BaseModel):
@@ -92,8 +125,8 @@ class MasterProfileUpdate(BaseModel):
     experience_years: int | None = Field(None, ge=0, le=80)
     city: str | None = Field(None, max_length=255)
     district: str | None = Field(None, max_length=255)
-    latitude: float | None = None
-    longitude: float | None = None
+    latitude: Latitude | None = None
+    longitude: Longitude | None = None
 
 
 class ServiceCreate(BaseModel):
@@ -106,11 +139,17 @@ class OrderCreate(BaseModel):
     category_id: int
     description: str = Field(min_length=1, max_length=2000)
     address: str | None = Field(None, max_length=500)
-    latitude: float | None = None
-    longitude: float | None = None
+    latitude: Latitude | None = None
+    longitude: Longitude | None = None
     price: float | None = Field(None, ge=0, le=10_000_000)
     date: datetime | None = None
-    time: str | None = Field(None, max_length=16)
+    time: str | None = Field(None, max_length=16, pattern=r"^\d{1,2}:\d{2}$")
+
+
+class ContactOut(BaseModel):
+    """Name + phone of the other side of an order, shown only once a master is selected."""
+    name: str
+    phone: str
 
 
 class OrderOut(BaseModel):
@@ -128,6 +167,12 @@ class OrderOut(BaseModel):
     status: OrderStatus
     created_at: datetime
     photos: list[PhotoOut] = []
+    client_contact: ContactOut | None = None
+    master_contact: ContactOut | None = None
+
+
+class OrderStatusUpdate(BaseModel):
+    status: OrderStatus
 
 
 class OrderOfferCreate(BaseModel):
@@ -147,6 +192,35 @@ class OrderOfferOut(BaseModel):
     created_at: datetime
 
 
+class MasterBriefOut(BaseModel):
+    id: int
+    name: str
+    rating: float
+    verified: bool
+    completed_orders: int
+
+
+class OrderOfferDetailOut(OrderOfferOut):
+    master: MasterBriefOut
+
+
+class OrderFeedOut(BaseModel):
+    """Open order as seen by masters: no address or client data until they are selected."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    category_id: int
+    description: str
+    price: float | None = None
+    date: datetime | None = None
+    time: str | None = None
+    status: OrderStatus
+    created_at: datetime
+    photos: list[PhotoOut] = []
+    offers_count: int = 0
+    my_offer: OrderOfferOut | None = None
+
+
 class ReviewCreate(BaseModel):
     rating: int = Field(ge=1, le=5)
     text: str | None = Field(None, max_length=2000)
@@ -162,6 +236,10 @@ class ReviewOut(BaseModel):
     rating: int
     text: str | None = None
     created_at: datetime
+
+
+class UnreadCountOut(BaseModel):
+    unread: int
 
 
 class NotificationOut(BaseModel):

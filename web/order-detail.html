@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Заказ — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="narrow" id="content">
+    <div class="skeleton" style="height:220px;margin-bottom:16px"></div>
+    <div class="skeleton" style="height:160px"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const orderId = new URLSearchParams(location.search).get("id");
+    const loggedIn = requireLogin(`order-detail.html?id=${encodeURIComponent(orderId || "")}`);
+
+    const PROGRESS = [
+      ["searching", "Поиск"],
+      ["master_selected", "Выбран"],
+      ["master_confirmed", "Подтвердил"],
+      ["master_en_route", "В пути"],
+      ["in_progress", "В работе"],
+      ["completed", "Готово"],
+    ];
+    const PROGRESS_INDEX = { created: 0, searching: 0, offers_received: 0, reviewed: 5 };
+    PROGRESS.forEach(([s], i) => { if (!(s in PROGRESS_INDEX)) PROGRESS_INDEX[s] = i; });
+
+    // Next steps the assigned master can report.
+    const MASTER_NEXT = {
+      master_selected: [["master_confirmed", "Подтвердить заказ"]],
+      master_confirmed: [["master_en_route", "Я выехал"], ["in_progress", "Начал работу"]],
+      master_en_route: [["in_progress", "Начал работу"]],
+      in_progress: [["completed", "Работа выполнена"]],
+    };
+
+    let me, order, offers, categoryName;
+    let reviewRating = 5;
+
+    function progressHtml(status) {
+      if (status === "cancelled") return "";
+      const idx = PROGRESS_INDEX[status] ?? 0;
+      return `
+        <div class="progress">${PROGRESS.map((_, i) => `<span class="${i <= idx ? "done" : ""}"></span>`).join("")}</div>
+        <div class="progress-labels">${PROGRESS.map(([, l]) => `<span>${l}</span>`).join("")}</div>`;
+    }
+
+    function contactHtml(contact, title, profileHref) {
+      return `
+        <div class="contact-box">
+          ${avatarHtml(contact.name)}
+          <div style="flex:1;min-width:160px">
+            <div class="muted" style="font-size:12px">${title}</div>
+            <div style="font-weight:700">${esc(contact.name)}</div>
+            <div class="muted">${esc(contact.phone)}</div>
+          </div>
+          <div class="row">
+            ${profileHref ? `<a class="btn small secondary" href="${profileHref}">Профиль</a>` : ""}
+            <a class="btn small secondary" href="${esc(telLink(contact.phone))}">📞 Позвонить</a>
+            <a class="btn small whatsapp" href="${esc(waLink(contact.phone))}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          </div>
+        </div>`;
+    }
+
+    function offersHtml() {
+      const isOwner = order.client_id === me.id;
+      const canAccept = isOwner && ["searching", "offers_received"].includes(order.status);
+      if (!offers.length) {
+        return canAccept
+          ? `<div class="empty" style="padding:32px"><div class="emoji">⏳</div><h3>Ждём предложения мастеров</h3><p style="margin:0">Мы пришлём уведомление, как только мастер предложит цену.</p></div>`
+          : "";
+      }
+      return `
+        <div class="section-title">${isOwner ? `Предложения мастеров (${offers.length})` : "Ваше предложение"}</div>
+        <div class="stack">
+          ${offers.map(o => `
+            <div class="offer-card ${o.status}">
+              ${avatarHtml(o.master.name)}
+              <div style="flex:1;min-width:160px">
+                <div style="font-weight:700">
+                  <a href="master.html?id=${o.master.id}">${esc(o.master.name)}</a>
+                  ${o.master.verified ? '<span class="badge">✓ Проверен</span>' : ""}
+                </div>
+                <div class="muted"><span class="rating">★ <b>${o.master.rating.toFixed(1)}</b></span> · ${o.master.completed_orders} ${pluralize(o.master.completed_orders, "заказ", "заказа", "заказов")}</div>
+                ${o.comment ? `<div style="margin-top:6px;font-size:14px;white-space:pre-wrap">${esc(o.comment)}</div>` : ""}
+              </div>
+              <div style="text-align:right">
+                <div class="price">${formatPrice(o.price)}</div>
+                ${canAccept && o.status === "pending"
+                  ? `<button class="btn small success" style="margin-top:8px" onclick="accept(${o.id}, ${o.price})">Выбрать</button>`
+                  : o.status === "accepted" ? '<span class="status-pill ok">Выбран</span>'
+                  : o.status === "rejected" ? '<span class="status-pill">Не выбран</span>' : '<span class="status-pill info">Ожидает</span>'}
+              </div>
+            </div>`).join("")}
+        </div>`;
+    }
+
+    function actionsHtml() {
+      const isOwner = order.client_id === me.id;
+      const isAssigned = !isOwner && order.client_contact;
+      const parts = [];
+
+      if (isAssigned && MASTER_NEXT[order.status]) {
+        parts.push(`
+          <div class="card-box">
+            <h2>Обновите статус</h2>
+            <p class="muted" style="margin-top:-6px">Клиент получит уведомление.</p>
+            <div class="row">${MASTER_NEXT[order.status].map(([s, label], i) =>
+              `<button class="btn ${i ? "secondary" : ""}" onclick="setStatus('${s}')">${label}</button>`).join("")}</div>
+          </div>`);
+      }
+
+      if (isOwner && ["master_confirmed", "master_en_route", "in_progress"].includes(order.status)) {
+        parts.push(`
+          <div class="card-box row">
+            <div style="flex:1;min-width:200px"><b>Мастер закончил работу?</b><div class="muted">Подтвердите, чтобы оставить отзыв.</div></div>
+            <button class="btn success" onclick="setStatus('completed')">Работа выполнена</button>
+          </div>`);
+      }
+
+      if (isOwner && order.status === "completed") {
+        parts.push(`
+          <form class="card" id="reviewForm" style="max-width:none" onsubmit="event.preventDefault(); sendReview();">
+            <h2 style="margin:0">Оцените работу мастера</h2>
+            <div class="star-input" id="starInput">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-n="${n}" onclick="setRating(${n})">★</button>`).join("")}</div>
+            <label>Отзыв (необязательно)
+              <textarea id="reviewText" rows="3" maxlength="2000" placeholder="Что понравилось, что можно улучшить"></textarea>
+            </label>
+            <div class="error" id="reviewError"></div>
+            <button class="btn" type="submit">Отправить отзыв</button>
+          </form>`);
+      }
+
+      const cancellable = isOwner && !["completed", "reviewed", "cancelled"].includes(order.status);
+      parts.push(`
+        <div class="row" style="justify-content:flex-end">
+          <button class="btn small ghost" onclick="toggleComplaint()">Пожаловаться</button>
+          ${cancellable ? `<button class="btn small secondary" onclick="cancelOrder()">Отменить заказ</button>` : ""}
+        </div>
+        <form class="card" id="complaintForm" hidden style="max-width:none" onsubmit="event.preventDefault(); sendComplaint();">
+          <label>Опишите проблему
+            <textarea id="complaintText" rows="3" maxlength="2000" required></textarea>
+          </label>
+          <div class="error" id="complaintError"></div>
+          <button class="btn danger" type="submit">Отправить жалобу</button>
+        </form>`);
+      return parts.join("");
+    }
+
+    function render() {
+      const isOwner = order.client_id === me.id;
+      const details = [
+        order.date ? `<div><span class="muted">Когда:</span> ${formatDate(order.date)}${order.time ? ", " + esc(order.time) : ""}</div>` : "",
+        order.address ? `<div><span class="muted">Адрес:</span> ${esc(order.address)}</div>` : "",
+        order.price ? `<div><span class="muted">${order.master_id ? "Цена" : "Бюджет"}:</span> <b>${formatPrice(order.price)}</b></div>` : "",
+      ].join("");
+
+      document.getElementById("content").innerHTML = `
+        <a class="muted" href="orders.html">← ${isOwner ? "Мои заказы" : "Мои работы"}</a>
+        <div class="card-box" style="margin-top:12px">
+          <div class="row">
+            <h1 style="margin:0;font-size:22px">${categoryIcon(categoryName)} ${esc(categoryName)} <span class="muted" style="font-size:16px">#${order.id}</span></h1>
+            <span class="spacer"></span>
+            ${statusPillHtml(order.status)}
+          </div>
+          ${progressHtml(order.status)}
+          <p style="white-space:pre-wrap;margin:18px 0 12px">${esc(order.description)}</p>
+          <div class="stack" style="gap:4px;font-size:14px">${details}</div>
+          ${order.photos.length ? `<div class="photo-grid" style="margin:16px 0 0">${order.photos.map(p =>
+            `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото" loading="lazy" /></a>`).join("")}</div>` : ""}
+          <div class="muted" style="margin-top:12px;font-size:12px">Создан ${formatDate(order.created_at, true)}</div>
+        </div>
+
+        ${order.master_contact ? `<div style="margin-top:16px">${contactHtml(order.master_contact, "Ваш мастер", `master.html?id=${order.master_id}`)}</div>` : ""}
+        ${order.client_contact ? `<div style="margin-top:16px">${contactHtml(order.client_contact, "Клиент", null)}</div>` : ""}
+
+        ${offersHtml()}
+        <div class="stack" style="margin-top:16px">${actionsHtml()}</div>
+      `;
+      if (document.getElementById("starInput")) setRating(reviewRating);
+    }
+
+    async function load() {
+      if (!/^\d+$/.test(orderId || "")) {
+        document.getElementById("content").innerHTML = `<div class="empty"><h3>Заказ не найден</h3><a class="btn" href="orders.html">К заказам</a></div>`;
+        return;
+      }
+      try {
+        const [user, o, cats] = await Promise.all([api.me(), api.getOrder(orderId), api.categories()]);
+        me = user;
+        order = o;
+        categoryName = cats.find(c => c.id === o.category_id)?.name || "Заказ";
+        offers = await api.orderOffers(orderId);
+        render();
+      } catch (e) {
+        document.getElementById("content").innerHTML = `<div class="empty"><div class="emoji">🔒</div><h3>${esc(e.message)}</h3><a class="btn" href="orders.html">К заказам</a></div>`;
+      }
+    }
+
+    async function run(action, successMessage) {
+      try {
+        await action();
+        toast(successMessage);
+        await load();
+        refreshUnread();
+      } catch (e) {
+        toast("Ошибка: " + e.message);
+      }
+    }
+
+    function accept(offerId, price) {
+      if (!confirm(`Выбрать этого мастера за ${formatPrice(price)}? Остальные предложения будут отклонены.`)) return;
+      run(() => api.acceptOffer(orderId, offerId), "Мастер выбран — свяжитесь с ним");
+    }
+
+    function setStatus(status) {
+      run(() => api.setOrderStatus(orderId, status), "Статус обновлён");
+    }
+
+    function cancelOrder() {
+      if (!confirm("Отменить заказ?")) return;
+      run(() => api.cancelOrder(orderId), "Заказ отменён");
+    }
+
+    function setRating(n) {
+      reviewRating = n;
+      document.querySelectorAll("#starInput button").forEach(b => b.classList.toggle("on", Number(b.dataset.n) <= n));
+    }
+
+    async function sendReview() {
+      try {
+        await api.leaveReview(orderId, { rating: reviewRating, text: document.getElementById("reviewText").value.trim() || null });
+        toast("Спасибо за отзыв!");
+        load();
+      } catch (e) {
+        document.getElementById("reviewError").textContent = e.message;
+      }
+    }
+
+    function toggleComplaint() {
+      const form = document.getElementById("complaintForm");
+      form.hidden = !form.hidden;
+    }
+
+    async function sendComplaint() {
+      try {
+        await api.fileComplaint({ text: document.getElementById("complaintText").value.trim(), order_id: Number(orderId) });
+        toast("Жалоба отправлена администратору");
+        document.getElementById("complaintForm").hidden = true;
+      } catch (e) {
+        document.getElementById("complaintError").textContent = e.message;
+      }
+    }
+
+    if (loggedIn) load();
+    renderNav();
+  </script>
+</body>
+</html>

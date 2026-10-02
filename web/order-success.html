@@ -4,24 +4,40 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Заявка отправлена — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
-  <main>
-    <h1>Заявка отправлена ✅</h1>
-    <p>Заказ <strong id="orderId"></strong> создан. Мы уведомим вас, как только мастера начнут присылать предложения.</p>
-    <a class="btn" href="index.html">На главную</a>
+  <main class="narrow">
+    <div class="card-box success-hero">
+      <div class="check">✓</div>
+      <h1>Заявка отправлена</h1>
+      <p class="muted">Заказ <strong id="orderId"></strong> создан. Мастера уже видят его — мы пришлём уведомление, как только появятся предложения.</p>
+      <p class="error" id="photoError"></p>
+      <div class="row" style="justify-content:center;margin-top:20px">
+        <a class="btn" id="orderLink" href="orders.html">Открыть заказ</a>
+        <a class="btn secondary" href="index.html">На главную</a>
+      </div>
+    </div>
   </main>
 
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
-    document.getElementById("orderId").textContent = "#" + new URLSearchParams(location.search).get("id");
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id");
+    if (/^\d+$/.test(id || "")) {
+      document.getElementById("orderId").textContent = "#" + id;
+      document.getElementById("orderLink").href = `order-detail.html?id=${id}`;
+    }
+    if (params.get("photo_error")) {
+      document.getElementById("photoError").textContent = "Не все фото удалось загрузить — заказ при этом создан.";
+    }
     renderNav();
   </script>
 </body>

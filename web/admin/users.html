@@ -4,11 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Пользователи — Админ-панель</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="../css/style.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="../index.html">🔧 Мастер рядом</a>
+    <a class="logo" href="../index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
@@ -43,7 +44,7 @@
       try {
         const users = await api.adminUsers();
         content.innerHTML = `
-          <table class="admin-table">
+          <div class="table-wrap"><table class="admin-table">
             <thead>
               <tr><th>Имя</th><th>Телефон</th><th>Роль</th><th>Статус</th><th>Регистрация</th><th></th></tr>
             </thead>
@@ -63,7 +64,7 @@
                 </tr>
               `).join("")}
             </tbody>
-          </table>
+          </table></div>
         `;
       } catch (e) {
         content.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;

@@ -4,30 +4,44 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Поиск мастеров — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main>
-    <h1 id="title">Мастера</h1>
+    <div class="page-head">
+      <div>
+        <h1 id="title">Мастера</h1>
+        <p class="muted" id="subtitle"></p>
+      </div>
+      <a class="btn" id="orderBtn" href="order.html">+ Создать заказ</a>
+    </div>
 
-    <div class="filters">
+    <div class="chips" id="categoryChips"></div>
+
+    <form class="filters" onsubmit="event.preventDefault(); applyFilters();">
+      <input id="searchInput" type="search" class="grow" maxlength="100" placeholder="Имя, услуга или описание" />
+      <input id="cityFilter" type="text" maxlength="100" placeholder="Город" style="width:140px" />
+      <select id="ratingFilter">
+        <option value="">Любой рейтинг</option>
+        <option value="4">★ 4 и выше</option>
+        <option value="4.5">★ 4.5 и выше</option>
+      </select>
       <select id="verifiedFilter">
         <option value="">Все мастера</option>
         <option value="true">Только проверенные</option>
       </select>
-      <select id="ratingFilter">
-        <option value="">Любой рейтинг</option>
-        <option value="4">От 4 и выше</option>
-        <option value="4.5">От 4.5 и выше</option>
+      <select id="sortFilter">
+        <option value="rating">По рейтингу</option>
+        <option value="orders">По числу заказов</option>
       </select>
-      <input id="cityFilter" type="text" placeholder="Город" />
-      <button class="btn secondary" onclick="loadMasters()">Применить</button>
-    </div>
+      <button class="btn" type="submit">Найти</button>
+    </form>
 
     <div id="masterList" class="master-list"></div>
   </main>
@@ -36,20 +50,79 @@
   <script src="js/nav.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
-    const categoryId = params.get("category_id");
-    const categoryName = params.get("name");
-    if (categoryName) document.getElementById("title").textContent = categoryName;
+    let categoryId = params.get("category_id") || "";
+    let categories = [];
 
-    function initials(name) {
-      return esc(name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase());
+    document.getElementById("searchInput").value = params.get("q") || "";
+    document.getElementById("cityFilter").value = params.get("city") || "";
+
+    function categoryName(id) {
+      return categories.find(c => String(c.id) === String(id))?.name;
+    }
+
+    function renderChips() {
+      const chips = [`<button type="button" class="chip ${categoryId ? "" : "active"}" onclick="pickCategory('')">Все</button>`]
+        .concat(categories.map(c => `
+          <button type="button" class="chip ${String(c.id) === String(categoryId) ? "active" : ""}" onclick="pickCategory('${c.id}')">
+            ${categoryIcon(c.name)} ${esc(c.name)}
+          </button>`));
+      document.getElementById("categoryChips").innerHTML = chips.join("");
+    }
+
+    function pickCategory(id) {
+      categoryId = id;
+      renderChips();
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const q = document.getElementById("searchInput").value.trim();
+      const city = document.getElementById("cityFilter").value.trim();
+      const next = new URLSearchParams();
+      if (categoryId) next.set("category_id", categoryId);
+      if (q) next.set("q", q);
+      if (city) next.set("city", city);
+      history.replaceState(null, "", `?${next}`);
+      loadMasters();
+    }
+
+    function masterCard(m) {
+      const prices = m.services.map(s => s.price_from);
+      const minPrice = prices.length ? Math.min(...prices) : null;
+      const tags = [...new Set(m.services.map(s => s.title))].slice(0, 4);
+      return `
+        <a class="master-card" href="master.html?id=${m.id}">
+          ${avatarHtml(m.user.name)}
+          <div class="info">
+            <div class="name">${esc(m.user.name)} ${m.verified ? '<span class="badge">✓ Проверен</span>' : ''}</div>
+            <div class="meta">
+              <span class="rating">★ <b>${m.rating.toFixed(1)}</b></span>
+              · ${m.completed_orders} ${pluralize(m.completed_orders, "заказ", "заказа", "заказов")}
+              ${m.experience_years ? `· опыт ${m.experience_years} ${pluralize(m.experience_years, "год", "года", "лет")}` : ""}
+              ${m.city ? "· 📍 " + esc(m.city) : ""}
+            </div>
+            ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ""}
+            ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
+          </div>
+          <div class="side">
+            ${minPrice !== null ? `<div class="price"><small>от</small> ${formatPrice(minPrice)}</div>` : ""}
+            <span class="btn small secondary" style="margin-top:10px">Подробнее</span>
+          </div>
+        </a>`;
     }
 
     async function loadMasters() {
       const list = document.getElementById("masterList");
-      list.innerHTML = `<p class="muted">Загрузка…</p>`;
+      list.innerHTML = skeletons(4, 110);
 
-      const query = {};
+      const q = document.getElementById("searchInput").value.trim();
+      const name = categoryName(categoryId) || params.get("name");
+      document.getElementById("title").textContent = q ? `Поиск: «${q}»` : (categoryId && name ? name : "Все мастера");
+      document.getElementById("orderBtn").href = categoryId ? `order.html?category_id=${encodeURIComponent(categoryId)}` : "order.html";
+
+      const query = { sort: document.getElementById("sortFilter").value };
       if (categoryId) query.category_id = categoryId;
+      if (q) query.q = q;
       const verified = document.getElementById("verifiedFilter").value;
       if (verified) query.verified = verified;
       const minRating = document.getElementById("ratingFilter").value;
@@ -59,30 +132,25 @@
 
       try {
         const masters = await api.searchMasters(query);
+        document.getElementById("subtitle").textContent =
+          `Найдено ${masters.length} ${pluralize(masters.length, "мастер", "мастера", "мастеров")}`;
         if (masters.length === 0) {
-          list.innerHTML = `<p class="muted">Мастера не найдены. Попробуйте изменить фильтры.</p>`;
+          list.innerHTML = `
+            <div class="empty">
+              <div class="emoji">🔍</div>
+              <h3>Мастера не найдены</h3>
+              <p>Попробуйте изменить запрос или фильтры — или создайте заказ, и мастера сами откликнутся.</p>
+              <a class="btn" href="order.html${categoryId ? `?category_id=${encodeURIComponent(categoryId)}` : ""}">Создать заказ</a>
+            </div>`;
           return;
         }
-        list.innerHTML = masters.map(m => `
-          <div class="master-card" onclick="location.href='master.html?id=${m.id}'">
-            <div class="avatar">${initials(m.user.name)}</div>
-            <div class="info">
-              <div class="name">${esc(m.user.name)} ${m.verified ? '<span class="badge">Проверен</span>' : ''}</div>
-              <div class="meta">
-                <span class="rating">★ ${m.rating.toFixed(1)}</span>
-                · ${m.completed_orders} заказов
-                ${m.city ? '· ' + esc(m.city) : ''}
-              </div>
-              <div class="meta">${m.description ? esc(m.description.slice(0, 90)) : ''}</div>
-            </div>
-          </div>
-        `).join("");
+        list.innerHTML = masters.map(masterCard).join("");
       } catch (e) {
         list.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
       }
     }
 
-    loadMasters();
+    api.categories().then(c => { categories = c; renderChips(); loadMasters(); }).catch(() => loadMasters());
     renderNav();
   </script>
 </body>

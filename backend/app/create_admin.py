@@ -4,6 +4,7 @@ import sys
 from app.auth import hash_password
 from app.database import Base, SessionLocal, engine
 from app.models import User, UserRole
+from app.schemas import normalize_phone
 
 
 def main() -> None:
@@ -11,7 +12,7 @@ def main() -> None:
         print("Использование: python -m app.create_admin <телефон> <пароль> <имя>")
         raise SystemExit(1)
 
-    phone, password, name = sys.argv[1], sys.argv[2], sys.argv[3]
+    phone, password, name = normalize_phone(sys.argv[1]), sys.argv[2], sys.argv[3]
 
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()

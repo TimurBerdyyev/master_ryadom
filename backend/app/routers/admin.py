@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
 
 from app.auth import require_admin
 from app.database import get_db
@@ -46,8 +47,10 @@ COMMISSION_RATE = 0.10
 
 @router.get("/stats", response_model=AdminStats)
 def get_stats(db: Session = Depends(get_db)):
-    completed_orders = db.query(Order).filter(Order.status.in_(COMPLETED_ORDER_STATUSES)).all()
-    revenue_total = sum(float(o.price or 0) for o in completed_orders)
+    completed = db.query(func.count(Order.id), func.coalesce(func.sum(Order.price), 0)).filter(
+        Order.status.in_(COMPLETED_ORDER_STATUSES)
+    ).one()
+    orders_completed, revenue_total = completed[0], float(completed[1])
 
     return AdminStats(
         users_total=db.query(User).count(),
@@ -55,7 +58,7 @@ def get_stats(db: Session = Depends(get_db)):
         masters_total=db.query(Master).count(),
         masters_verified=db.query(Master).filter(Master.verified.is_(True)).count(),
         orders_active=db.query(Order).filter(Order.status.in_(ACTIVE_ORDER_STATUSES)).count(),
-        orders_completed=len(completed_orders),
+        orders_completed=orders_completed,
         orders_cancelled=db.query(Order).filter(Order.status == OrderStatus.cancelled).count(),
         revenue_total=revenue_total,
         commission_total=revenue_total * COMMISSION_RATE,
@@ -92,7 +95,7 @@ def update_user_status(user_id: int, data: UserStatusUpdate, db: Session = Depen
 
 @router.get("/masters", response_model=list[MasterOut])
 def list_masters(verified: bool | None = None, db: Session = Depends(get_db)):
-    query = db.query(Master)
+    query = db.query(Master).options(selectinload(Master.user), selectinload(Master.services), selectinload(Master.photos))
     if verified is not None:
         query = query.filter(Master.verified.is_(verified))
     return query.order_by(Master.created_at.desc()).all()
@@ -111,7 +114,7 @@ def verify_master(master_id: int, data: MasterVerifyUpdate, db: Session = Depend
 
 @router.get("/orders", response_model=list[OrderOut])
 def list_orders(status_: OrderStatus | None = Query(None, alias="status"), db: Session = Depends(get_db)):
-    query = db.query(Order)
+    query = db.query(Order).options(selectinload(Order.photos))
     if status_ is not None:
         query = query.filter(Order.status == status_)
     return query.order_by(Order.created_at.desc()).all()

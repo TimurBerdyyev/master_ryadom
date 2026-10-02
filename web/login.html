@@ -4,49 +4,58 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Вход — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main>
-    <h1>Вход</h1>
+    <div class="auth-wrap">
+      <h1>С возвращением 👋</h1>
+      <p class="muted">Войдите, чтобы создавать заказы и видеть контакты мастеров</p>
 
-    <form class="card" id="loginForm">
-      <label>
-        Телефон
-        <input id="phone" type="tel" placeholder="+996 700 000 000" required />
-      </label>
-      <label>
-        Пароль
-        <input id="password" type="password" required />
-      </label>
-      <div id="formError" class="error"></div>
-      <button class="btn" type="submit">Войти</button>
-      <p class="muted">Нет аккаунта? <a href="register.html">Зарегистрироваться</a></p>
-    </form>
+      <form class="card" id="loginForm">
+        <label>
+          Телефон
+          <input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" />
+        </label>
+        <label>
+          Пароль
+          <input id="password" type="password" autocomplete="current-password" required maxlength="72" />
+        </label>
+        <div id="formError" class="error"></div>
+        <button class="btn block" type="submit" id="submitBtn">Войти</button>
+        <p class="muted" style="text-align:center;margin:0">Нет аккаунта? <a id="registerLink" href="register.html">Зарегистрироваться</a></p>
+      </form>
+    </div>
   </main>
 
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
+    const next = safeNext(new URLSearchParams(location.search).get("next"));
+    if (next !== "index.html") document.getElementById("registerLink").href = `register.html?next=${encodeURIComponent(next)}`;
+
     document.getElementById("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const errorBox = document.getElementById("formError");
+      const button = document.getElementById("submitBtn");
       errorBox.textContent = "";
+      button.disabled = true;
       try {
         const { access_token } = await api.login({
           phone: document.getElementById("phone").value,
           password: document.getElementById("password").value,
         });
         setToken(access_token);
-        const next = new URLSearchParams(location.search).get("next") || "index.html";
         location.href = next;
       } catch (e) {
         errorBox.textContent = "Не удалось войти: " + e.message;
+        button.disabled = false;
       }
     });
 

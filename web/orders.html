@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Мои заказы — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="narrow">
+    <div class="page-head">
+      <div>
+        <h1 id="title">Мои заказы</h1>
+        <p class="muted" id="subtitle"></p>
+      </div>
+      <a class="btn" id="headerAction" href="order.html" hidden>+ Новый заказ</a>
+    </div>
+
+    <div class="chips">
+      <button class="chip active" data-tab="active" onclick="setTab('active')">Активные</button>
+      <button class="chip" data-tab="done" onclick="setTab('done')">Завершённые</button>
+      <button class="chip" data-tab="cancelled" onclick="setTab('cancelled')">Отменённые</button>
+    </div>
+
+    <div id="list" class="stack"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const loggedIn = requireLogin("orders.html");
+
+    const TABS = {
+      active: s => !["completed", "reviewed", "cancelled"].includes(s),
+      done: s => ["completed", "reviewed"].includes(s),
+      cancelled: s => s === "cancelled",
+    };
+    let tab = "active";
+    let orders = [];
+    let categories = {};
+    let isMaster = false;
+
+    function setTab(name) {
+      tab = name;
+      document.querySelectorAll(".chip[data-tab]").forEach(c => c.classList.toggle("active", c.dataset.tab === name));
+      render();
+    }
+
+    function render() {
+      const list = document.getElementById("list");
+      const visible = orders.filter(o => TABS[tab](o.status));
+      if (!visible.length) {
+        list.innerHTML = isMaster
+          ? `<div class="empty"><div class="emoji">🧰</div><h3>Здесь пока пусто</h3><p>Заказы появятся, когда клиент выберет ваше предложение.</p><a class="btn" href="feed.html">Смотреть новые заказы</a></div>`
+          : `<div class="empty"><div class="emoji">📝</div><h3>Здесь пока пусто</h3><p>Опишите задачу — мастера сами предложат цену.</p><a class="btn" href="order.html">Создать заказ</a></div>`;
+        return;
+      }
+      list.innerHTML = visible.map(o => {
+        const cat = categories[o.category_id] || "Заказ";
+        const action = !isMaster && o.status === "offers_received" ? '<span class="status-pill warn">Выберите мастера →</span>'
+          : !isMaster && o.status === "completed" ? '<span class="status-pill warn">Оставьте отзыв →</span>' : "";
+        const who = isMaster && o.client_contact ? `👤 ${esc(o.client_contact.name)}`
+          : !isMaster && o.master_contact ? `🧰 ${esc(o.master_contact.name)}` : "";
+        return `
+          <a class="order-card" href="order-detail.html?id=${o.id}">
+            <div class="top">
+              <span class="title">${categoryIcon(cat)} ${esc(cat)}</span>
+              <span class="muted">#${o.id}</span>
+              <span class="spacer"></span>
+              ${statusPillHtml(o.status)}
+            </div>
+            <div class="desc">${esc(o.description.length > 160 ? o.description.slice(0, 160) + "…" : o.description)}</div>
+            <div class="foot">
+              <span>🗓 ${formatDate(o.created_at)}</span>
+              ${o.price ? `<span>💰 ${formatPrice(o.price)}</span>` : ""}
+              ${who ? `<span>${who}</span>` : ""}
+              <span class="spacer"></span>
+              ${action}
+            </div>
+          </a>`;
+      }).join("");
+    }
+
+    async function load() {
+      document.getElementById("list").innerHTML = skeletons(3, 120);
+      try {
+        const [me, list, cats] = await Promise.all([api.me(), api.myOrders(), api.categories()]);
+        isMaster = me.role === "master";
+        orders = list;
+        categories = Object.fromEntries(cats.map(c => [c.id, c.name]));
+        document.getElementById("title").textContent = isMaster ? "Мои работы" : "Мои заказы";
+        document.getElementById("subtitle").textContent = isMaster
+          ? "Заказы, на которые вас выбрали клиенты"
+          : "Следите за предложениями и статусом работ";
+        const action = document.getElementById("headerAction");
+        if (isMaster) {
+          action.href = "feed.html";
+          action.textContent = "Новые заказы";
+        }
+        action.hidden = false;
+        render();
+      } catch (e) {
+        document.getElementById("list").innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+      }
+    }
+
+    if (loggedIn) load();
+    renderNav();
+  </script>
+</body>
+</html>

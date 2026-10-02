@@ -4,35 +4,78 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Мастер рядом — найдите специалиста рядом с вами</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html">🔧 Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main>
-    <h1>Что вам нужно?</h1>
+    <section class="hero">
+      <h1>Найдите проверенного мастера рядом с домом</h1>
+      <p>Опишите задачу — мастера сами предложат цену, а вы выберете лучшее предложение по рейтингу и отзывам.</p>
 
-    <form class="search-bar" onsubmit="event.preventDefault(); goSearch();">
-      <input id="searchInput" type="text" placeholder="Например: почистить кондиционер" />
-      <button class="btn" type="submit">Найти</button>
-    </form>
+      <form class="search-bar" onsubmit="event.preventDefault(); goSearch();">
+        <input id="searchInput" type="search" maxlength="100" placeholder="Например: починить розетку или почистить кондиционер" />
+        <button class="btn" type="submit">Найти</button>
+      </form>
 
+      <div class="hero-chips">
+        <a href="masters.html?q=%D1%81%D0%BC%D0%B5%D1%81%D0%B8%D1%82%D0%B5%D0%BB%D1%8C">Смеситель</a>
+        <a href="masters.html?q=%D1%80%D0%BE%D0%B7%D0%B5%D1%82%D0%BA%D0%B0">Розетка</a>
+        <a href="masters.html?q=%D1%83%D0%B1%D0%BE%D1%80%D0%BA%D0%B0">Уборка</a>
+        <a href="masters.html?q=%D0%BA%D0%BE%D0%BD%D0%B4%D0%B8%D1%86%D0%B8%D0%BE%D0%BD%D0%B5%D1%80">Кондиционер</a>
+      </div>
+    </section>
+
+    <div class="page-head">
+      <h2 style="margin:0">Категории услуг</h2>
+      <a class="btn ghost small" href="masters.html">Все мастера →</a>
+    </div>
     <div id="categories" class="category-grid"></div>
+
+    <div class="section-title">Как это работает</div>
+    <div class="steps">
+      <div class="step"><h3>Опишите задачу</h3><p>Расскажите, что случилось, приложите фото и удобное время.</p></div>
+      <div class="step"><h3>Получите предложения</h3><p>Мастера вашей категории пришлют цены — сравните их рейтинг и отзывы.</p></div>
+      <div class="step"><h3>Выберите мастера</h3><p>После выбора вы получите номер для звонка или WhatsApp.</p></div>
+      <div class="step"><h3>Оцените работу</h3><p>Отзыв помогает другим клиентам и честным мастерам.</p></div>
+    </div>
+
+    <div class="features">
+      <div class="feature"><div class="icon">✅</div><h3>Проверенные мастера</h3><p>Администраторы проверяют мастеров — ищите значок «Проверен».</p></div>
+      <div class="feature"><div class="icon">💬</div><h3>Честные отзывы</h3><p>Отзыв можно оставить только после выполненного заказа.</p></div>
+      <div class="feature"><div class="icon">💰</div><h3>Цена заранее</h3><p>Вы видите цену до того, как мастер выедет к вам.</p></div>
+    </div>
+
+    <div class="cta-band">
+      <div>
+        <h2>Вы мастер?</h2>
+        <p class="muted" style="margin:0">Получайте заказы рядом с домом — регистрация бесплатная.</p>
+      </div>
+      <a class="btn" href="register.html?role=master">Стать мастером</a>
+    </div>
   </main>
+
+  <footer class="site-footer">© Мастер рядом — сервис поиска мастеров</footer>
 
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
     async function loadCategories() {
       const grid = document.getElementById("categories");
+      grid.innerHTML = skeletons(8, 98);
       try {
         const categories = await api.categories();
-        grid.innerHTML = categories.map(c =>
-          `<div class="category-card" onclick="location.href='masters.html?category_id=${c.id}&name=${encodeURIComponent(c.name)}'">${esc(c.name)}</div>`
-        ).join("");
+        grid.innerHTML = categories.map(c => `
+          <a class="category-card" href="masters.html?category_id=${c.id}&name=${encodeURIComponent(c.name)}">
+            <span class="cat-icon">${categoryIcon(c.name)}</span>
+            ${esc(c.name)}
+          </a>
+        `).join("");
       } catch (e) {
         grid.innerHTML = `<p class="error">Не удалось загрузить категории: ${esc(e.message)}</p>`;
       }
@@ -40,7 +83,7 @@
 
     function goSearch() {
       const q = document.getElementById("searchInput").value.trim();
-      location.href = `masters.html?q=${encodeURIComponent(q)}`;
+      location.href = q ? `masters.html?q=${encodeURIComponent(q)}` : "masters.html";
     }
 
     loadCategories();
