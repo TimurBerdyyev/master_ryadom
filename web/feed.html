@@ -6,10 +6,27 @@
   <title>Новые заказы — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .offer-form {
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr) auto;
+      gap: 10px;
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 14px;
+      background: var(--surface-2);
+    }
+
+    @media (max-width: 600px) {
+      .offer-form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
@@ -19,12 +36,13 @@
         <h1>Новые заказы</h1>
         <p class="muted">Открытые заказы в ваших категориях. Адрес и телефон клиента откроются, когда он выберет вас.</p>
       </div>
-      <button class="btn secondary" onclick="load()">↻ Обновить</button>
+      <button class="btn secondary" onclick="load()"><svg class="i" aria-hidden="true"><use href="#i-refresh-cw"></use></svg>Обновить</button>
     </div>
 
     <div id="list" class="stack"></div>
   </main>
 
+  <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -36,45 +54,43 @@
     function offerForm(o) {
       const mine = o.my_offer;
       return `
-        <form class="row" style="margin-top:14px" onsubmit="event.preventDefault(); sendOffer(${o.id});">
-          <input class="field-input" id="price-${o.id}" type="number" min="0" max="10000000" required placeholder="Ваша цена, сом"
-                 value="${mine ? Number(mine.price) : ""}" style="width:150px;padding:10px 12px;border:1px solid var(--color-border);border-radius:10px" />
-          <input id="comment-${o.id}" type="text" maxlength="1000" placeholder="Комментарий: когда сможете приехать"
-                 value="${mine && mine.comment ? esc(mine.comment) : ""}" style="flex:1;min-width:180px;padding:10px 12px;border:1px solid var(--color-border);border-radius:10px" />
-          <button class="btn" type="submit">${mine ? "Изменить цену" : "Предложить цену"}</button>
+        <form class="offer-form" onsubmit="event.preventDefault(); sendOffer(${o.id});">
+          <span class="input-icon">${icon("wallet")}<input class="input" id="price-${o.id}" type="number" min="0" max="10000000" required
+                 placeholder="Цена, сом" aria-label="Ваша цена" value="${mine ? Number(mine.price) : ""}" /></span>
+          <input class="input" id="comment-${o.id}" type="text" maxlength="1000" aria-label="Комментарий"
+                 placeholder="Комментарий: когда сможете приехать" value="${mine && mine.comment ? esc(mine.comment) : ""}" />
+          <button class="btn ${mine ? "secondary" : "accent"}" type="submit">${icon(mine ? "pencil" : "send")}${mine ? "Изменить" : "Предложить"}</button>
         </form>`;
     }
 
     function render() {
       const list = document.getElementById("list");
       if (!orders.length) {
-        list.innerHTML = `
-          <div class="empty">
-            <div class="emoji">📭</div>
-            <h3>Новых заказов пока нет</h3>
-            <p>Заказы появляются в категориях ваших услуг. Добавьте услуги в профиль, чтобы видеть больше заказов.</p>
-            <a class="btn" href="master-profile-edit.html">Мои услуги</a>
-          </div>`;
+        list.classList.remove("reveal");
+        list.innerHTML = emptyState("inbox", "Новых заказов пока нет",
+          "Заказы появляются в категориях ваших услуг. Добавьте больше услуг в профиль, чтобы видеть больше заказов.",
+          `<a class="btn" href="master-profile-edit.html">${icon("settings-2")}Мои услуги</a>`);
         return;
       }
+      list.classList.add("reveal");
       list.innerHTML = orders.map(o => {
         const cat = categories[o.category_id] || "Заказ";
         return `
           <div class="order-card">
             <div class="top">
-              <span class="title">${categoryIcon(cat)} ${esc(cat)}</span>
-              <span class="muted">#${o.id}</span>
+              <span class="title">${categoryBadge(cat)}${esc(cat)}</span>
+              <span class="num">#${o.id}</span>
               <span class="spacer"></span>
               ${o.my_offer ? `<span class="status-pill ok">Вы предложили ${formatPrice(o.my_offer.price)}</span>` : '<span class="status-pill info">Новый</span>'}
             </div>
             <div class="desc">${esc(o.description)}</div>
-            ${o.photos.length ? `<div class="photo-grid" style="margin:12px 0 0;grid-template-columns:repeat(auto-fill,minmax(80px,1fr))">${o.photos.map(p =>
-              `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото" loading="lazy" /></a>`).join("")}</div>` : ""}
+            ${o.photos.length ? `<div class="photo-grid" style="margin:14px 0 0;grid-template-columns:repeat(auto-fill,minmax(84px,1fr))">${o.photos.map(p =>
+              `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото к заказу" loading="lazy" /></a>`).join("")}</div>` : ""}
             <div class="foot">
-              <span>🕒 ${formatDate(o.created_at, true)}</span>
-              ${o.date ? `<span>🗓 Нужно: ${formatDate(o.date)}${o.time ? ", " + esc(o.time) : ""}</span>` : ""}
-              ${o.price ? `<span>💰 Бюджет клиента: <b>${formatPrice(o.price)}</b></span>` : ""}
-              <span>💬 ${o.offers_count} ${pluralize(o.offers_count, "предложение", "предложения", "предложений")}</span>
+              <span>${icon("clock")}${formatDate(o.created_at, true)}</span>
+              ${o.date ? `<span>${icon("calendar")}Нужно ${formatDate(o.date)}${o.time ? ", " + esc(o.time) : ""}</span>` : ""}
+              ${o.price ? `<span>${icon("wallet")}Бюджет <b>${formatPrice(o.price)}</b></span>` : ""}
+              <span>${icon("users")}${o.offers_count} ${pluralize(o.offers_count, "предложение", "предложения", "предложений")}</span>
             </div>
             ${offerForm(o)}
           </div>`;
@@ -83,11 +99,12 @@
 
     async function load() {
       const list = document.getElementById("list");
-      list.innerHTML = skeletons(3, 170);
+      list.innerHTML = skeletons(3, 200);
       try {
         const me = await api.me();
         if (me.role !== "master") {
-          list.innerHTML = `<div class="empty"><div class="emoji">🧰</div><h3>Эта страница для мастеров</h3><p>Зарегистрируйтесь как мастер, чтобы получать заказы.</p><a class="btn" href="masters.html">Найти мастера</a></div>`;
+          list.innerHTML = emptyState("briefcase", "Эта страница для мастеров",
+            "Зарегистрируйтесь как мастер, чтобы получать заказы.", `<a class="btn" href="masters.html">Найти мастера</a>`);
           return;
         }
         const [feed, cats] = await Promise.all([api.orderFeed(), api.categories()]);
@@ -95,7 +112,7 @@
         categories = Object.fromEntries(cats.map(c => [c.id, c.name]));
         render();
       } catch (e) {
-        list.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        list.innerHTML = emptyState("triangle-alert", "Не удалось загрузить заказы", esc(e.message));
       }
     }
 

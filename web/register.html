@@ -9,42 +9,46 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main>
-    <div class="auth-wrap">
-      <h1>Создать аккаунт</h1>
-      <p class="muted">Это займёт меньше минуты</p>
+    <div class="auth-wrap reveal">
+      <div class="auth-head">
+        <div class="badge-icon"><svg class="i " aria-hidden="true"><use href="#i-sparkles"></use></svg></div>
+        <h1>Создать аккаунт</h1>
+        <p>Это займёт меньше минуты</p>
+      </div>
 
       <form class="card" id="registerForm">
-        <div class="role-picker">
+        <div class="role-picker" role="radiogroup" aria-label="Тип аккаунта">
           <input type="radio" name="role" id="roleClient" value="client" checked />
-          <label for="roleClient"><span class="emoji">🏠</span>Ищу мастера<small>Создаю заказы</small></label>
+          <label for="roleClient"><svg class="i " aria-hidden="true"><use href="#i-house"></use></svg>Ищу мастера<small>Создаю заказы</small></label>
           <input type="radio" name="role" id="roleMaster" value="master" />
-          <label for="roleMaster"><span class="emoji">🧰</span>Я мастер<small>Получаю заказы</small></label>
+          <label for="roleMaster"><svg class="i " aria-hidden="true"><use href="#i-briefcase"></use></svg>Я мастер<small>Получаю заказы</small></label>
         </div>
         <label>
           Имя
-          <input id="name" type="text" autocomplete="name" required maxlength="255" />
+          <span class="input-icon"><svg class="i " aria-hidden="true"><use href="#i-user"></use></svg><input id="name" type="text" autocomplete="name" required maxlength="255" placeholder="Как к вам обращаться" /></span>
         </label>
         <label>
           Телефон
-          <input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" />
+          <span class="input-icon"><svg class="i " aria-hidden="true"><use href="#i-phone"></use></svg><input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" /></span>
         </label>
         <label>
           Пароль
-          <input id="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" />
+          <span class="input-icon"><svg class="i " aria-hidden="true"><use href="#i-lock"></use></svg><input id="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" /></span>
           <span class="hint">Минимум 6 символов</span>
         </label>
-        <div id="formError" class="error"></div>
-        <button class="btn block" type="submit" id="submitBtn">Зарегистрироваться</button>
-        <p class="muted" style="text-align:center;margin:0">Уже есть аккаунт? <a href="login.html">Войти</a></p>
+        <div id="formError" class="error" role="alert"></div>
+        <button class="btn block large" type="submit" id="submitBtn">Зарегистрироваться<svg class="i " aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+        <p class="auth-foot">Уже есть аккаунт? <a class="link" href="login.html">Войти</a></p>
       </form>
     </div>
   </main>
 
+  <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>

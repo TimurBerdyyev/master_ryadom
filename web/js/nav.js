@@ -1,9 +1,9 @@
 const ROOT = location.pathname.includes("/admin/") ? "../" : "";
 
-function navLink(href, label) {
+function navLink(href, label, iconName) {
   const current = location.pathname.split("/").pop() || "index.html";
-  const active = href.split("/").pop() === current ? " active" : "";
-  return `<a class="nav-link${active}" href="${ROOT}${href}">${label}</a>`;
+  const isActive = href.split("/").pop() === current && location.pathname.includes("/admin/") === href.startsWith("admin/");
+  return `<a class="nav-link${isActive ? " active" : ""}" href="${ROOT}${href}">${iconName ? icon(iconName) : ""}${label}</a>`;
 }
 
 function ensureNavToggle(nav) {
@@ -13,8 +13,12 @@ function ensureNavToggle(nav) {
   toggle.className = "nav-toggle";
   toggle.type = "button";
   toggle.setAttribute("aria-label", "Меню");
-  toggle.textContent = "☰";
-  toggle.addEventListener("click", () => nav.classList.toggle("open"));
+  toggle.innerHTML = icon("menu", "lg");
+  toggle.addEventListener("click", () => {
+    const open = nav.classList.toggle("open");
+    toggle.innerHTML = icon(open ? "x" : "menu", "lg");
+    toggle.setAttribute("aria-expanded", String(open));
+  });
   nav.parentNode.insertBefore(toggle, nav);
 }
 
@@ -24,9 +28,10 @@ async function renderNav() {
   ensureNavToggle(nav);
 
   const guestNav = `
-    ${navLink("masters.html", "Найти мастера")}
-    ${navLink("login.html", "Войти")}
-    <a class="btn small" href="${ROOT}register.html">Регистрация</a>
+    ${navLink("masters.html", "Найти мастера", "search")}
+    ${navLink("register.html?role=master", "Стать мастером", "briefcase")}
+    ${navLink("login.html", "Войти", "user")}
+    <a class="btn small accent" href="${ROOT}order.html">${icon("plus")}Создать заказ</a>
   `;
 
   if (!getToken()) {
@@ -37,20 +42,20 @@ async function renderNav() {
     const user = await api.me();
     const links = [];
     if (user.role === "master") {
-      links.push(navLink("feed.html", "Новые заказы"));
-      links.push(navLink("orders.html", "Мои работы"));
-      links.push(navLink("master-profile-edit.html", "Профиль"));
+      links.push(navLink("feed.html", "Новые заказы", "inbox"));
+      links.push(navLink("orders.html", "Мои работы", "clipboard-list"));
+      links.push(navLink("master-profile-edit.html", "Профиль", "settings-2"));
     } else {
-      links.push(navLink("masters.html", "Найти мастера"));
-      links.push(navLink("orders.html", "Мои заказы"));
+      links.push(navLink("masters.html", "Найти мастера", "search"));
+      links.push(navLink("orders.html", "Мои заказы", "clipboard-list"));
     }
-    if (user.role === "admin") links.push(navLink("admin/index.html", "Админка"));
+    if (user.role === "admin") links.push(navLink("admin/index.html", "Админка", "shield-check"));
 
     nav.innerHTML = `
       ${links.join("")}
-      <a class="nav-bell" href="${ROOT}notifications.html" title="Уведомления">🔔<span class="count" id="unreadCount" hidden></span></a>
+      <a class="nav-bell" href="${ROOT}notifications.html" title="Уведомления" aria-label="Уведомления">${icon("bell", "lg")}<span class="label">Уведомления</span><span class="count" id="unreadCount" hidden></span></a>
       <span class="nav-user">${esc(user.name)}${avatarHtml(user.name, "avatar-xs")}</span>
-      <a class="nav-link" href="#" onclick="logout(); return false;">Выйти</a>
+      <a class="nav-link" href="#" onclick="logout(); return false;" title="Выйти">${icon("log-out")}<span class="nav-logout-label">Выйти</span></a>
     `;
     refreshUnread();
   } catch (e) {

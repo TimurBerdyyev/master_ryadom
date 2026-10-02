@@ -9,7 +9,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
@@ -17,28 +17,34 @@
     <div class="page-head">
       <div>
         <h1 id="title">Мастера</h1>
-        <p class="muted" id="subtitle"></p>
+        <p class="muted" id="subtitle">&nbsp;</p>
       </div>
-      <a class="btn" id="orderBtn" href="order.html">+ Создать заказ</a>
+      <a class="btn accent" id="orderBtn" href="order.html"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg>Создать заказ</a>
     </div>
 
-    <div class="chips" id="categoryChips"></div>
+    <div class="chips" id="categoryChips" role="tablist" aria-label="Категории"></div>
 
     <form class="filters" onsubmit="event.preventDefault(); applyFilters();">
-      <input id="searchInput" type="search" class="grow" maxlength="100" placeholder="Имя, услуга или описание" />
-      <input id="cityFilter" type="text" maxlength="100" placeholder="Город" style="width:140px" />
-      <select id="ratingFilter">
+      <div class="input-icon">
+        <svg class="i" aria-hidden="true"><use href="#i-search"></use></svg>
+        <input id="searchInput" type="search" maxlength="100" placeholder="Имя, услуга или описание" aria-label="Поиск" />
+      </div>
+      <div class="input-icon">
+        <svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg>
+        <input id="cityFilter" type="text" maxlength="100" placeholder="Город" aria-label="Город" />
+      </div>
+      <select id="ratingFilter" aria-label="Рейтинг">
         <option value="">Любой рейтинг</option>
-        <option value="4">★ 4 и выше</option>
-        <option value="4.5">★ 4.5 и выше</option>
+        <option value="4">Рейтинг 4.0+</option>
+        <option value="4.5">Рейтинг 4.5+</option>
       </select>
-      <select id="verifiedFilter">
+      <select id="verifiedFilter" aria-label="Проверка">
         <option value="">Все мастера</option>
-        <option value="true">Только проверенные</option>
+        <option value="true">Проверенные</option>
       </select>
-      <select id="sortFilter">
+      <select id="sortFilter" aria-label="Сортировка">
         <option value="rating">По рейтингу</option>
-        <option value="orders">По числу заказов</option>
+        <option value="orders">По опыту</option>
       </select>
       <button class="btn" type="submit">Найти</button>
     </form>
@@ -46,6 +52,7 @@
     <div id="masterList" class="master-list"></div>
   </main>
 
+  <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -61,12 +68,12 @@
     }
 
     function renderChips() {
-      const chips = [`<button type="button" class="chip ${categoryId ? "" : "active"}" onclick="pickCategory('')">Все</button>`]
-        .concat(categories.map(c => `
-          <button type="button" class="chip ${String(c.id) === String(categoryId) ? "active" : ""}" onclick="pickCategory('${c.id}')">
-            ${categoryIcon(c.name)} ${esc(c.name)}
-          </button>`));
-      document.getElementById("categoryChips").innerHTML = chips.join("");
+      const chip = (id, label, iconHtml, style = "") => `
+        <button type="button" role="tab" class="chip ${String(id) === String(categoryId) ? "active" : ""}"
+                style="${style}" onclick="pickCategory('${id}')">${iconHtml}${label}</button>`;
+      document.getElementById("categoryChips").innerHTML = [chip("", "Все категории", icon("layout-grid"))]
+        .concat(categories.map(c => chip(c.id, esc(c.name), categoryIcon(c.name), categoryStyle(c.name).style)))
+        .join("");
     }
 
     function pickCategory(id) {
@@ -90,30 +97,32 @@
       const prices = m.services.map(s => s.price_from);
       const minPrice = prices.length ? Math.min(...prices) : null;
       const tags = [...new Set(m.services.map(s => s.title))].slice(0, 4);
+      const orders = `${m.completed_orders} ${pluralize(m.completed_orders, "заказ", "заказа", "заказов")}`;
       return `
         <a class="master-card" href="master.html?id=${m.id}">
           ${avatarHtml(m.user.name)}
-          <div class="info">
-            <div class="name">${esc(m.user.name)} ${m.verified ? '<span class="badge">✓ Проверен</span>' : ''}</div>
+          <div>
+            <div class="name">${esc(m.user.name)} ${m.verified ? verifiedBadge() : ""}</div>
             <div class="meta">
-              <span class="rating">★ <b>${m.rating.toFixed(1)}</b></span>
-              · ${m.completed_orders} ${pluralize(m.completed_orders, "заказ", "заказа", "заказов")}
-              ${m.experience_years ? `· опыт ${m.experience_years} ${pluralize(m.experience_years, "год", "года", "лет")}` : ""}
-              ${m.city ? "· 📍 " + esc(m.city) : ""}
+              ${ratingHtml(m.rating)}
+              <span>${icon("briefcase")}${orders}</span>
+              ${m.experience_years ? `<span>${icon("timer")}${m.experience_years} ${pluralize(m.experience_years, "год", "года", "лет")} опыта</span>` : ""}
+              ${m.city ? `<span>${icon("map-pin")}${esc(m.city)}</span>` : ""}
             </div>
             ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ""}
             ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
           </div>
           <div class="side">
-            ${minPrice !== null ? `<div class="price"><small>от</small> ${formatPrice(minPrice)}</div>` : ""}
-            <span class="btn small secondary" style="margin-top:10px">Подробнее</span>
+            ${minPrice !== null ? `<div class="price-from"><small>от</small> ${formatPrice(minPrice)}</div>` : "<span></span>"}
+            <span class="btn small secondary">Профиль ${icon("arrow-right")}</span>
           </div>
         </a>`;
     }
 
     async function loadMasters() {
       const list = document.getElementById("masterList");
-      list.innerHTML = skeletons(4, 110);
+      list.classList.remove("reveal");
+      list.innerHTML = skeletons(4, 132);
 
       const q = document.getElementById("searchInput").value.trim();
       const name = categoryName(categoryId) || params.get("name");
@@ -135,18 +144,16 @@
         document.getElementById("subtitle").textContent =
           `Найдено ${masters.length} ${pluralize(masters.length, "мастер", "мастера", "мастеров")}`;
         if (masters.length === 0) {
-          list.innerHTML = `
-            <div class="empty">
-              <div class="emoji">🔍</div>
-              <h3>Мастера не найдены</h3>
-              <p>Попробуйте изменить запрос или фильтры — или создайте заказ, и мастера сами откликнутся.</p>
-              <a class="btn" href="order.html${categoryId ? `?category_id=${encodeURIComponent(categoryId)}` : ""}">Создать заказ</a>
-            </div>`;
+          const href = `order.html${categoryId ? `?category_id=${encodeURIComponent(categoryId)}` : ""}`;
+          list.innerHTML = emptyState("search-x", "Мастера не найдены",
+            "Измените запрос или фильтры — или создайте заказ, и подходящие мастера сами откликнутся.",
+            `<a class="btn accent" href="${href}">${icon("plus")}Создать заказ</a>`);
           return;
         }
+        list.classList.add("reveal");
         list.innerHTML = masters.map(masterCard).join("");
       } catch (e) {
-        list.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        list.innerHTML = emptyState("triangle-alert", "Не удалось загрузить мастеров", esc(e.message));
       }
     }
 

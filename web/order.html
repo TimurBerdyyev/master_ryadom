@@ -6,31 +6,94 @@
   <title>Новый заказ — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .cat-picker {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
+    }
+
+    .cat-picker input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .cat-picker label {
+      flex-direction: row !important;
+      align-items: center;
+      gap: 10px !important;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      font-weight: 500 !important;
+      font-size: 14px !important;
+      line-height: 1.25;
+      cursor: pointer;
+      transition: border-color .2s, background .2s, box-shadow .2s;
+    }
+
+    .cat-picker label:hover {
+      border-color: var(--border-strong);
+    }
+
+    .cat-picker input:checked + label {
+      border-color: var(--primary);
+      background: var(--primary-50);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    .cat-picker input:focus-visible + label {
+      box-shadow: var(--ring);
+    }
+
+    .cat-picker .cat-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+    }
+
+    .cat-picker .cat-dot .i {
+      width: 17px;
+      height: 17px;
+    }
+
+    .fieldset-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: -8px;
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main class="narrow">
-    <h1>Создать заказ</h1>
-    <p class="muted" style="margin-top:-6px;margin-bottom:20px">Заявку увидят мастера этой категории — они предложат цену, а вы выберете лучшее предложение.</p>
+    <div class="page-head">
+      <div>
+        <h1>Новый заказ</h1>
+        <p class="muted">Заявку увидят мастера выбранной категории — они предложат цену, а вы выберете лучшее предложение.</p>
+      </div>
+    </div>
 
-    <form class="card" id="orderForm" style="max-width:none">
-      <label>
-        Категория
-        <select id="category" required></select>
-      </label>
+    <form class="card reveal" id="orderForm" style="max-width:none">
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Что нужно сделать</h2>
+      <div class="fieldset-title" id="catLabel">Категория</div>
+      <div class="cat-picker" id="categoryPicker" role="radiogroup" aria-labelledby="catLabel"></div>
 
       <label>
         Опишите задачу
         <textarea id="description" rows="4" required maxlength="2000" placeholder="Например: течёт кран на кухне, нужен новый смеситель"></textarea>
+        <span class="hint">Чем подробнее — тем точнее мастера назовут цену</span>
       </label>
 
+      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg>Где и когда</h2>
       <label>
         Адрес
-        <input id="address" type="text" maxlength="500" placeholder="Город, улица, дом" />
+        <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-house"></use></svg><input id="address" type="text" maxlength="500" placeholder="Город, улица, дом" /></span>
         <span class="hint">Мастер увидит адрес только после того, как вы его выберете</span>
       </label>
 
@@ -45,21 +108,24 @@
         </label>
       </div>
 
+      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-wallet"></use></svg>Бюджет и фото</h2>
       <label>
-        Ваш бюджет, сом (необязательно)
-        <input id="price" type="number" min="0" max="10000000" placeholder="Оставьте пустым — мастера предложат цену сами" />
+        Ваш бюджет, сом
+        <input id="price" type="number" min="0" max="10000000" placeholder="Необязательно — мастера предложат цену сами" />
       </label>
 
       <label>
-        Фото (до 5 штук, необязательно)
+        Фото (до 5 штук)
         <input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+        <span class="hint">JPEG, PNG или WebP — помогают мастеру оценить работу</span>
       </label>
 
-      <div id="formError" class="error"></div>
-      <button class="btn" type="submit" id="submitBtn">Отправить заявку</button>
+      <div id="formError" class="error" role="alert"></div>
+      <button class="btn accent large" type="submit" id="submitBtn"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg>Отправить заявку</button>
     </form>
   </main>
 
+  <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -69,11 +135,13 @@
     document.getElementById("date").min = new Date().toISOString().slice(0, 10);
 
     async function loadCategories() {
-      const select = document.getElementById("category");
+      const picker = document.getElementById("categoryPicker");
       try {
         const categories = await api.categories();
-        select.innerHTML = categories.map(c => `<option value="${c.id}">${categoryIcon(c.name)} ${esc(c.name)}</option>`).join("");
-        if (preselectCategory) select.value = preselectCategory;
+        picker.innerHTML = categories.map((c, i) => `
+          <input type="radio" name="category" id="cat${c.id}" value="${c.id}" ${String(c.id) === preselectCategory || (!preselectCategory && i === 0) ? "checked" : ""} required />
+          <label for="cat${c.id}">${categoryBadge(c.name)}<span>${esc(c.name)}</span></label>
+        `).join("");
       } catch (e) {
         document.getElementById("formError").textContent = "Не удалось загрузить категории: " + e.message;
       }
@@ -92,13 +160,19 @@
       const button = document.getElementById("submitBtn");
       errorBox.textContent = "";
 
+      const checked = document.querySelector('input[name="category"]:checked');
+      if (!checked) {
+        errorBox.textContent = "Выберите категорию";
+        return;
+      }
+
       const date = document.getElementById("date").value;
       const time = document.getElementById("time").value;
       const price = document.getElementById("price").value;
       const photoFiles = Array.from(document.getElementById("photos").files || []);
 
       const payload = {
-        category_id: Number(document.getElementById("category").value),
+        category_id: Number(checked.value),
         description: document.getElementById("description").value.trim(),
         address: document.getElementById("address").value.trim() || null,
         date: date ? new Date(`${date}T${time || "00:00"}:00`).toISOString() : null,
@@ -107,7 +181,6 @@
       };
 
       button.disabled = true;
-      button.textContent = "Отправляем…";
       try {
         const order = await api.createOrder(payload);
         let photoWarning = "";
@@ -122,7 +195,6 @@
       } catch (e) {
         errorBox.textContent = "Не удалось отправить заявку: " + e.message;
         button.disabled = false;
-        button.textContent = "Отправить заявку";
       }
     });
 

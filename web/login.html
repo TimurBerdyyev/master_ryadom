@@ -9,31 +9,35 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main>
-    <div class="auth-wrap">
-      <h1>С возвращением 👋</h1>
-      <p class="muted">Войдите, чтобы создавать заказы и видеть контакты мастеров</p>
+    <div class="auth-wrap reveal">
+      <div class="auth-head">
+        <div class="badge-icon"><svg class="i " aria-hidden="true"><use href="#i-user-round"></use></svg></div>
+        <h1>С возвращением</h1>
+        <p>Войдите, чтобы создавать заказы и видеть контакты мастеров</p>
+      </div>
 
       <form class="card" id="loginForm">
         <label>
           Телефон
-          <input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" />
+          <span class="input-icon"><svg class="i " aria-hidden="true"><use href="#i-phone"></use></svg><input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" /></span>
         </label>
         <label>
           Пароль
-          <input id="password" type="password" autocomplete="current-password" required maxlength="72" />
+          <span class="input-icon"><svg class="i " aria-hidden="true"><use href="#i-lock"></use></svg><input id="password" type="password" autocomplete="current-password" required maxlength="72" /></span>
         </label>
-        <div id="formError" class="error"></div>
-        <button class="btn block" type="submit" id="submitBtn">Войти</button>
-        <p class="muted" style="text-align:center;margin:0">Нет аккаунта? <a id="registerLink" href="register.html">Зарегистрироваться</a></p>
+        <div id="formError" class="error" role="alert"></div>
+        <button class="btn block large" type="submit" id="submitBtn">Войти<svg class="i " aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+        <p class="auth-foot">Нет аккаунта? <a class="link" id="registerLink" href="register.html">Зарегистрироваться</a></p>
       </form>
     </div>
   </main>
 
+  <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>

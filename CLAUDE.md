@@ -15,7 +15,20 @@
   контакты сторон (`client_contact`/`master_contact`) отдаются только после выбора мастера (`_order_out`).
 - `web/` — статические страницы без сборки. Общий код: `web/js/api.js` (все вызовы API + хелперы `esc`,
   `avatarHtml`, `formatPrice`, `statusPillHtml`, `toast`, `requireLogin`, `safeNext`), `web/js/nav.js` (шапка по роли).
-- Стили — один файл `web/css/style.css` на CSS-переменных (`--color-*`, `--radius`, `--shadow`).
+- Стили — один файл `web/css/style.css` на CSS-переменных (`--primary`, `--accent`, `--ink`, `--muted`, `--r-*`, `--shadow-*`).
+
+## Дизайн-система
+- Шрифты: **Unbounded** — только заголовки, логотип, крупные цифры (`--font-display`); **Onest** — весь остальной текст.
+  Оба с кириллицей, подключены в начале `style.css`.
+- Иконки: **Lucide** (ISC) спрайтом в `web/js/icons.js`. В JS — `icon("name")`, в HTML —
+  `<svg class="i"><use href="#i-name"></use></svg>`. Новую иконку добавлять `<symbol>` в спрайт
+  (исходники: `npm pack lucide-static`). **Эмодзи вместо иконок не использовать.**
+- `icons.js` подключается на каждой странице перед `api.js`.
+- Цвета: синий `--primary` — основные действия, оранжевый `--accent` — главный CTA («Создать заказ», «Предложить»),
+  зелёный — подтверждение/WhatsApp. У каждой категории своя иконка и цвет — `CATEGORY_STYLE` в `api.js`,
+  рисовать через `categoryBadge()`.
+- Готовые хелперы: `avatarHtml`, `ratingHtml`, `starsHtml`, `verifiedBadge`, `statusPillHtml`, `emptyState`, `skeletons`, `toast`.
+- Проверять вёрстку на 390px и 1280px; анимации уважают `prefers-reduced-motion`.
 
 ## Правила, которые нельзя нарушать
 - **Любые данные пользователя в HTML — только через `esc()`**. Не вставлять значения в `onclick="...'${x}'"`

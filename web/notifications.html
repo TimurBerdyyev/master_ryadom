@@ -9,15 +9,21 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main class="narrow">
-    <h1>Уведомления</h1>
+    <div class="page-head">
+      <div>
+        <h1>Уведомления</h1>
+        <p class="muted">Новые предложения и изменения статуса ваших заказов</p>
+      </div>
+    </div>
     <div id="list"></div>
   </main>
 
+  <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -29,24 +35,35 @@
       return match ? `order-detail.html?id=${match[1]}` : null;
     }
 
+    // Pick an icon from the notification title.
+    function notificationIcon(title) {
+      if (/предложени/i.test(title)) return "hand-coins";
+      if (/выбрал/i.test(title)) return "badge-check";
+      if (/выехал/i.test(title)) return "car";
+      if (/выполнен/i.test(title)) return "circle-check";
+      if (/отмен/i.test(title)) return "circle-x";
+      return "bell";
+    }
+
     async function load() {
       const list = document.getElementById("list");
-      list.innerHTML = skeletons(4, 64);
+      list.innerHTML = skeletons(4, 76);
       try {
         const items = await api.notifications();
         if (!items.length) {
-          list.innerHTML = `<div class="empty"><div class="emoji">🔔</div><h3>Уведомлений пока нет</h3><p>Здесь появятся новые предложения и изменения статуса заказов.</p></div>`;
+          list.innerHTML = emptyState("bell", "Уведомлений пока нет", "Здесь появятся новые предложения и изменения статуса заказов.");
           return;
         }
-        list.innerHTML = `<div class="card-box" style="padding:0;overflow:hidden">${items.map(n => {
+        list.innerHTML = `<div class="card-box reveal" style="padding:0;overflow:hidden">${items.map(n => {
           const href = orderLink(n.text);
           const body = `
-            <span class="dot"></span>
-            <div style="flex:1">
+            <span class="n-ico">${icon(notificationIcon(n.title))}</span>
+            <div style="flex:1;min-width:0">
               <div style="font-weight:700">${esc(n.title)}</div>
-              ${n.text ? `<div class="muted">${esc(n.text)}</div>` : ""}
-              <div class="muted" style="font-size:12px;margin-top:2px">${formatDate(n.created_at, true)}</div>
-            </div>`;
+              ${n.text ? `<div class="muted" style="font-size:15px">${esc(n.text)}</div>` : ""}
+              <div class="muted" style="font-size:13px;margin-top:4px">${formatDate(n.created_at, true)}</div>
+            </div>
+            <span class="dot"></span>`;
           return href
             ? `<a class="notification ${n.is_read ? "" : "unread"}" href="${href}">${body}</a>`
             : `<div class="notification ${n.is_read ? "" : "unread"}">${body}</div>`;
@@ -56,7 +73,7 @@
           refreshUnread();
         }
       } catch (e) {
-        list.innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
+        list.innerHTML = emptyState("triangle-alert", "Не удалось загрузить уведомления", esc(e.message));
       }
     }
 

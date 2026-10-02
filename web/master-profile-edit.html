@@ -9,7 +9,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
@@ -19,15 +19,15 @@
         <h1>Мой профиль мастера</h1>
         <p class="muted">Эти данные видят клиенты в поиске. Заполните их, чтобы получать заказы.</p>
       </div>
-      <a class="btn secondary" id="publicLink" href="#" hidden>Как видят клиенты →</a>
+      <a class="btn secondary" id="publicLink" href="#" hidden><svg class="i" aria-hidden="true"><use href="#i-eye"></use></svg>Как видят клиенты</a>
     </div>
 
     <div class="notice success" id="welcome" hidden style="margin-bottom:16px">
-      🎉 Добро пожаловать! Заполните профиль и добавьте хотя бы одну услугу — после этого вы начнёте видеть заказы в разделе «Новые заказы».
+      <svg class="i" aria-hidden="true"><use href="#i-sparkles"></use></svg><span>Добро пожаловать! Заполните профиль и добавьте хотя бы одну услугу — после этого вы начнёте видеть заказы в разделе «Новые заказы».</span>
     </div>
 
-    <form class="card" id="profileForm" style="max-width:none">
-      <h2 style="margin:0">О себе</h2>
+    <form class="card reveal" id="profileForm" style="max-width:none">
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-user-round"></use></svg>О себе</h2>
       <label>
         Описание
         <textarea id="description" rows="3" maxlength="2000" placeholder="Например: опытный сантехник, работаю быстро и аккуратно"></textarea>
@@ -39,7 +39,7 @@
         </label>
         <label>
           Город
-          <input id="city" type="text" maxlength="255" placeholder="Бишкек" />
+          <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><input id="city" type="text" maxlength="255" placeholder="Бишкек" /></span>
         </label>
       </div>
       <label>
@@ -47,39 +47,42 @@
         <input id="district" type="text" maxlength="255" placeholder="Центр" />
       </label>
       <div id="profileError" class="error"></div>
-      <button class="btn" type="submit">Сохранить</button>
+      <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg>Сохранить</button>
     </form>
 
     <div class="section-title">Мои услуги и цены</div>
     <div id="servicesList" class="card-box" style="padding-top:6px;padding-bottom:6px"></div>
 
     <form class="card" id="serviceForm" style="margin-top:16px;max-width:none">
-      <h2 style="margin:0">Добавить услугу</h2>
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg>Добавить услугу</h2>
       <label>
         Категория
         <select id="serviceCategory" required></select>
       </label>
-      <label>
-        Название услуги
-        <input id="serviceTitle" type="text" maxlength="255" placeholder="Например: замена смесителя" required />
-      </label>
-      <label>
-        Цена от (сом)
-        <input id="servicePrice" type="number" min="0" max="10000000" required />
-      </label>
+      <div class="form-grid">
+        <label>
+          Название услуги
+          <input id="serviceTitle" type="text" maxlength="255" placeholder="Например: замена смесителя" required />
+        </label>
+        <label>
+          Цена от, сом
+          <input id="servicePrice" type="number" min="0" max="10000000" required />
+        </label>
+      </div>
       <div id="serviceError" class="error"></div>
-      <button class="btn secondary" type="submit">Добавить услугу</button>
+      <button class="btn secondary" type="submit"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg>Добавить услугу</button>
     </form>
 
     <div class="section-title">Фото работ</div>
     <div id="photosGrid" class="photo-grid"></div>
     <label class="btn secondary" style="cursor:pointer;">
-      📷 Добавить фото
+      <svg class="i" aria-hidden="true"><use href="#i-image-plus"></use></svg>Добавить фото
       <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" />
     </label>
     <div id="photoError" class="error"></div>
   </main>
 
+  <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
@@ -108,20 +111,23 @@
     function renderServices(services) {
       const list = document.getElementById("servicesList");
       if (!services.length) {
-        list.innerHTML = `<p class="muted">Вы пока не добавили ни одной услуги — без них клиенты не найдут вас в категории.</p>`;
+        list.innerHTML = `<p class="muted" style="margin:14px 0">Вы пока не добавили ни одной услуги — без них клиенты не найдут вас в категории.</p>`;
         return;
       }
       list.innerHTML = services.map(s => {
         const cat = categories.find(c => c.id === s.category_id)?.name || "";
         return `
         <div class="service-row" style="align-items:center">
-          <div>
-            <div style="font-weight:600">${esc(s.title)}</div>
-            <div class="muted" style="font-size:13px">${categoryIcon(cat)} ${esc(cat)}</div>
+          <div class="row" style="flex-wrap:nowrap;gap:12px">
+            ${categoryBadge(cat)}
+            <div>
+              <div style="font-weight:600">${esc(s.title)}</div>
+              <div class="muted" style="font-size:13px">${esc(cat)}</div>
+            </div>
           </div>
           <div class="row">
             <span class="price">от ${formatPrice(s.price_from)}</span>
-            <button class="btn small secondary" onclick="removeService(${s.id})">Удалить</button>
+            <button class="btn small secondary" onclick="removeService(${s.id})" aria-label="Удалить услугу">${icon("trash-2")}</button>
           </div>
         </div>`;
       }).join("");
@@ -132,7 +138,7 @@
       grid.innerHTML = photos.map(p => `
         <div class="photo-thumb-wrap">
           <img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="Фото работы" />
-          <button class="remove-btn" onclick="removePhoto(${p.id})" title="Удалить">×</button>
+          <button class="remove-btn" onclick="removePhoto(${p.id})" title="Удалить" aria-label="Удалить фото">${icon("x", "sm")}</button>
         </div>
       `).join("");
     }
@@ -172,7 +178,7 @@
     async function loadCategories() {
       categories = await api.categories();
       document.getElementById("serviceCategory").innerHTML =
-        categories.map(c => `<option value="${c.id}">${categoryIcon(c.name)} ${esc(c.name)}</option>`).join("");
+        categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
     }
 
     document.getElementById("profileForm").addEventListener("submit", async (e) => {
@@ -186,7 +192,7 @@
           city: document.getElementById("city").value || null,
           district: document.getElementById("district").value || null,
         });
-        toast("Профиль сохранён ✓");
+        toast("Профиль сохранён");
       } catch (e) {
         errorBox.textContent = "Не удалось сохранить: " + e.message;
       }
@@ -214,13 +220,9 @@
     async function init() {
       const me = await api.me();
       if (me.role !== "master") {
-        document.querySelector("main").innerHTML = `
-          <div class="empty">
-            <div class="emoji">🧰</div>
-            <h3>Эта страница для мастеров</h3>
-            <p>Вы вошли как клиент. Чтобы получать заказы, зарегистрируйте отдельный аккаунт мастера.</p>
-            <a class="btn" href="orders.html">Мои заказы</a>
-          </div>`;
+        document.querySelector("main").innerHTML = emptyState("briefcase", "Эта страница для мастеров",
+          "Вы вошли как клиент. Чтобы получать заказы, зарегистрируйте отдельный аккаунт мастера.",
+          `<a class="btn" href="orders.html">Мои заказы</a>`);
         return;
       }
       await loadCategories().catch(() => {});

@@ -9,23 +9,24 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main class="narrow">
-    <div class="card-box success-hero">
-      <div class="check">✓</div>
+    <div class="card-box success-hero reveal">
+      <div class="check"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg></div>
       <h1>Заявка отправлена</h1>
-      <p class="muted">Заказ <strong id="orderId"></strong> создан. Мастера уже видят его — мы пришлём уведомление, как только появятся предложения.</p>
+      <p class="muted" style="font-size:16px;max-width:460px;margin:0 auto">Заказ <strong id="orderId"></strong> создан. Мастера уже видят его — мы пришлём уведомление, как только появятся предложения.</p>
       <p class="error" id="photoError"></p>
-      <div class="row" style="justify-content:center;margin-top:20px">
-        <a class="btn" id="orderLink" href="orders.html">Открыть заказ</a>
-        <a class="btn secondary" href="index.html">На главную</a>
+      <div class="row" style="justify-content:center;margin-top:28px">
+        <a class="btn large" id="orderLink" href="orders.html">Открыть заказ<svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
+        <a class="btn secondary large" href="index.html">На главную</a>
       </div>
     </div>
   </main>
 
+  <script src="js/icons.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>

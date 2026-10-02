@@ -26,25 +26,38 @@ function safeNext(value, fallback = "index.html") {
   return value.replace(/^\/+/, "");
 }
 
-const CATEGORY_ICONS = {
-  "Сантехника": "🚰",
-  "Электрика": "⚡",
-  "Строительство": "🧱",
-  "Ремонт": "🛠️",
-  "Уборка": "🧹",
-  "Компьютеры": "💻",
-  "Ремонт телефонов": "📱",
-  "Автомастера": "🚗",
-  "Красота": "💅",
-  "Парикмахеры": "✂️",
-  "Грузчики": "💪",
-  "Перевозки": "🚚",
-  "Ремонт бытовой техники": "🔌",
-  "Другое": "✨",
+// Lucide icon + tint per category (tint = icon color, background is a light wash of it).
+const CATEGORY_STYLE = {
+  "Сантехника": ["shower-head", "#0ea5e9"],
+  "Электрика": ["zap", "#f59e0b"],
+  "Строительство": ["brick-wall", "#ea580c"],
+  "Ремонт": ["hammer", "#7c3aed"],
+  "Уборка": ["spray-can", "#14b8a6"],
+  "Компьютеры": ["monitor", "#2d5bff"],
+  "Ремонт телефонов": ["smartphone", "#6366f1"],
+  "Автомастера": ["car", "#ef4444"],
+  "Красота": ["flower-2", "#ec4899"],
+  "Парикмахеры": ["scissors", "#d946ef"],
+  "Грузчики": ["package", "#a16207"],
+  "Перевозки": ["truck", "#0891b2"],
+  "Ремонт бытовой техники": ["washing-machine", "#16a34a"],
+  "Другое": ["layout-grid", "#64748b"],
 };
 
+function categoryStyle(name) {
+  const [iconName, tint] = CATEGORY_STYLE[name] || ["wrench", "#2d5bff"];
+  return { iconName, tint, style: `--tint:${tint};--tint-bg:${tint}17` };
+}
+
+// Inline icon for a category (used next to its name in chips/selects-free text).
 function categoryIcon(name) {
-  return CATEGORY_ICONS[name] || "🔧";
+  return icon(categoryStyle(name).iconName);
+}
+
+// Tinted rounded square with the category icon.
+function categoryBadge(name, cls = "cat-dot") {
+  const c = categoryStyle(name);
+  return `<span class="${cls}" style="${c.style}">${icon(c.iconName)}</span>`;
 }
 
 const AVATAR_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0d9488", "#16a34a", "#0891b2", "#4f46e5"];
@@ -65,7 +78,26 @@ function avatarHtml(name, cls = "avatar") {
 
 function starsHtml(rating) {
   const full = Math.round(Number(rating) || 0);
-  return `<span class="stars">${"★".repeat(full)}${"☆".repeat(5 - full)}</span>`;
+  const star = on => `<svg class="i ${on ? "" : "off"}" aria-hidden="true"><use href="#i-star"></use></svg>`;
+  return `<span class="stars" aria-label="Оценка ${full} из 5">${[1, 2, 3, 4, 5].map(n => star(n <= full)).join("")}</span>`;
+}
+
+function ratingHtml(rating) {
+  return `<span class="rating">${icon("star", "sm")}${Number(rating).toFixed(1)}</span>`;
+}
+
+function verifiedBadge() {
+  return `<span class="badge">${icon("badge-check")}Проверен</span>`;
+}
+
+function emptyState(iconName, title, text, actionHtml = "") {
+  return `
+    <div class="empty">
+      <div class="empty-icon">${icon(iconName)}</div>
+      <h3>${title}</h3>
+      ${text ? `<p>${text}</p>` : ""}
+      ${actionHtml}
+    </div>`;
 }
 
 function formatPrice(value) {

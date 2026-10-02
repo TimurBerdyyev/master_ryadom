@@ -9,24 +9,25 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="../index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="../index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main class="wide">
     <h1>Жалобы</h1>
     <div class="admin-tabs">
-      <a href="index.html">Дашборд</a>
-      <a href="users.html">Пользователи</a>
-      <a href="masters.html">Мастера</a>
-      <a href="orders.html">Заказы</a>
-      <a href="complaints.html" class="active">Жалобы</a>
-      <a href="categories.html">Категории</a>
+      <a href="index.html"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Дашборд</a>
+      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg>Пользователи</a>
+      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg>Мастера</a>
+      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg>Заказы</a>
+      <a href="complaints.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg>Жалобы</a>
+      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg>Категории</a>
     </div>
 
     <div id="content"><p class="muted">Загрузка…</p></div>
   </main>
 
+  <script src="../js/icons.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
@@ -70,7 +71,7 @@
         await api.adminSetComplaintStatus(id, status);
         load();
       } catch (e) {
-        alert("Не удалось изменить статус: " + e.message);
+        toast("Не удалось изменить статус: " + e.message);
       }
     }
 

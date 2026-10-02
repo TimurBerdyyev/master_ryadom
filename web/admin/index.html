@@ -9,24 +9,25 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="logo" href="../index.html"><span class="logo-mark">🔧</span> Мастер рядом</a>
+    <a class="logo" href="../index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
     <nav id="nav"></nav>
   </header>
 
   <main class="wide">
     <h1>Админ-панель</h1>
     <div class="admin-tabs">
-      <a href="index.html" class="active">Дашборд</a>
-      <a href="users.html">Пользователи</a>
-      <a href="masters.html">Мастера</a>
-      <a href="orders.html">Заказы</a>
-      <a href="complaints.html">Жалобы</a>
-      <a href="categories.html">Категории</a>
+      <a href="index.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Дашборд</a>
+      <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg>Пользователи</a>
+      <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg>Мастера</a>
+      <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg>Заказы</a>
+      <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg>Жалобы</a>
+      <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg>Категории</a>
     </div>
 
     <div id="stats" class="stat-grid"></div>
   </main>
 
+  <script src="../js/icons.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
@@ -36,18 +37,20 @@
       try {
         const s = await api.adminStats();
         const tiles = [
-          ["Всего пользователей", s.users_total],
-          ["Клиентов", s.clients_total],
-          [`Мастеров (${s.masters_verified} проверено)`, s.masters_total],
-          ["Активных заказов", s.orders_active],
-          ["Завершённых заказов", s.orders_completed],
-          ["Отменённых заказов", s.orders_cancelled],
-          ["Оборот", `${s.revenue_total.toFixed(0)} сом`],
-          ["Комиссия сервиса (10%)", `${s.commission_total.toFixed(0)} сом`],
-          ["Открытых жалоб", s.complaints_open],
+          ["Всего пользователей", s.users_total, "users"],
+          ["Клиентов", s.clients_total, "user"],
+          [`Мастеров (${s.masters_verified} проверено)`, s.masters_total, "briefcase"],
+          ["Активных заказов", s.orders_active, "timer"],
+          ["Завершённых заказов", s.orders_completed, "circle-check"],
+          ["Отменённых заказов", s.orders_cancelled, "circle-x"],
+          ["Оборот", formatPrice(s.revenue_total), "wallet"],
+          ["Комиссия сервиса (10%)", formatPrice(s.commission_total), "hand-coins"],
+          ["Открытых жалоб", s.complaints_open, "flag"],
         ];
-        grid.innerHTML = tiles.map(([label, value]) => `
+        grid.classList.add("reveal");
+        grid.innerHTML = tiles.map(([label, value, iconName]) => `
           <div class="stat-tile">
+            <div class="badge-icon" style="width:42px;height:42px;border-radius:12px;margin-bottom:14px">${icon(iconName)}</div>
             <div class="value">${value}</div>
             <div class="label">${label}</div>
           </div>
