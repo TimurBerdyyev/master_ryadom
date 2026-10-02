@@ -1,0 +1,25 @@
+# Production overlay: HTTPS with automatic Let's Encrypt certificates (Caddy).
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Укажите DOMAIN в .env, например master-ryadom.kg}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+  backend:
+    environment:
+      ENVIRONMENT: production
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -27,6 +27,11 @@ class UserRegister(BaseModel):
     phone: str = Field(min_length=5, max_length=32)
     password: str = Field(min_length=6, max_length=PASSWORD_MAX_LENGTH)
     role: Literal[UserRole.client, UserRole.master] = UserRole.client
+    code: str = Field(pattern=r"^\d{6}$")  # SMS confirmation code from /auth/send-code
+    # Masters only: explicit consent to notifications outside the site and the chosen channel.
+    notify_enabled: bool = False
+    notify_channel: Literal["telegram", "sms"] = "telegram"
+    lang: Literal["ru", "ky", "en"] = "ru"
 
     @field_validator("name")
     @classmethod
@@ -43,6 +48,34 @@ class UserRegister(BaseModel):
         if not PHONE_RE.match(value):
             raise ValueError("Телефон должен содержать от 9 до 15 цифр, например +996700000000")
         return value
+
+
+def _valid_phone(value: str) -> str:
+    value = normalize_phone(value)
+    if not PHONE_RE.match(value):
+        raise ValueError("Телефон должен содержать от 9 до 15 цифр, например +996700000000")
+    return value
+
+
+class SendCodeIn(BaseModel):
+    phone: str = Field(min_length=5, max_length=32)
+    purpose: Literal["register", "reset"]
+
+    _phone = field_validator("phone")(_valid_phone)
+
+
+class SendCodeOut(BaseModel):
+    sent: bool = True
+    # Only with the development SMS provider (SMS_PROVIDER=console), so sign-up works without real SMS.
+    debug_code: str | None = None
+
+
+class PasswordResetIn(BaseModel):
+    phone: str = Field(min_length=5, max_length=32)
+    code: str = Field(pattern=r"^\d{6}$")
+    password: str = Field(min_length=6, max_length=PASSWORD_MAX_LENGTH)
+
+    _phone = field_validator("phone")(_valid_phone)
 
 
 class UserLogin(BaseModel):
@@ -313,6 +346,7 @@ class AdminStats(BaseModel):
 
 
 class PublicConfigOut(BaseModel):
+    telegram_enabled: bool = False
     subscriptions_enabled: bool
     subscription_trial_days: int
     subscription_price: int
@@ -376,3 +410,21 @@ class AdminSubscriptionPaymentOut(SubscriptionPaymentOut):
 
 class ExtendIn(BaseModel):
     months: int = Field(ge=1, le=24)
+
+
+class NotificationSettingsOut(BaseModel):
+    enabled: bool
+    channel: Literal["telegram", "sms"]
+    lang: Literal["ru", "ky", "en"]
+    telegram_connected: bool
+    telegram_available: bool
+
+
+class NotificationSettingsIn(BaseModel):
+    enabled: bool
+    channel: Literal["telegram", "sms"]
+    lang: Literal["ru", "ky", "en"] = "ru"
+
+
+class TelegramLinkOut(BaseModel):
+    url: str

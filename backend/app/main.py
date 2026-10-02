@@ -7,8 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import DEFAULT_JWT_SECRET, settings
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal
+from app.migrations import upgrade_database
 from app.payments import get_provider
+from app.sms import get_sms_provider
 from app.routers import admin, auth, categories, complaints, masters, notifications, orders, reviews, subscriptions
 from app.seed import seed_categories
 from app.subscriptions import ensure_all_masters
@@ -18,22 +20,40 @@ logger = logging.getLogger("master_ryadom")
 os.makedirs(settings.upload_dir, exist_ok=True)
 
 
+def check_production_settings() -> None:
+    """Refuse to start a production server with settings that are only safe for development."""
+    if settings.environment != "production":
+        return
+    problems = []
+    if settings.jwt_secret == DEFAULT_JWT_SECRET or len(settings.jwt_secret) < 32:
+        problems.append("JWT_SECRET не задан или короче 32 символов")
+    if get_sms_provider().is_dev:
+        problems.append("SMS_PROVIDER=console — подключите реальный SMS-шлюз (app/sms.py)")
+    if "*" in settings.cors_origins_list:
+        problems.append("CORS_ORIGINS=* — укажите домен сайта")
+    if "localhost" in settings.site_url:
+        problems.append("SITE_URL указывает на localhost")
+    if problems:
+        raise RuntimeError("ENVIRONMENT=production, но настройки небезопасны:\n  - " + "\n  - ".join(problems))
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    check_production_settings()
     if settings.jwt_secret == DEFAULT_JWT_SECRET:
         logger.warning(
             "JWT_SECRET использует значение по умолчанию — это небезопасно для продакшена. "
             "Задайте случайный секрет в backend/.env (JWT_SECRET)."
         )
 
-    Base.metadata.create_all(bind=engine)
-    # create_all skips tables that already exist, so indexes added to models later would never
-    # reach an existing database — create any missing ones explicitly.
-    for table in Base.metadata.sorted_tables:
-        for index in table.indexes:
-            index.create(bind=engine, checkfirst=True)
+    upgrade_database()
 
     get_provider()  # fail fast on a typo in PAYMENT_PROVIDER
+    if get_sms_provider().is_dev:
+        logger.warning(
+            "SMS_PROVIDER=console: SMS не отправляются, коды подтверждения видны на странице. "
+            "Только для разработки — на сервере подключите реальный SMS-шлюз (app/sms.py)."
+        )
 
     db = SessionLocal()
     try:
@@ -77,6 +97,7 @@ app.include_router(masters.router)
 app.include_router(orders.router)
 app.include_router(reviews.router)
 app.include_router(notifications.router)
+app.include_router(notifications.telegram_router)
 app.include_router(complaints.router)
 app.include_router(admin.router)
 app.include_router(subscriptions.router)

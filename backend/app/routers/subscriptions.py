@@ -40,6 +40,7 @@ def _require_enabled() -> None:
 def public_config():
     """Feature flags the web client needs before login (e.g. to mention the free trial)."""
     return PublicConfigOut(
+        telegram_enabled=settings.telegram_enabled,
         subscriptions_enabled=settings.subscriptions_enabled,
         subscription_trial_days=settings.subscription_trial_days,
         subscription_price=settings.subscription_price,

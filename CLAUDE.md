@@ -8,9 +8,11 @@
 - Docker: `docker compose up --build` (Postgres; nginx из `deploy/nginx.conf` проксирует `/api/` → backend).
 
 ## Устройство
-- `backend/app/` — FastAPI + SQLAlchemy 2.0. Таблицы создаются через `create_all` при старте (`main.py` lifespan),
-  недостающие индексы досоздаются там же. Alembic подключён, но миграций пока нет: новая **колонка** в
-  существующей таблице сама не появится — для неё нужна миграция или пересоздание локальной БД.
+- `backend/app/` — FastAPI + SQLAlchemy 2.0. Схема БД — **миграции Alembic** (`backend/alembic/versions/`),
+  применяются автоматически при старте (`app/migrations.py`). После изменения моделей:
+  `cd backend && alembic revision --autogenerate -m "..."`, проверить файл, закоммитить.
+  Тест `test_models_match_migrations` падает, если миграцию забыли. Для Postgres в `downgrade` удалять enum-типы.
+- Тесты можно прогнать на Postgres: `TEST_DATABASE_URL=postgresql://... python -m pytest`.
 - `backend/app/routers/orders.py` — весь жизненный цикл заказа: `MASTER_PROGRESS` задаёт допустимые статусы,
   контакты сторон (`client_contact`/`master_contact`) отдаются только после выбора мастера (`_order_out`).
 - `web/` — статические страницы без сборки. Общий код: `web/js/api.js` (все вызовы API + хелперы `esc`,
@@ -29,6 +31,23 @@
   рисовать через `categoryBadge()`.
 - Готовые хелперы: `avatarHtml`, `ratingHtml`, `starsHtml`, `verifiedBadge`, `statusPillHtml`, `emptyState`, `skeletons`, `toast`.
 - Проверять вёрстку на 390px и 1280px; анимации уважают `prefers-reduced-motion`.
+
+## Телефон, SMS, уведомления
+- Регистрация требует SMS-код (`/auth/send-code` → `/auth/register` с `code`), восстановление пароля —
+  `/auth/send-code` (purpose=reset) → `/auth/reset-password`; смена пароля разлогинивает старые токены (`password_changed_at`).
+  Логика кодов — `app/phone_codes.py` (5 мин, 5 неверных попыток, повтор через 60 с, 5 SMS/час на номер).
+- SMS-шлюз — `app/sms.py`; `SMS_PROVIDER=console` (по умолчанию) пишет SMS в лог и **возвращает код в ответе API**
+  (`debug_code`) — только для разработки; с `ENVIRONMENT=production` сервер с ним не стартует.
+- Уведомления мастерам вне сайта — **только по согласию** (галочка при регистрации, по умолчанию выключена),
+  канал Telegram или SMS, меняется в профиле. Вызов: `notify(db, user_id, title, text, kind=..., **params)`
+  из `app/notify.py` — in-app запись + сообщение по каналу мастера на его языке, отправка после commit в фоне.
+  Шаблоны сообщений — `TEMPLATES` в `notify.py`.
+- Telegram-бот — `app/telegram.py` (привязка по одноразовой ссылке `t.me/<bot>?start=<token>`),
+  вебхук `/telegram/webhook` с секретом в заголовке; локально — `python -m app.telegram_poll`.
+
+## Деплой
+Пошагово — `DEPLOY.md` (Caddy с HTTPS → nginx → backend; Postgres, Redis; бэкапы `deploy/backup.sh`).
+`ENVIRONMENT=production` не даёт запуститься с дефолтным JWT, console-SMS, `CORS_ORIGINS=*`, `SITE_URL` на localhost.
 
 ## Языки (ru / ky / en)
 - Все тексты интерфейса — в `web/js/i18n.js`, каждая строка `"ключ": [ru, ky, en]`. Скрипт подключается
@@ -69,4 +88,4 @@
 
 ## Идеи на будущее
 Чат по заказу (таблица `messages` уже есть), аватар мастера, поиск по расстоянию на фронте (API: `sort=distance&lat&lon`),
-пагинация в админке, перенос rate-limit в Redis при нескольких процессах backend.
+пагинация в админке, реальные SMS-шлюз и эквайринг, перевод описаний мастеров.

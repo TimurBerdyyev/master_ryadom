@@ -15,36 +15,78 @@
 
   <main>
     <div class="auth-wrap reveal">
-      <div class="auth-head">
-        <div class="badge-icon"><svg class="i " aria-hidden="true"><use href="#i-sparkles"></use></svg></div>
-        <h1 data-i18n="reg.title">Создать аккаунт</h1>
-        <p data-i18n="reg.sub">Это займёт меньше минуты</p>
+      <!-- Step 1: account details -->
+      <div id="stepDetails">
+        <div class="auth-head">
+          <div class="badge-icon"><svg class="i" aria-hidden="true"><use href="#i-sparkles"></use></svg></div>
+          <h1 data-i18n="reg.title">Создать аккаунт</h1>
+          <p data-i18n="reg.sub">Это займёт меньше минуты</p>
+        </div>
+
+        <form class="card" id="detailsForm">
+          <div class="role-picker" role="radiogroup" data-i18n-aria="reg.roleAria">
+            <input type="radio" name="role" id="roleClient" value="client" checked />
+            <label for="roleClient"><svg class="i" aria-hidden="true"><use href="#i-house"></use></svg><span data-i18n="reg.roleClient">Ищу мастера</span><small data-i18n="reg.roleClientS">Создаю заказы</small></label>
+            <input type="radio" name="role" id="roleMaster" value="master" />
+            <label for="roleMaster"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="reg.roleMaster">Я мастер</span><small data-i18n="reg.roleMasterS">Получаю заказы</small><small id="trialHint" class="trial-hint" hidden></small></label>
+          </div>
+          <label>
+            <span data-i18n="reg.name">Имя</span>
+            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-user"></use></svg><input id="name" type="text" autocomplete="name" required maxlength="255" data-i18n-ph="reg.namePh" /></span>
+          </label>
+          <label>
+            <span data-i18n="common.phone">Телефон</span>
+            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-phone"></use></svg><input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" /></span>
+          </label>
+          <label>
+            <span data-i18n="login.password">Пароль</span>
+            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-lock"></use></svg><input id="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" /></span>
+            <span class="hint" data-i18n="reg.pwHint">Минимум 6 символов</span>
+          </label>
+
+          <!-- Masters only: explicit opt-in to notifications outside the site -->
+          <fieldset class="consent-box" id="notifyBox" hidden>
+            <legend><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="reg.notifyTitle">Уведомления о новых заказах</span></legend>
+            <label class="check">
+              <input type="checkbox" id="notifyEnabled" />
+              <span data-i18n="reg.notifyConsent">Да, присылайте мне уведомления о новых заказах</span>
+            </label>
+            <div class="role-picker channel-picker" id="channelPicker" role="radiogroup" data-i18n-aria="reg.channelAria" hidden>
+              <input type="radio" name="channel" id="chTelegram" value="telegram" />
+              <label for="chTelegram"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span>Telegram</span><small id="tgSub" data-i18n="reg.tgSub">Бесплатно, мгновенно</small></label>
+              <input type="radio" name="channel" id="chSms" value="sms" />
+              <label for="chSms"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg><span>SMS</span><small data-i18n="reg.smsSub">На ваш номер телефона</small></label>
+            </div>
+            <span class="hint" data-i18n="reg.notifyHint">Можно изменить в любой момент в профиле</span>
+          </fieldset>
+
+          <div id="detailsError" class="error" role="alert"></div>
+          <button class="btn block large" type="submit" id="getCodeBtn"><span data-i18n="reg.getCode">Получить код</span><svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+          <p class="auth-foot"><span data-i18n="reg.haveAccount">Уже есть аккаунт?</span> <a class="link" href="login.html" data-i18n="nav.login">Войти</a></p>
+        </form>
       </div>
 
-      <form class="card" id="registerForm">
-        <div class="role-picker" role="radiogroup" data-i18n-aria="reg.roleAria">
-          <input type="radio" name="role" id="roleClient" value="client" checked />
-          <label for="roleClient"><svg class="i " aria-hidden="true"><use href="#i-house"></use></svg><span data-i18n="reg.roleClient">Ищу мастера</span><small data-i18n="reg.roleClientS">Создаю заказы</small></label>
-          <input type="radio" name="role" id="roleMaster" value="master" />
-          <label for="roleMaster"><svg class="i " aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="reg.roleMaster">Я мастер</span><small data-i18n="reg.roleMasterS">Получаю заказы</small><small id="trialHint" class="trial-hint" hidden></small></label>
+      <!-- Step 2: SMS code -->
+      <div id="stepCode" hidden>
+        <div class="auth-head">
+          <div class="badge-icon"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg></div>
+          <h1 data-i18n="reg.codeTitle">Подтвердите номер</h1>
+          <p id="codeSentText"></p>
         </div>
-        <label>
-          <span data-i18n="reg.name">Имя</span>
-          <span class="input-icon"><svg class="i " aria-hidden="true"><use href="#i-user"></use></svg><input id="name" type="text" autocomplete="name" required maxlength="255" data-i18n-ph="reg.namePh" /></span>
-        </label>
-        <label>
-          <span data-i18n="common.phone">Телефон</span>
-          <span class="input-icon"><svg class="i " aria-hidden="true"><use href="#i-phone"></use></svg><input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" /></span>
-        </label>
-        <label>
-          <span data-i18n="login.password">Пароль</span>
-          <span class="input-icon"><svg class="i " aria-hidden="true"><use href="#i-lock"></use></svg><input id="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" /></span>
-          <span class="hint" data-i18n="reg.pwHint">Минимум 6 символов</span>
-        </label>
-        <div id="formError" class="error" role="alert"></div>
-        <button class="btn block large" type="submit" id="submitBtn"><span data-i18n="reg.submit">Зарегистрироваться</span><svg class="i " aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
-        <p class="auth-foot"><span data-i18n="reg.haveAccount">Уже есть аккаунт?</span> <a class="link" href="login.html" data-i18n="nav.login">Войти</a></p>
-      </form>
+        <form class="card" id="codeForm">
+          <div class="notice" id="devCode" hidden></div>
+          <label>
+            <span data-i18n="reg.code">Код из SMS</span>
+            <input id="code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="\d{6}" maxlength="6" required placeholder="••••••" />
+          </label>
+          <div id="codeError" class="error" role="alert"></div>
+          <button class="btn block large" type="submit" id="submitBtn"><span data-i18n="reg.submit">Зарегистрироваться</span><svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+          <div class="row" style="justify-content:space-between">
+            <button type="button" class="btn small ghost" id="backBtn"><svg class="i" aria-hidden="true"><use href="#i-arrow-left"></use></svg><span data-i18n="reg.changePhone">Изменить номер</span></button>
+            <button type="button" class="btn small ghost" id="resendBtn" disabled></button>
+          </div>
+        </form>
+      </div>
     </div>
   </main>
 
@@ -52,35 +94,100 @@
   <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
+  <script src="js/code-step.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
-    if (params.get("role") === "master") document.getElementById("roleMaster").checked = true;
+    const roleMaster = document.getElementById("roleMaster");
+    if (params.get("role") === "master") roleMaster.checked = true;
+    let telegramAvailable = false;
+
+    function syncRole() {
+      document.getElementById("notifyBox").hidden = !roleMaster.checked;
+    }
+    function syncConsent() {
+      document.getElementById("channelPicker").hidden = !document.getElementById("notifyEnabled").checked;
+    }
+    document.querySelectorAll('input[name="role"]').forEach(r => r.addEventListener("change", syncRole));
+    document.getElementById("notifyEnabled").addEventListener("change", syncConsent);
+    syncRole();
+    syncConsent();
 
     api.publicConfig().then(cfg => {
-      if (!cfg.subscriptions_enabled) return;
-      const hint = document.getElementById("trialHint");
-      hint.textContent = t("reg.trialHint");
-      hint.hidden = false;
-    }).catch(() => {});
+      if (cfg.subscriptions_enabled) {
+        const hint = document.getElementById("trialHint");
+        hint.textContent = t("reg.trialHint");
+        hint.hidden = false;
+      }
+      telegramAvailable = cfg.telegram_enabled;
+      const tg = document.getElementById("chTelegram");
+      if (telegramAvailable) {
+        tg.checked = true;
+      } else {
+        // No bot configured yet: Telegram is shown but can't be chosen.
+        tg.disabled = true;
+        document.getElementById("tgSub").textContent = t("reg.soon");
+        document.getElementById("chSms").checked = true;
+      }
+    }).catch(() => {
+      document.getElementById("chSms").checked = true;
+    });
 
-    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+    function details() {
+      const isMaster = roleMaster.checked;
+      const notifyEnabled = isMaster && document.getElementById("notifyEnabled").checked;
+      return {
+        name: document.getElementById("name").value,
+        phone: document.getElementById("phone").value,
+        password: document.getElementById("password").value,
+        role: isMaster ? "master" : "client",
+        notify_enabled: notifyEnabled,
+        notify_channel: document.querySelector('input[name="channel"]:checked')?.value || "sms",
+        lang: LANG,
+      };
+    }
+
+    const codeStep = createCodeStep({
+      purpose: "register",
+      getPhone: () => document.getElementById("phone").value,
+      showStep: (onCode) => {
+        document.getElementById("stepDetails").hidden = onCode;
+        document.getElementById("stepCode").hidden = !onCode;
+      },
+    });
+
+    document.getElementById("detailsForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const errorBox = document.getElementById("formError");
-      const button = document.getElementById("submitBtn");
-      const role = document.querySelector('input[name="role"]:checked').value;
+      const errorBox = document.getElementById("detailsError");
       errorBox.textContent = "";
+      const button = document.getElementById("getCodeBtn");
       button.disabled = true;
       try {
-        const { access_token } = await api.register({
-          name: document.getElementById("name").value,
-          phone: document.getElementById("phone").value,
-          password: document.getElementById("password").value,
-          role,
-        });
+        await codeStep.send();
+      } catch (err) {
+        errorBox.textContent = t("code.sendFail") + err.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById("codeForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById("codeError");
+      const button = document.getElementById("submitBtn");
+      errorBox.textContent = "";
+      button.disabled = true;
+      const data = details();
+      try {
+        const { access_token } = await api.register({ ...data, code: document.getElementById("code").value.trim() });
         setToken(access_token);
-        location.href = role === "master" ? "master-profile-edit.html?welcome=1" : safeNext(params.get("next"));
-      } catch (e) {
-        errorBox.textContent = t("reg.fail") + e.message;
+        if (data.role === "master") {
+          const tg = data.notify_enabled && data.notify_channel === "telegram" ? "&tg=1" : "";
+          location.href = `master-profile-edit.html?welcome=1${tg}`;
+        } else {
+          location.href = safeNext(params.get("next"));
+        }
+      } catch (err) {
+        errorBox.textContent = t("reg.fail") + err.message;
         button.disabled = false;
       }
     });

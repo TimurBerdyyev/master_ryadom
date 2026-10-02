@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n="reset.docTitle">Восстановление пароля — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main>
+    <div class="auth-wrap reveal">
+      <!-- Step 1: phone -->
+      <div id="stepPhone">
+        <div class="auth-head">
+          <div class="badge-icon"><svg class="i" aria-hidden="true"><use href="#i-key-round"></use></svg></div>
+          <h1 data-i18n="reset.title">Восстановление пароля</h1>
+          <p data-i18n="reset.sub">Пришлём код в SMS на номер вашего аккаунта</p>
+        </div>
+        <form class="card" id="phoneForm">
+          <label>
+            <span data-i18n="common.phone">Телефон</span>
+            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-phone"></use></svg><input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" /></span>
+          </label>
+          <div id="phoneError" class="error" role="alert"></div>
+          <button class="btn block large" type="submit" id="getCodeBtn"><span data-i18n="reg.getCode">Получить код</span><svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+          <p class="auth-foot"><a class="link" href="login.html" data-i18n="nav.login">Войти</a></p>
+        </form>
+      </div>
+
+      <!-- Step 2: code + new password -->
+      <div id="stepCode" hidden>
+        <div class="auth-head">
+          <div class="badge-icon"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg></div>
+          <h1 data-i18n="reset.title">Восстановление пароля</h1>
+          <p id="codeSentText"></p>
+        </div>
+        <form class="card" id="codeForm">
+          <div class="notice" id="devCode" hidden></div>
+          <label>
+            <span data-i18n="reg.code">Код из SMS</span>
+            <input id="code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="\d{6}" maxlength="6" required placeholder="••••••" />
+          </label>
+          <label>
+            <span data-i18n="reset.newPassword">Новый пароль</span>
+            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-lock"></use></svg><input id="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" /></span>
+            <span class="hint" data-i18n="reg.pwHint">Минимум 6 символов</span>
+          </label>
+          <div id="codeError" class="error" role="alert"></div>
+          <button class="btn block large" type="submit" id="submitBtn"><span data-i18n="reset.submit">Сохранить пароль и войти</span><svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
+          <div class="row" style="justify-content:space-between">
+            <button type="button" class="btn small ghost" id="backBtn"><svg class="i" aria-hidden="true"><use href="#i-arrow-left"></use></svg><span data-i18n="reg.changePhone">Изменить номер</span></button>
+            <button type="button" class="btn small ghost" id="resendBtn" disabled></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/code-step.js"></script>
+  <script>
+    const codeStep = createCodeStep({
+      purpose: "reset",
+      getPhone: () => document.getElementById("phone").value,
+      // The server never says whether the number exists, so neither do we.
+      sentText: () => t("reset.sentGeneric"),
+      showStep: (onCode) => {
+        document.getElementById("stepPhone").hidden = onCode;
+        document.getElementById("stepCode").hidden = !onCode;
+      },
+    });
+
+    document.getElementById("phoneForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById("phoneError");
+      const button = document.getElementById("getCodeBtn");
+      errorBox.textContent = "";
+      button.disabled = true;
+      try {
+        await codeStep.send();
+      } catch (err) {
+        errorBox.textContent = t("code.sendFail") + err.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById("codeForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById("codeError");
+      const button = document.getElementById("submitBtn");
+      errorBox.textContent = "";
+      button.disabled = true;
+      try {
+        const { access_token } = await api.resetPassword({
+          phone: document.getElementById("phone").value,
+          code: document.getElementById("code").value.trim(),
+          password: document.getElementById("password").value,
+        });
+        setToken(access_token);
+        toast(t("reset.done"));
+        setTimeout(() => { location.href = "index.html"; }, 600);
+      } catch (err) {
+        errorBox.textContent = t("reset.fail") + err.message;
+        button.disabled = false;
+      }
+    });
+
+    renderNav();
+  </script>
+</body>
+</html>

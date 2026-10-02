@@ -1,27 +1,43 @@
+# Local / staging:  docker compose up --build            → http://localhost:8080
+# Production (HTTPS): see DEPLOY.md — adds deploy/docker-compose.prod.yml with Caddy in front.
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: master_ryadom
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-master_ryadom}
       POSTGRES_DB: master_ryadom
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U master_ryadom -d master_ryadom"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     ports:
       - "127.0.0.1:5432:5432"  # только локально: не открывать БД в интернет
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "127.0.0.1:6379:6379"  # Redis без пароля — только локально
 
   backend:
     build: ./backend
+    restart: unless-stopped
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: postgresql://master_ryadom:${POSTGRES_PASSWORD:-master_ryadom}@db:5432/master_ryadom
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      SITE_URL: ${SITE_URL:-http://localhost:8080}
+      SMS_PROVIDER: ${SMS_PROVIDER:-console}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       SUBSCRIPTIONS_ENABLED: ${SUBSCRIPTIONS_ENABLED:-false}
       SUBSCRIPTION_TRIAL_DAYS: ${SUBSCRIPTION_TRIAL_DAYS:-30}
       SUBSCRIPTION_PRICE: ${SUBSCRIPTION_PRICE:-500}
@@ -29,18 +45,22 @@ services:
     volumes:
       - uploads_data:/app/uploads
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy  # migrations run at startup and need the database
+      redis:
+        condition: service_started
     ports:
-      - "127.0.0.1:8000:8000"  # снаружи API доступен только через nginx: http://<сервер>:8080/api/
+      - "127.0.0.1:8000:8000"  # снаружи API доступен только через nginx (/api/)
 
   web:
     image: nginx:alpine
+    restart: unless-stopped
     volumes:
       - ./web:/usr/share/nginx/html:ro
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "8080:80"
+      # Only on this machine; in production Caddy (HTTPS) is the single public entry point.
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
 

@@ -2,7 +2,8 @@
 import sys
 
 from app.auth import hash_password
-from app.database import Base, SessionLocal, engine
+from app.database import SessionLocal
+from app.migrations import upgrade_database
 from app.models import User, UserRole
 from app.schemas import normalize_phone
 
@@ -14,7 +15,7 @@ def main() -> None:
 
     phone, password, name = normalize_phone(sys.argv[1]), sys.argv[2], sys.argv[3]
 
-    Base.metadata.create_all(bind=engine)
+    upgrade_database()
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.phone == phone).first()

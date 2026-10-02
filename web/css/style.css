@@ -3191,3 +3191,66 @@ header.topbar nav {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Sign-up: notification consent, SMS code ---------- */
+
+.consent-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.consent-box legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.consent-box legend .i {
+  color: var(--primary);
+}
+
+label.check,
+form.card label.check {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+label.check input[type="checkbox"],
+form.card label.check input[type="checkbox"] {
+  width: 20px;
+  min-height: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+
+.channel-picker label {
+  background: var(--surface);
+}
+
+.role-picker input:disabled + label {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.code-input {
+  text-align: center;
+  font-family: var(--font-display) !important;
+  font-size: 26px !important;
+  letter-spacing: .5em;
+  padding-left: calc(14px + .5em) !important;
+}

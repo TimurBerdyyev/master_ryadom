@@ -50,6 +50,23 @@
       <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
     </form>
 
+    <form class="card" id="notifyForm" style="max-width:none;margin-top:16px">
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="edit.notifyTitle">Уведомления</span></h2>
+      <p class="muted" style="margin:-8px 0 0" data-i18n="edit.notifySub">Куда присылать уведомления о новых заказах и выборе вашего предложения.</p>
+      <label class="check">
+        <input type="checkbox" id="notifyEnabled" />
+        <span data-i18n="edit.notifyOn">Присылать уведомления</span>
+      </label>
+      <div class="role-picker channel-picker" id="channelPicker" role="radiogroup" data-i18n-aria="reg.channelAria">
+        <input type="radio" name="channel" id="chTelegram" value="telegram" />
+        <label for="chTelegram"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span>Telegram</span><small id="tgSub" data-i18n="reg.tgSub">Бесплатно, мгновенно</small></label>
+        <input type="radio" name="channel" id="chSms" value="sms" />
+        <label for="chSms"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg><span>SMS</span><small data-i18n="reg.smsSub">На ваш номер телефона</small></label>
+      </div>
+      <div id="channelStatus"></div>
+      <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
+    </form>
+
     <div class="section-title" data-i18n="edit.servicesTitle">Мои услуги и цены</div>
     <div id="servicesList" class="card-box" style="padding-top:6px;padding-bottom:6px"></div>
 
@@ -218,6 +235,73 @@
       }
     });
 
+    let notifyPrefs = null;
+    let myPhone = "";
+
+    function renderChannelStatus() {
+      const box = document.getElementById("channelStatus");
+      const enabled = document.getElementById("notifyEnabled").checked;
+      const channel = document.querySelector('input[name="channel"]:checked')?.value;
+      document.getElementById("channelPicker").hidden = !enabled;
+      if (!enabled || !notifyPrefs) {
+        box.innerHTML = "";
+        return;
+      }
+      if (channel === "sms") {
+        box.innerHTML = `<div class="notice">${icon("message-square")}<span>${t("edit.smsTo", { phone: esc(myPhone) })}</span></div>`;
+      } else if (notifyPrefs.telegram_connected) {
+        box.innerHTML = `<div class="notice success">${icon("circle-check")}<span>${t("edit.tgConnected")}</span></div>`;
+      } else {
+        box.innerHTML = `
+          <div class="notice" style="flex-wrap:wrap">
+            ${icon("triangle-alert")}<span style="flex:1;min-width:200px">${t("edit.tgNotConnected")}<br /><span class="muted">${t("edit.tgHint")}</span></span>
+            <div class="row">
+              <button type="button" class="btn small" onclick="connectTelegram()">${icon("send")}${t("edit.tgConnect")}</button>
+              <button type="button" class="btn small secondary" onclick="loadNotifySettings()">${icon("refresh-cw")}${t("edit.tgCheck")}</button>
+            </div>
+          </div>`;
+      }
+    }
+
+    async function loadNotifySettings() {
+      notifyPrefs = await api.notificationSettings();
+      document.getElementById("notifyEnabled").checked = notifyPrefs.enabled;
+      const tg = document.getElementById("chTelegram");
+      tg.disabled = !notifyPrefs.telegram_available;
+      if (!notifyPrefs.telegram_available) document.getElementById("tgSub").textContent = t("reg.soon");
+      const channel = notifyPrefs.telegram_available ? notifyPrefs.channel : "sms";
+      document.getElementById(channel === "telegram" ? "chTelegram" : "chSms").checked = true;
+      renderChannelStatus();
+    }
+
+    async function connectTelegram() {
+      try {
+        // Save the choice first, then open the bot; the master comes back and presses "check".
+        await api.saveNotificationSettings({ enabled: true, channel: "telegram", lang: LANG });
+        const { url } = await api.telegramLink();
+        window.open(url, "_blank", "noopener");
+      } catch (e) {
+        toast(t("common.error") + e.message);
+      }
+    }
+
+    document.getElementById("notifyEnabled").addEventListener("change", renderChannelStatus);
+    document.querySelectorAll('input[name="channel"]').forEach(r => r.addEventListener("change", renderChannelStatus));
+    document.getElementById("notifyForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        notifyPrefs = await api.saveNotificationSettings({
+          enabled: document.getElementById("notifyEnabled").checked,
+          channel: document.querySelector('input[name="channel"]:checked')?.value || "sms",
+          lang: LANG,
+        });
+        toast(t("edit.notifySaved"));
+        renderChannelStatus();
+      } catch (err) {
+        toast(t("common.error") + err.message);
+      }
+    });
+
     async function init() {
       const me = await api.me();
       if (me.role !== "master") {
@@ -225,8 +309,13 @@
           `<a class="btn" href="orders.html">${t("nav.myOrders")}</a>`);
         return;
       }
+      myPhone = me.phone || "";
       await loadCategories().catch(() => {});
       loadProfile();
+      await loadNotifySettings().catch(() => {});
+      if (new URLSearchParams(location.search).get("tg")) {
+        document.getElementById("notifyForm").scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     }
 
     if (loggedIn) init().catch(e => toast(t("common.error") + e.message));

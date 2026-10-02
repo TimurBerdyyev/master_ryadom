@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import Master, Notification, Order, OrderOffer, OrderStatus, OfferStatus, Photo, User, UserRole
+from app.models import Category, Master, Order, OrderOffer, OrderStatus, OfferStatus, Photo, Service, User, UserRole, UserStatus
 from app.schemas import (
     ContactOut,
     MasterBriefOut,
@@ -16,7 +16,8 @@ from app.schemas import (
     OrderStatusUpdate,
     PhotoOut,
 )
-from app.subscriptions import require_access
+from app.notify import notify
+from app.subscriptions import filter_masters_with_access, require_access
 from app.uploads import delete_upload, save_upload
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -81,14 +82,36 @@ def _order_out(order: Order, current_user: User) -> OrderOut:
     return out
 
 
-def _notify(db: Session, user_id: int, title: str, text: str | None = None) -> None:
-    db.add(Notification(user_id=user_id, title=title, text=text))
+# Masters notified about one new order at most (protects SMS budget and the DB on huge categories).
+MAX_NEW_ORDER_NOTIFICATIONS = 300
+
+
+def _notify_masters_about_new_order(db: Session, order: Order) -> None:
+    category = db.get(Category, order.category_id)
+    masters = (
+        filter_masters_with_access(
+            db.query(Master)
+            .join(User, Master.user_id == User.id)
+            .filter(User.status == UserStatus.active, User.id != order.client_id)
+            .filter(Master.services.any(Service.category_id == order.category_id))
+        )
+        .limit(MAX_NEW_ORDER_NOTIFICATIONS)
+        .all()
+    )
+    for master in masters:
+        notify(
+            db, master.user_id, "Новый заказ в вашей категории", f"Заказ #{order.id}: {category.name}",
+            kind="new_order", id=order.id, category=category.name, description=order.description,
+            price=float(order.price) if order.price else None,
+        )
 
 
 @router.post("", response_model=OrderOut)
 def create_order(data: OrderCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     order = Order(client_id=current_user.id, status=OrderStatus.searching, **data.model_dump())
     db.add(order)
+    db.flush()
+    _notify_masters_about_new_order(db, order)
     db.commit()
     db.refresh(order)
     return order
@@ -220,7 +243,7 @@ def offer_order(
         title = "Новое предложение по заказу"
 
     order.status = OrderStatus.offers_received
-    _notify(db, order.client_id, title, f"{current_user.name} предлагает {data.price:g} сом за заказ #{order.id}")
+    notify(db, order.client_id, title, f"{current_user.name} предлагает {data.price:g} сом за заказ #{order.id}")
     db.commit()
     db.refresh(offer)
     return offer
@@ -254,7 +277,8 @@ def accept_offer(
         other.status = OfferStatus.rejected
 
     master = db.get(Master, offer.master_id)
-    _notify(db, master.user_id, "Вас выбрали для заказа", f"Клиент выбрал ваше предложение по заказу #{order.id}")
+    notify(db, master.user_id, "Вас выбрали для заказа", f"Клиент выбрал ваше предложение по заказу #{order.id}",
+           kind="chosen", id=order.id)
     db.commit()
     db.refresh(order)
     return _order_out(order, current_user)
@@ -288,7 +312,7 @@ def update_status(
         text = f"Заказ #{order.id}"
         if new_status == OrderStatus.completed and notify_user_id == order.client_id:
             text += " — оставьте, пожалуйста, отзыв о мастере"
-        _notify(db, notify_user_id, STATUS_TITLES[new_status], text)
+        notify(db, notify_user_id, STATUS_TITLES[new_status], text)
     db.commit()
     db.refresh(order)
     return _order_out(order, current_user)
@@ -304,7 +328,7 @@ def cancel_order(order_id: int, current_user: User = Depends(get_current_user), 
 
     order.status = OrderStatus.cancelled
     if order.master is not None:
-        _notify(db, order.master.user_id, "Клиент отменил заказ", f"Заказ #{order.id} отменён")
+        notify(db, order.master.user_id, "Клиент отменил заказ", f"Заказ #{order.id} отменён", kind="cancelled", id=order.id)
     db.commit()
     db.refresh(order)
     return _order_out(order, current_user)

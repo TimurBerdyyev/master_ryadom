@@ -76,6 +76,8 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.client)
     photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus), default=UserStatus.active)
+    # Tokens issued before this moment are rejected (password reset logs out other devices).
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     master: Mapped["Master"] = relationship(back_populates="user", uselist=False)
@@ -302,3 +304,31 @@ class SubscriptionPayment(Base):
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     master: Mapped["Master"] = relationship()
+
+
+class PhoneCode(Base):
+    """One-time SMS code confirming a phone (sign-up) or authorising a password reset."""
+    __tablename__ = "phone_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    phone: Mapped[str] = mapped_column(String(32), index=True)
+    purpose: Mapped[str] = mapped_column(String(16))  # "register" | "reset"
+    code_hash: Mapped[str] = mapped_column(String(128))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class NotificationSettings(Base):
+    """Where a master agreed to receive notifications outside the site (opt-in at sign-up)."""
+    __tablename__ = "notification_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    channel: Mapped[str] = mapped_column(String(16), default="telegram")  # "telegram" | "sms"
+    lang: Mapped[str] = mapped_column(String(2), default="ru")
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    telegram_link_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

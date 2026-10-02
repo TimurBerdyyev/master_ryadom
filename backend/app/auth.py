@@ -30,16 +30,31 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_access_token(user_id: int) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": str(user_id), "exp": expire}
+    payload = {"sub": str(user_id), "exp": expire, "iat": datetime.now(UTC)}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def _user_id_from_token(token: str) -> int | None:
+def _decode(token: str) -> tuple[int, int] | None:
+    """(user_id, issued_at) from a valid token, else None."""
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        return int(payload["sub"])
+        return int(payload["sub"]), int(payload.get("iat", 0))
     except (jwt.PyJWTError, KeyError, TypeError, ValueError):
         return None
+
+
+def _token_user(token: str, db: Session) -> User | None:
+    decoded = _decode(token)
+    if decoded is None:
+        return None
+    user_id, issued_at = decoded
+    user = db.get(User, user_id)
+    if user is None:
+        return None
+    # A password change revokes every token issued before it.
+    if user.password_changed_at and issued_at < int(user.password_changed_at.replace(tzinfo=UTC).timestamp()):
+        return None
+    return user
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
@@ -48,11 +63,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         detail="Не удалось подтвердить учётные данные",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    user_id = _user_id_from_token(token)
-    if user_id is None:
-        raise credentials_error
-
-    user = db.get(User, user_id)
+    user = _token_user(token, db)
     if user is None:
         raise credentials_error
     if user.status == UserStatus.blocked:
@@ -71,10 +82,7 @@ def get_current_user_optional(
 ) -> User | None:
     if token is None:
         return None
-    user_id = _user_id_from_token(token)
-    if user_id is None:
-        return None
-    user = db.get(User, user_id)
+    user = _token_user(token, db)
     # A blocked account must not keep seeing contact data via the "optional login" endpoints.
     if user is None or user.status == UserStatus.blocked:
         return None

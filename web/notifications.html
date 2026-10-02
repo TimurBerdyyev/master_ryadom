@@ -31,13 +31,15 @@
     const loggedIn = requireLogin("notifications.html");
 
     // Pull "#123" out of a notification so it can link straight to the order.
-    function orderLink(text) {
+    function orderLink(text, title) {
+      if (/Новый заказ/.test(title || "")) return "feed.html";  // masters can't open other people's orders
       const match = /#(\d+)/.exec(text || "");
       return match ? `order-detail.html?id=${match[1]}` : null;
     }
 
     // Pick an icon from the notification title.
     function notificationIcon(title) {
+      if (/Новый заказ/i.test(title)) return "inbox";
       if (/предложени/i.test(title)) return "hand-coins";
       if (/выбрал/i.test(title)) return "badge-check";
       if (/выехал/i.test(title)) return "car";
@@ -56,7 +58,7 @@
           return;
         }
         list.innerHTML = `<div class="card-box reveal" style="padding:0;overflow:hidden">${items.map(n => {
-          const href = orderLink(n.text);
+          const href = orderLink(n.text, n.title);
           const body = `
             <span class="n-ico">${icon(notificationIcon(n.title))}</span>
             <div style="flex:1;min-width:0">

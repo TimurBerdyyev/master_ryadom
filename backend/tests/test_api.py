@@ -9,9 +9,12 @@ import os
 import tempfile
 
 _tmp = tempfile.mkdtemp()
-os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
+# A throwaway SQLite file by default; TEST_DATABASE_URL runs the suite against e.g. a scratch Postgres.
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/test.db"
 os.environ["UPLOAD_DIR"] = f"{_tmp}/uploads"
 os.environ["JWT_SECRET"] = "test-secret-that-is-long-enough-for-hs256-0123456789"
+os.environ["REDIS_URL"] = ""  # in-memory rate limits, reset between tests
+os.environ["SMS_PROVIDER"] = "console"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -40,9 +43,17 @@ def reset_rate_limit():
 _counter = iter(range(100, 1000))
 
 
+def sms_code(client, phone, purpose="register"):
+    """The dev SMS provider (SMS_PROVIDER=console) echoes the code back in the response."""
+    r = client.post("/auth/send-code", json={"phone": phone, "purpose": purpose})
+    assert r.status_code == 200, r.text
+    return r.json()["debug_code"]
+
+
 def register(client, role="client", name="Тест"):
     phone = f"+996700000{next(_counter)}"
-    r = client.post("/auth/register", json={"name": name, "phone": phone, "password": "secret123", "role": role})
+    r = client.post("/auth/register", json={"name": name, "phone": phone, "password": "secret123", "role": role,
+                                            "code": sms_code(client, phone)})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}, phone
 
@@ -173,15 +184,17 @@ def test_idor(client):
 
 def test_auth_hardening(client):
     # cannot self-register as admin
-    r = client.post("/auth/register", json={"name": "x", "phone": "+996711111111", "password": "secret123", "role": "admin"})
+    r = client.post("/auth/register", json={"name": "x", "phone": "+996711111111", "password": "secret123", "role": "admin",
+                                            "code": sms_code(client, "+996711111111")})
     assert r.status_code == 422
 
     # phone normalization: formatted and plain are the same account
-    r = client.post("/auth/register", json={"name": "x", "phone": "+996 722 333 444", "password": "secret123"})
+    r = client.post("/auth/register", json={"name": "x", "phone": "+996 722 333 444", "password": "secret123",
+                                            "code": sms_code(client, "+996722333444")})
     assert r.status_code == 200
-    assert client.post("/auth/register", json={"name": "y", "phone": "+996722333444", "password": "secret123"}).status_code == 400
+    assert client.post("/auth/send-code", json={"phone": "+996 722 333 444", "purpose": "register"}).status_code == 400
     assert client.post("/auth/login", json={"phone": "+996-722-333-444", "password": "secret123"}).status_code == 200
-    assert client.post("/auth/register", json={"name": "x", "phone": "abc", "password": "secret123"}).status_code == 422
+    assert client.post("/auth/send-code", json={"phone": "abc", "purpose": "register"}).status_code == 422
 
     # forged / tampered tokens
     forged = jwt.encode({"sub": "1"}, "wrong-secret-of-a-sufficient-length-0123456789", algorithm="HS256")
@@ -398,3 +411,230 @@ def test_existing_masters_get_trial_when_enabled(client, monkeypatch):
     ensure_all_masters(db)
     assert db.query(Master).filter(~Master.subscription.has()).count() == 0
     db.close()
+
+
+
+# ---------- SMS codes and password reset ----------
+
+def test_register_requires_valid_code(client):
+    phone = "+996755000001"
+    base = {"name": "X", "phone": phone, "password": "secret123"}
+    # no code / wrong format
+    assert client.post("/auth/register", json=base).status_code == 422
+    assert client.post("/auth/register", json={**base, "code": "123"}).status_code == 422
+    # no code was sent yet
+    assert client.post("/auth/register", json={**base, "code": "000000"}).status_code == 400
+
+    code = sms_code(client, phone)
+    # resend is throttled
+    assert client.post("/auth/send-code", json={"phone": phone, "purpose": "register"}).status_code == 429
+    wrong = "000000" if code != "000000" else "111111"
+    assert client.post("/auth/register", json={**base, "code": wrong}).json()["detail"] == "Неверный код"
+    assert client.post("/auth/register", json={**base, "code": code}).status_code == 200
+    # a code works once
+    assert client.post("/auth/register", json={**base, "phone": "+996755000001", "code": code}).status_code == 400
+
+
+def test_code_brute_force_is_capped(client):
+    phone = "+996755000002"
+    code = sms_code(client, phone)
+    base = {"name": "X", "phone": phone, "password": "secret123"}
+    wrong = [c for c in ("000000", "111111", "222222", "333333", "444444", "555555") if c != code][:5]
+    for w in wrong:
+        assert client.post("/auth/register", json={**base, "code": w}).status_code == 400
+    # even the right code is refused after 5 wrong attempts
+    r = client.post("/auth/register", json={**base, "code": code})
+    assert r.status_code == 400 and "запросите новый" in r.json()["detail"]
+
+
+def test_expired_code(client, monkeypatch):
+    from datetime import timedelta
+
+    from app.models import PhoneCode, utcnow
+    phone = "+996755000003"
+    code = sms_code(client, phone)
+    db = SessionLocal()
+    db.query(PhoneCode).filter(PhoneCode.phone == phone).update({PhoneCode.expires_at: utcnow() - timedelta(seconds=1)})
+    db.commit()
+    db.close()
+    r = client.post("/auth/register", json={"name": "X", "phone": phone, "password": "secret123", "code": code})
+    assert r.status_code == 400 and "устарел" in r.json()["detail"]
+
+
+def test_password_reset(client):
+    headers, phone = register(client)
+    # unknown phone: same answer, nothing sent (no account probing)
+    r = client.post("/auth/send-code", json={"phone": "+996755999999", "purpose": "reset"})
+    assert r.status_code == 200 and r.json()["debug_code"] is None
+
+    import time
+    time.sleep(1.1)  # tokens carry whole-second timestamps; make the reset strictly later than login
+    code = sms_code(client, phone, "reset")
+    # a sign-up code can't be used for a reset and vice versa
+    assert client.post("/auth/register", json={"name": "Z", "phone": phone, "password": "x" * 8, "code": code}).status_code == 400
+    r = client.post("/auth/reset-password", json={"phone": phone, "code": code, "password": "newpass123"})
+    assert r.status_code == 200
+    new_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+    # old sessions are logged out, the new token and password work, the old password doesn't
+    assert client.get("/auth/me", headers=headers).status_code == 401
+    assert client.get("/auth/me", headers=new_headers).status_code == 200
+    assert client.post("/auth/login", json={"phone": phone, "password": "secret123"}).status_code == 401
+    assert client.post("/auth/login", json={"phone": phone, "password": "newpass123"}).status_code == 200
+    # code is single-use
+    assert client.post("/auth/reset-password", json={"phone": phone, "code": code, "password": "other123"}).status_code == 400
+
+
+def test_models_match_migrations():
+    """Every model change must come with an Alembic migration (cd backend && alembic revision --autogenerate)."""
+    from alembic import command
+
+    from app.database import engine
+    from app.migrations import _config
+    command.check(_config(engine))
+
+
+def test_pre_migration_database_is_upgraded(tmp_path):
+    """A database created with create_all before migrations existed — and before some tables did."""
+    from sqlalchemy import create_engine, inspect, text
+
+    from app.database import Base
+    from app.migrations import upgrade_database
+
+    legacy = create_engine(f"sqlite:///{tmp_path}/legacy.db")
+    old_tables = [t for t in Base.metadata.sorted_tables
+                  if t.name not in {"master_subscriptions", "subscription_payments", "phone_codes", "notification_settings"}]
+    Base.metadata.create_all(legacy, tables=old_tables)
+    with legacy.begin() as conn:  # the old users table had no password_changed_at column
+        conn.execute(text("ALTER TABLE users DROP COLUMN password_changed_at"))
+        conn.execute(text("INSERT INTO categories (name) VALUES ('Сантехника')"))
+
+    upgrade_database(legacy)
+
+    tables = set(inspect(legacy).get_table_names())
+    assert {"master_subscriptions", "subscription_payments", "phone_codes", "notification_settings"} <= tables
+    assert "password_changed_at" in {c["name"] for c in inspect(legacy).get_columns("users")}
+    with legacy.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM categories")).scalar() == 1  # data kept
+
+
+# ---------- master notifications (Telegram / SMS, opt-in) ----------
+
+@pytest.fixture
+def outbox(monkeypatch):
+    """Deliver notifications synchronously and capture what would be sent."""
+    from app import notify, telegram
+    sent = []
+
+    class FakeSms:
+        is_dev = True
+
+        def send(self, phone, text):
+            sent.append(("sms", phone, text))
+
+    monkeypatch.setattr(notify, "_submit", lambda fn, *args: fn(*args))
+    monkeypatch.setattr(notify, "get_sms_provider", lambda: FakeSms())
+    monkeypatch.setattr(telegram, "send_message", lambda chat_id, text: sent.append(("telegram", chat_id, text)))
+    return sent
+
+
+def register_master(client, notify_enabled=False, channel="sms", lang="ru", category="Сантехника"):
+    phone = f"+996700000{next(_counter)}"
+    r = client.post("/auth/register", json={
+        "name": "Мастер", "phone": phone, "password": "secret123", "role": "master",
+        "code": sms_code(client, phone), "notify_enabled": notify_enabled, "notify_channel": channel, "lang": lang,
+    })
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    client.post("/masters/me/services", headers=headers,
+                json={"category_id": category_id(client, category), "title": "Услуга", "price_from": 100})
+    return headers, phone
+
+
+def test_notifications_need_consent(client, outbox):
+    silent_h, _ = register_master(client, notify_enabled=False)
+    sms_h, sms_phone = register_master(client, notify_enabled=True, channel="sms", lang="ky")
+    electrician_h, _ = register_master(client, notify_enabled=True, category="Электрика")
+    assert client.get("/notifications/settings", headers=silent_h).json()["enabled"] is False
+
+    client_h, _ = register(client)
+    outbox.clear()
+    order = client.post("/orders", headers=client_h,
+                        json={"category_id": category_id(client), "description": "Течёт кран", "price": 800}).json()
+
+    # everyone in the category gets the in-app notification…
+    for h in (silent_h, sms_h):
+        assert any("Новый заказ" in n["title"] for n in client.get("/notifications", headers=h).json())
+    # …but only the master who agreed gets an SMS, in their language; other categories get nothing
+    assert len(outbox) == 1
+    channel, phone, text = outbox[0]
+    assert channel == "sms" and phone == sms_phone
+    assert f"#{order['id']}" in text and "Жаңы буйрутма" in text
+    assert not any("Новый заказ" in n["title"] for n in client.get("/notifications", headers=electrician_h).json())
+
+    # the master can switch notifications off
+    client.put("/notifications/settings", headers=sms_h, json={"enabled": False, "channel": "sms", "lang": "ky"})
+    outbox.clear()
+    client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "Ещё"})
+    assert outbox == []
+
+    # clients have no notification settings
+    assert client.get("/notifications/settings", headers=client_h).status_code == 403
+
+
+def test_chosen_and_cancelled_notifications(client, outbox):
+    master_h, phone = register_master(client, notify_enabled=True, channel="sms")
+    client_h, _ = register(client)
+    order = client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "x"}).json()
+    offer = client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 500}).json()
+    outbox.clear()
+    client.post(f"/orders/{order['id']}/accept", params={"offer_id": offer["id"]}, headers=client_h)
+    assert any("Вас выбрали" in m[2] for m in outbox)
+    client.post(f"/orders/{order['id']}/cancel", headers=client_h)
+    assert any("отменил заказ" in m[2] for m in outbox)
+
+
+def test_telegram_linking(client, outbox, monkeypatch):
+    from app.config import settings
+    master_h, _ = register_master(client, notify_enabled=True, channel="telegram")
+
+    # bot not configured -> Telegram can't be chosen
+    assert client.post("/notifications/telegram/link", headers=master_h).status_code == 400
+    assert client.get("/notifications/settings", headers=master_h).json()["telegram_available"] is False
+
+    monkeypatch.setattr(settings, "telegram_bot_token", "123:abc")
+    monkeypatch.setattr(settings, "telegram_bot_username", "test_bot")
+    monkeypatch.setattr(settings, "telegram_webhook_secret", "hook-secret")
+    url = client.post("/notifications/telegram/link", headers=master_h).json()["url"]
+    assert url.startswith("https://t.me/test_bot?start=")
+    token = url.split("start=")[1]
+
+    update = {"update_id": 1, "message": {"chat": {"id": 555}, "text": f"/start {token}"}}
+    # webhook calls without Telegram's secret header are rejected
+    assert client.post("/telegram/webhook", json=update).status_code == 404
+    assert client.post("/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"}).status_code == 404
+    r = client.post("/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "hook-secret"})
+    assert r.status_code == 200
+    assert outbox[-1][:2] == ("telegram", "555") and "Готово" in outbox[-1][2]
+    assert client.get("/notifications/settings", headers=master_h).json()["telegram_connected"] is True
+
+    # the link is single-use
+    outbox.clear()
+    client.post("/telegram/webhook", json={**update, "message": {"chat": {"id": 999}, "text": f"/start {token}"}},
+                headers={"X-Telegram-Bot-Api-Secret-Token": "hook-secret"})
+    assert outbox[-1][1] == "999" and "Подключить Telegram" in outbox[-1][2]
+
+    # new orders now arrive in Telegram
+    client_h, _ = register(client)
+    outbox.clear()
+    client.post("/orders", headers=client_h, json={"category_id": category_id(client), "description": "Срочно"})
+    assert any(m[0] == "telegram" and m[1] == "555" and "Срочно" in m[2] for m in outbox)
+
+
+
+def test_production_refuses_unsafe_settings(monkeypatch):
+    from app.config import settings
+    from app.main import check_production_settings
+    monkeypatch.setattr(settings, "environment", "production")
+    with pytest.raises(RuntimeError) as e:
+        check_production_settings()
+    assert "SMS_PROVIDER=console" in str(e.value) and "CORS_ORIGINS" in str(e.value)
