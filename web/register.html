@@ -51,6 +51,12 @@
             <span class="hint" data-i18n="reg.cityHint">Вы будете получать заказы из этого города</span>
           </label>
 
+          <label id="emailField" hidden>
+            <span data-i18n="reg.email">Email</span>
+            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="email" type="email" autocomplete="email" maxlength="255" placeholder="name@gmail.com" /></span>
+            <span class="hint" data-i18n="reg.emailHint">На эту почту будем присылать новые заказы</span>
+          </label>
+
           <!-- Masters only: explicit opt-in to notifications outside the site -->
           <fieldset class="consent-box" id="notifyBox" hidden>
             <legend><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="reg.notifyTitle">Уведомления о новых заказах</span></legend>
@@ -61,6 +67,8 @@
             <div class="role-picker channel-picker" id="channelPicker" role="radiogroup" data-i18n-aria="reg.channelAria" hidden>
               <input type="radio" name="channel" id="chTelegram" value="telegram" />
               <label for="chTelegram"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span>Telegram</span><small id="tgSub" data-i18n="reg.tgSub">Бесплатно, мгновенно</small></label>
+              <input type="radio" name="channel" id="chEmail" value="email" />
+              <label for="chEmail"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><span>Email</span><small data-i18n="reg.emailSub">На вашу почту</small></label>
               <input type="radio" name="channel" id="chSms" value="sms" />
               <label for="chSms"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg><span>SMS</span><small data-i18n="reg.smsSub">На ваш номер телефона</small></label>
             </div>
@@ -112,6 +120,8 @@
       document.getElementById("notifyBox").hidden = !roleMaster.checked;
       document.getElementById("cityField").hidden = !roleMaster.checked;
       document.getElementById("city").required = roleMaster.checked;
+      document.getElementById("emailField").hidden = !roleMaster.checked;
+      document.getElementById("email").required = roleMaster.checked;
     }
     function syncConsent() {
       document.getElementById("channelPicker").hidden = !document.getElementById("notifyEnabled").checked;
@@ -131,17 +141,13 @@
       }
       telegramAvailable = cfg.telegram_enabled;
       const tg = document.getElementById("chTelegram");
-      if (telegramAvailable) {
-        tg.checked = true;
-      } else {
+      if (!telegramAvailable) {
         // No bot configured yet: Telegram is shown but can't be chosen.
         tg.disabled = true;
         document.getElementById("tgSub").textContent = t("reg.soon");
-        document.getElementById("chSms").checked = true;
       }
-    }).catch(() => {
-      document.getElementById("chSms").checked = true;
-    });
+    }).catch(() => {});
+    document.getElementById("chEmail").checked = true;  // free and needs no extra setup
 
     function details() {
       const isMaster = roleMaster.checked;
@@ -152,8 +158,9 @@
         password: document.getElementById("password").value,
         role: isMaster ? "master" : "client",
         city: isMaster ? document.getElementById("city").value : null,
+        email: isMaster ? document.getElementById("email").value.trim() : null,
         notify_enabled: notifyEnabled,
-        notify_channel: document.querySelector('input[name="channel"]:checked')?.value || "sms",
+        notify_channel: document.querySelector('input[name="channel"]:checked')?.value || "email",
         lang: LANG,
       };
     }

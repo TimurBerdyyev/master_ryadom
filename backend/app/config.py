@@ -27,6 +27,17 @@ class Settings(BaseSettings):
     sms_provider: str = "console"  # см. app/sms.py
     sms_code_ttl_minutes: int = 5
 
+    # Email for (opt-in) master notifications. "console" only logs letters; "smtp" sends via the server below
+    # (any mailbox provider: Gmail/Yandex/Mail.ru app password, or a transactional service).
+    email_provider: str = "console"  # см. app/email.py
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""  # e.g. "Мастер рядом <noreply@master-ryadom.kg>"
+    # starttls (port 587) | ssl (port 465) | none (only for a local relay on the same machine)
+    smtp_security: str = "starttls"
+
     # Telegram bot for master notifications (opt-in). Empty token = Telegram option is hidden.
     telegram_bot_token: str = ""
     telegram_bot_username: str = ""  # without @, e.g. master_ryadom_bot

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.models import Notification, NotificationSettings, User, UserRole
+from app.email import get_email_provider
 from app.sms import get_sms_provider
 
 logger = logging.getLogger("master_ryadom.notify")
@@ -67,6 +68,18 @@ TEMPLATES = {
         "en": ("❌ The client cancelled order #{id}.", "The client cancelled order #{id}."),
     },
 }
+SUBJECTS = {
+    "new_order": {"ru": "Новый заказ #{id} — {category}", "ky": "Жаңы буйрутма #{id} — {category}",
+                  "en": "New order #{id} — {category}"},
+    "chosen": {"ru": "Вас выбрали для заказа #{id}", "ky": "Сизди #{id} буйрутмага тандашты",
+               "en": "You were chosen for order #{id}"},
+    "cancelled": {"ru": "Заказ #{id} отменён", "ky": "#{id} буйрутма жокко чыгарылды", "en": "Order #{id} was cancelled"},
+}
+UNSUBSCRIBE = {
+    "ru": "Вы получили это письмо, потому что включили уведомления в профиле мастера. Отключить: {url}",
+    "ky": "Бул катты уста профилинде билдирмелерди күйгүзгөнүңүз үчүн алдыңыз. Өчүрүү: {url}",
+    "en": "You received this email because you turned on notifications in your pro profile. Turn off: {url}",
+}
 BUDGET = {"ru": "Бюджет: {price} сом", "ky": "Бюджет: {price} сом", "en": "Budget: {price} som"}
 LINKS = {"new_order": "/feed.html", "chosen": "/order-detail.html?id={id}", "cancelled": "/orders.html"}
 
@@ -89,16 +102,21 @@ def _drop_outbox(session: Session) -> None:
     session.info.pop("outbox", None)
 
 
+def render_category(category: str, lang: str) -> str:
+    if lang != "ru" and category in CATEGORY_NAMES:
+        return CATEGORY_NAMES[category][0 if lang == "ky" else 1]
+    return category
+
+
 def render(kind: str, lang: str, channel: str, params: dict) -> str:
     lang = lang if lang in ("ru", "ky", "en") else "ru"
-    category = params.get("category", "")
-    if lang != "ru" and category in CATEGORY_NAMES:
-        category = CATEGORY_NAMES[category][0 if lang == "ky" else 1]
+    category = render_category(params.get("category", ""), lang)
     description = (params.get("description") or "")[:200]
     budget = BUDGET[lang].format(price=f"{params['price']:g}") if params.get("price") else ""
     url = settings.site_url.rstrip("/") + LINKS[kind].format(id=params.get("id", ""))
     telegram_text, sms_text = TEMPLATES[kind][lang]
-    template = telegram_text if channel == "telegram" else sms_text
+    # Email gets the full text, like Telegram; SMS stays short.
+    template = sms_text if channel == "sms" else telegram_text
     text = template.format(id=params.get("id", ""), category=category, description=description, budget=budget, url=url)
     return "\n".join(line for line in text.split("\n") if line.strip())
 
@@ -118,6 +136,14 @@ def deliver(user_id: int, kind: str, params: dict) -> None:
             send_message(prefs.telegram_chat_id, text)
         elif prefs.channel == "sms":
             get_sms_provider().send(user.phone, text)
+        elif prefs.channel == "email":
+            if not user.email:
+                return
+            lang = prefs.lang if prefs.lang in SUBJECTS[kind] else "ru"
+            category = render_category(params.get("category", ""), lang)
+            subject = SUBJECTS[kind][lang].format(id=params.get("id", ""), category=category)
+            footer = UNSUBSCRIBE[lang].format(url=settings.site_url.rstrip("/") + "/master-profile-edit.html")
+            get_email_provider().send(user.email, subject, f"{text}\n\n—\n{footer}")
     except Exception:
         logger.exception("Не удалось доставить уведомление %s пользователю %s", kind, user_id)
     finally:

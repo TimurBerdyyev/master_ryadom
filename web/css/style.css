@@ -3272,3 +3272,13 @@ form.card label.check input[type="checkbox"] {
   height: 16px;
   color: var(--primary);
 }
+
+.channel-picker {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 480px) {
+  .channel-picker {
+    grid-template-columns: 1fr;
+  }
+}

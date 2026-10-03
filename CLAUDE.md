@@ -42,6 +42,8 @@
   канал Telegram или SMS, меняется в профиле. Вызов: `notify(db, user_id, title, text, kind=..., **params)`
   из `app/notify.py` — in-app запись + сообщение по каналу мастера на его языке, отправка после commit в фоне.
   Шаблоны сообщений — `TEMPLATES` в `notify.py`.
+- Email мастера обязателен при регистрации (у клиентов — нет); канал `email` отправляет письма через `app/email.py`
+  (`EMAIL_PROVIDER=console|smtp`, `SMTP_SECURITY=starttls|ssl|none`, TLS не отключается молча).
 - Telegram-бот — `app/telegram.py` (привязка по одноразовой ссылке `t.me/<bot>?start=<token>`),
   вебхук `/telegram/webhook` с секретом в заголовке; локально — `python -m app.telegram_poll`.
 

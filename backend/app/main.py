@@ -10,6 +10,7 @@ from app.config import DEFAULT_JWT_SECRET, settings
 from app.database import SessionLocal
 from app.migrations import upgrade_database
 from app.payments import get_provider
+from app.email import get_email_provider
 from app.sms import get_sms_provider
 from app.routers import admin, auth, categories, complaints, masters, notifications, orders, reviews, subscriptions
 from app.seed import seed_categories
@@ -27,6 +28,9 @@ def check_production_settings() -> None:
     problems = []
     if settings.jwt_secret == DEFAULT_JWT_SECRET or len(settings.jwt_secret) < 32:
         problems.append("JWT_SECRET не задан или короче 32 символов")
+    get_email_provider()  # fail fast on a typo in EMAIL_PROVIDER
+    if settings.environment == "production" and settings.email_provider == "console":
+        logger.warning("EMAIL_PROVIDER=console: письма мастерам не отправляются — настройте SMTP (app/email.py).")
     if get_sms_provider().is_dev:
         problems.append("SMS_PROVIDER=console — подключите реальный SMS-шлюз (app/sms.py)")
     if "*" in settings.cors_origins_list:

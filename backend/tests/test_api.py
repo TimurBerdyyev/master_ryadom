@@ -54,7 +54,8 @@ def register(client, role="client", name="Тест"):
     phone = f"+996700000{next(_counter)}"
     r = client.post("/auth/register", json={"name": name, "phone": phone, "password": "secret123", "role": role,
                                             "code": sms_code(client, phone),
-                                            "city": "Бишкек" if role == "master" else None})
+                                            "city": "Бишкек" if role == "master" else None,
+                                            "email": f"m{phone[-4:]}@example.com" if role == "master" else None})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}, phone
 
@@ -535,8 +536,13 @@ def outbox(monkeypatch):
         def send(self, phone, text):
             sent.append(("sms", phone, text))
 
+    class FakeEmail:
+        def send(self, to, subject, text):
+            sent.append(("email", to, f"{subject}\n{text}"))
+
     monkeypatch.setattr(notify, "_submit", lambda fn, *args: fn(*args))
     monkeypatch.setattr(notify, "get_sms_provider", lambda: FakeSms())
+    monkeypatch.setattr(notify, "get_email_provider", lambda: FakeEmail())
     monkeypatch.setattr(telegram, "send_message", lambda chat_id, text: sent.append(("telegram", chat_id, text)))
     return sent
 
@@ -545,6 +551,7 @@ def register_master(client, notify_enabled=False, channel="sms", lang="ru", cate
     phone = f"+996700000{next(_counter)}"
     r = client.post("/auth/register", json={
         "name": "Мастер", "phone": phone, "password": "secret123", "role": "master", "city": city,
+        "email": f"master{phone[-4:]}@example.com",
         "code": sms_code(client, phone), "notify_enabled": notify_enabled, "notify_channel": channel, "lang": lang,
     })
     headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -648,7 +655,8 @@ def test_production_refuses_unsafe_settings(monkeypatch):
 
 def test_master_must_choose_city(client):
     phone = "+996755100001"
-    base = {"name": "M", "phone": phone, "password": "secret123", "role": "master", "code": sms_code(client, phone)}
+    base = {"name": "M", "phone": phone, "password": "secret123", "role": "master", "code": sms_code(client, phone),
+            "email": "osh.master@example.com"}
     r = client.post("/auth/register", json=base)
     assert r.status_code == 400 and "город" in r.json()["detail"]
     assert client.post("/auth/register", json={**base, "city": "Москва"}).status_code == 422
@@ -724,3 +732,45 @@ def test_city_migration_backfills_old_data(tmp_path):
     with engine.connect() as conn:
         assert conn.execute(text("SELECT city FROM masters WHERE id = 1")).scalar() == "Бишкек"
         assert dict(conn.execute(text("SELECT id, city FROM orders")).all()) == {1: "Ош", 2: None}
+
+
+
+# ---------- email ----------
+
+def test_master_email_required_and_validated(client):
+    phone = "+996755200001"
+    base = {"name": "M", "phone": phone, "password": "secret123", "role": "master", "city": "Бишкек",
+            "code": sms_code(client, phone)}
+    r = client.post("/auth/register", json=base)
+    assert r.status_code == 400 and r.json()["detail"] == "Укажите email"
+    assert client.post("/auth/register", json={**base, "email": "not-an-email"}).status_code == 422
+    r = client.post("/auth/register", json={**base, "email": "  Usta@Example.COM "})
+    assert r.status_code == 200
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/notifications/settings", headers=headers).json()["email"] == "usta@example.com"
+
+    # clients don't need an email
+    client_phone = "+996755200002"
+    r = client.post("/auth/register", json={"name": "C", "phone": client_phone, "password": "secret123",
+                                            "code": sms_code(client, client_phone)})
+    assert r.status_code == 200
+
+
+def test_new_orders_by_email(client, outbox):
+    master_h, _ = register_master(client, notify_enabled=True, channel="email", lang="en")
+    email = client.get("/notifications/settings", headers=master_h).json()["email"]
+    client_h, _ = register(client)
+    outbox.clear()
+    order = client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client),
+                                                           "description": "Leaking tap", "price": 700}).json()
+    mails = [m for m in outbox if m[0] == "email"]
+    assert len(mails) == 1 and mails[0][1] == email
+    assert f"New order #{order['id']} — Plumbing" in mails[0][2]  # subject in the master's language
+    assert "Leaking tap" in mails[0][2] and "700 som" in mails[0][2] and "Turn off" in mails[0][2]
+
+    # the master changes the address in settings
+    client.put("/notifications/settings", headers=master_h,
+               json={"enabled": True, "channel": "email", "lang": "en", "email": "new@example.com"})
+    outbox.clear()
+    client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"})
+    assert [m[1] for m in outbox if m[0] == "email"] == ["new@example.com"]

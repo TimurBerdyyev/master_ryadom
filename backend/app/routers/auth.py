@@ -52,6 +52,8 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Пользователь с таким телефоном уже существует")
     if data.role == UserRole.master and not data.city:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Укажите город, в котором вы работаете")
+    if data.role == UserRole.master and not data.email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Укажите email")
     check_code(db, data.phone, "register", data.code)
 
     user = User(
@@ -59,6 +61,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         phone=data.phone,
         password_hash=hash_password(data.password),
         role=data.role,
+        email=data.email,
     )
     db.add(user)
     try:

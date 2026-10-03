@@ -34,11 +34,12 @@ def _master_prefs(db: Session, current_user: User) -> NotificationSettings:
     return prefs
 
 
-def _settings_out(prefs: NotificationSettings) -> NotificationSettingsOut:
+def _settings_out(prefs: NotificationSettings, user: User) -> NotificationSettingsOut:
     return NotificationSettingsOut(
         enabled=prefs.enabled,
         channel=prefs.channel,
         lang=prefs.lang,
+        email=user.email,
         telegram_connected=bool(prefs.telegram_chat_id),
         telegram_available=settings.telegram_enabled,
     )
@@ -64,7 +65,7 @@ def mark_all_read(current_user: User = Depends(get_current_user), db: Session = 
 def get_settings(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     prefs = _master_prefs(db, current_user)
     db.commit()
-    return _settings_out(prefs)
+    return _settings_out(prefs, current_user)
 
 
 @router.put("/settings", response_model=NotificationSettingsOut)
@@ -75,12 +76,16 @@ def update_settings(
 ):
     if data.enabled and data.channel == "telegram" and not settings.telegram_enabled:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Telegram-бот пока не подключён")
+    if data.email:
+        current_user.email = data.email
+    if data.enabled and data.channel == "email" and not current_user.email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Укажите email")
     prefs = _master_prefs(db, current_user)
     prefs.enabled = data.enabled
     prefs.channel = data.channel
     prefs.lang = data.lang
     db.commit()
-    return _settings_out(prefs)
+    return _settings_out(prefs, current_user)
 
 
 @router.post("/telegram/link", response_model=TelegramLinkOut)

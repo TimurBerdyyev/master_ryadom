@@ -61,9 +61,15 @@
       <div class="role-picker channel-picker" id="channelPicker" role="radiogroup" data-i18n-aria="reg.channelAria">
         <input type="radio" name="channel" id="chTelegram" value="telegram" />
         <label for="chTelegram"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span>Telegram</span><small id="tgSub" data-i18n="reg.tgSub">Бесплатно, мгновенно</small></label>
+        <input type="radio" name="channel" id="chEmail" value="email" />
+        <label for="chEmail"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><span>Email</span><small data-i18n="reg.emailSub">На вашу почту</small></label>
         <input type="radio" name="channel" id="chSms" value="sms" />
         <label for="chSms"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg><span>SMS</span><small data-i18n="reg.smsSub">На ваш номер телефона</small></label>
       </div>
+      <label id="notifyEmailField" hidden>
+        <span data-i18n="reg.email">Email</span>
+        <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="notifyEmail" type="email" autocomplete="email" maxlength="255" placeholder="name@gmail.com" /></span>
+      </label>
       <div id="channelStatus"></div>
       <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
     </form>
@@ -244,11 +250,16 @@
       const enabled = document.getElementById("notifyEnabled").checked;
       const channel = document.querySelector('input[name="channel"]:checked')?.value;
       document.getElementById("channelPicker").hidden = !enabled;
+      document.getElementById("notifyEmailField").hidden = !enabled || channel !== "email";
+      document.getElementById("notifyEmail").required = enabled && channel === "email";
       if (!enabled || !notifyPrefs) {
         box.innerHTML = "";
         return;
       }
-      if (channel === "sms") {
+      if (channel === "email") {
+        box.innerHTML = notifyPrefs.email
+          ? `<div class="notice">${icon("mail")}<span>${t("edit.emailTo", { email: esc(notifyPrefs.email) })}</span></div>` : "";
+      } else if (channel === "sms") {
         box.innerHTML = `<div class="notice">${icon("message-square")}<span>${t("edit.smsTo", { phone: esc(myPhone) })}</span></div>`;
       } else if (notifyPrefs.telegram_connected) {
         box.innerHTML = `<div class="notice success">${icon("circle-check")}<span>${t("edit.tgConnected")}</span></div>`;
@@ -270,15 +281,17 @@
       const tg = document.getElementById("chTelegram");
       tg.disabled = !notifyPrefs.telegram_available;
       if (!notifyPrefs.telegram_available) document.getElementById("tgSub").textContent = t("reg.soon");
-      const channel = notifyPrefs.telegram_available ? notifyPrefs.channel : "sms";
-      document.getElementById(channel === "telegram" ? "chTelegram" : "chSms").checked = true;
+      document.getElementById("notifyEmail").value = notifyPrefs.email || "";
+      const channel = notifyPrefs.channel === "telegram" && !notifyPrefs.telegram_available ? "email" : notifyPrefs.channel;
+      document.getElementById({ telegram: "chTelegram", sms: "chSms", email: "chEmail" }[channel] || "chEmail").checked = true;
       renderChannelStatus();
     }
 
     async function connectTelegram() {
       try {
         // Save the choice first, then open the bot; the master comes back and presses "check".
-        await api.saveNotificationSettings({ enabled: true, channel: "telegram", lang: LANG });
+        await api.saveNotificationSettings({ enabled: true, channel: "telegram", lang: LANG,
+          email: document.getElementById("notifyEmail").value.trim() || null });
         const { url } = await api.telegramLink();
         window.open(url, "_blank", "noopener");
       } catch (e) {
@@ -293,8 +306,9 @@
       try {
         notifyPrefs = await api.saveNotificationSettings({
           enabled: document.getElementById("notifyEnabled").checked,
-          channel: document.querySelector('input[name="channel"]:checked')?.value || "sms",
+          channel: document.querySelector('input[name="channel"]:checked')?.value || "email",
           lang: LANG,
+          email: document.getElementById("notifyEmail").value.trim() || null,
         });
         toast(t("edit.notifySaved"));
         renderChannelStatus();

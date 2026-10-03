@@ -12,6 +12,7 @@ from app.models import ComplaintStatus, OfferStatus, OrderStatus, SubscriptionPa
 PASSWORD_MAX_LENGTH = 72
 
 PHONE_RE = re.compile(r"^\+?\d{9,15}$")
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$")
 
 
 def normalize_phone(value: str) -> str:
@@ -32,6 +33,15 @@ def _valid_city(value: str | None) -> str | None:
     return city
 
 
+def _valid_email(value: str | None) -> str | None:
+    if value is None or not value.strip():
+        return None
+    value = value.strip().lower()
+    if len(value) > 255 or not EMAIL_RE.match(value):
+        raise ValueError("Проверьте email — например name@gmail.com")
+    return value
+
+
 def _required_city(value: str) -> str:
     city = _valid_city(value)
     if city is None:
@@ -47,11 +57,13 @@ class UserRegister(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")  # SMS confirmation code from /auth/send-code
     # Masters only: explicit consent to notifications outside the site and the chosen channel.
     notify_enabled: bool = False
-    notify_channel: Literal["telegram", "sms"] = "telegram"
+    notify_channel: Literal["telegram", "sms", "email"] = "email"
     lang: Literal["ru", "ky", "en"] = "ru"
     city: str | None = Field(None, max_length=100)  # required for masters: they get orders from this city
+    email: str | None = Field(None, max_length=255)  # required for masters: new orders can be emailed to them
 
     _city = field_validator("city")(_valid_city)
+    _email = field_validator("email")(_valid_email)
 
     @field_validator("name")
     @classmethod
@@ -442,16 +454,20 @@ class ExtendIn(BaseModel):
 
 class NotificationSettingsOut(BaseModel):
     enabled: bool
-    channel: Literal["telegram", "sms"]
+    channel: Literal["telegram", "sms", "email"]
     lang: Literal["ru", "ky", "en"]
+    email: str | None = None
     telegram_connected: bool
     telegram_available: bool
 
 
 class NotificationSettingsIn(BaseModel):
     enabled: bool
-    channel: Literal["telegram", "sms"]
+    channel: Literal["telegram", "sms", "email"]
     lang: Literal["ru", "ky", "en"] = "ru"
+    email: str | None = Field(None, max_length=255)
+
+    _email = field_validator("email")(_valid_email)
 
 
 class TelegramLinkOut(BaseModel):

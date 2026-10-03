@@ -584,6 +584,12 @@ const I18N = {
   "feed.noCityText": ["Заказы показываются по городу. Выберите город в профиле, чтобы видеть заказы рядом с вами.", "Буйрутмалар шаар боюнча көрсөтүлөт. Жакын жердеги буйрутмаларды көрүү үчүн профилден шаарды тандаңыз.", "Orders are shown by city. Choose your city in your profile to see orders near you."],
   "feed.chooseCity": ["Выбрать город", "Шаарды тандоо", "Choose city"],
   "feed.emptyCityText": ["В вашем городе пока нет новых заказов по вашим категориям. Мы сообщим, когда они появятся.", "Шаарыңызда азырынча категорияларыңыз боюнча жаңы буйрутмалар жок. Пайда болгондо кабарлайбыз.", "No new orders in your city and categories yet. We'll let you know when they appear."],
+  "reg.email": ["Email", "Email", "Email"],
+  "reg.emailHint": ["На эту почту будем присылать новые заказы, если вы включите уведомления", "Билдирмелерди күйгүзсөңүз, жаңы буйрутмаларды ушул почтага жөнөтөбүз", "We'll email new orders here if you turn on notifications"],
+  "reg.emailSub": ["На вашу почту", "Почтаңызга", "To your inbox"],
+  "edit.emailTo": ["Письма будут приходить на {email}", "Каттар {email} дарегине келет", "Emails will be sent to {email}"],
+  "srv.Укажите email": ["Укажите email", "Email көрсөтүңүз", "Enter your email"],
+  "srv.Проверьте email — например name@gmail.com": ["Проверьте email — например name@gmail.com", "Email'ди текшериңиз — мисалы name@gmail.com", "Check the email — e.g. name@gmail.com"],
   "srv.Выберите город из списка": ["Выберите город из списка", "Тизмеден шаарды тандаңыз", "Choose a city from the list"],
   "srv.Укажите город, в котором вы работаете": ["Укажите город, в котором вы работаете", "Иштеген шаарыңызды көрсөтүңүз", "Choose the city you work in"],
 
