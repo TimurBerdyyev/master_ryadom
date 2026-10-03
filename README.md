@@ -94,6 +94,8 @@ uvicorn app.main:app --reload
 ## Деплой
 
 Пошаговая инструкция для сервера с HTTPS, бэкапами и чек-листом — [DEPLOY.md](DEPLOY.md).
+Первичная настройка сервера — `sudo ./deploy/setup.sh`. Тесты автоматически запускаются на GitHub
+(SQLite и Postgres) при каждом push — `.github/workflows/tests.yml`.
 
 ## Платный тариф для мастеров
 

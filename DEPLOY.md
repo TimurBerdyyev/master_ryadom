@@ -10,13 +10,17 @@
 - Открыты порты 80 и 443 (и 22 для SSH). Остальные порты наружу не открываются — compose слушает их только на `127.0.0.1`.
 
 ```bash
-curl -fsSL https://get.docker.com | sh
 git clone https://github.com/TimurBerdyyev/master_ryadom.git /opt/master_ryadom
 cd /opt/master_ryadom
-cp .env.example .env
+sudo ./deploy/setup.sh
 ```
 
+`setup.sh` ставит Docker (если его нет), спрашивает домен и создаёт `.env` с новыми случайными секретами
+и `ENVIRONMENT=production`. Существующий `.env` не перезаписывает.
+
 ## 2. Настройки `.env`
+
+Большую часть заполнит `setup.sh`; вручную нужно указать SMS-шлюз и (по желанию) Telegram-бот.
 
 | Переменная | Что указать |
 |---|---|

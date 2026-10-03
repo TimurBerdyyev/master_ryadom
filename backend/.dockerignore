@@ -6,3 +6,5 @@ __pycache__/
 *.db
 uploads/
 .git/
+tests/
+.pytest_cache/
