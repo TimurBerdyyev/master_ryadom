@@ -66,13 +66,33 @@
         <input type="radio" name="channel" id="chSms" value="sms" />
         <label for="chSms"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg><span>SMS</span><small data-i18n="reg.smsSub">На ваш номер телефона</small></label>
       </div>
-      <label id="notifyEmailField" hidden>
-        <span data-i18n="reg.email">Email</span>
-        <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="notifyEmail" type="email" autocomplete="email" maxlength="255" placeholder="name@gmail.com" /></span>
-      </label>
       <div id="channelStatus"></div>
       <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
     </form>
+
+    <div class="card-box" id="emailCard" style="margin-top:16px">
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><span data-i18n="edit.accountEmail">Email аккаунта</span></h2>
+      <div class="row" style="margin-top:12px">
+        <b id="currentEmail" style="flex:1;min-width:180px;word-break:break-all">—</b>
+        <button type="button" class="btn small secondary" id="changeEmailBtn"><span data-i18n="edit.changeEmail">Изменить email</span></button>
+      </div>
+      <form id="changeEmailForm" class="stack" style="margin-top:14px" hidden>
+        <label class="field">
+          <span data-i18n="edit.newEmail">Новый email</span>
+          <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="newEmail" type="email" autocomplete="email" maxlength="255" placeholder="name@gmail.com" required /></span>
+        </label>
+        <div class="notice" id="emailCodeInfo" hidden></div>
+        <label class="field" id="emailCodeField" hidden>
+          <span data-i18n="reg.code">Код из письма</span>
+          <input id="emailCode" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" />
+        </label>
+        <div class="error" id="emailError"></div>
+        <div class="row">
+          <button type="submit" class="btn small" id="emailSubmit"><span data-i18n="edit.sendCode">Отправить код</span></button>
+          <button type="button" class="btn small ghost" id="emailCancel"><span data-i18n="edit.cancel">Отмена</span></button>
+        </div>
+      </form>
+    </div>
 
     <div class="section-title" data-i18n="edit.servicesTitle">Мои услуги и цены</div>
     <div id="servicesList" class="card-box" style="padding-top:6px;padding-bottom:6px"></div>
@@ -250,8 +270,6 @@
       const enabled = document.getElementById("notifyEnabled").checked;
       const channel = document.querySelector('input[name="channel"]:checked')?.value;
       document.getElementById("channelPicker").hidden = !enabled;
-      document.getElementById("notifyEmailField").hidden = !enabled || channel !== "email";
-      document.getElementById("notifyEmail").required = enabled && channel === "email";
       if (!enabled || !notifyPrefs) {
         box.innerHTML = "";
         return;
@@ -281,8 +299,12 @@
       const tg = document.getElementById("chTelegram");
       tg.disabled = !notifyPrefs.telegram_available;
       if (!notifyPrefs.telegram_available) document.getElementById("tgSub").textContent = t("reg.soon");
-      document.getElementById("notifyEmail").value = notifyPrefs.email || "";
-      const channel = notifyPrefs.channel === "telegram" && !notifyPrefs.telegram_available ? "email" : notifyPrefs.channel;
+      const sms = document.getElementById("chSms");
+      sms.disabled = !notifyPrefs.sms_available;
+      if (!notifyPrefs.sms_available) document.querySelector('label[for="chSms"] small').textContent = t("reg.soon");
+      const unavailable = (notifyPrefs.channel === "telegram" && !notifyPrefs.telegram_available)
+        || (notifyPrefs.channel === "sms" && !notifyPrefs.sms_available);
+      const channel = unavailable ? "email" : notifyPrefs.channel;
       document.getElementById({ telegram: "chTelegram", sms: "chSms", email: "chEmail" }[channel] || "chEmail").checked = true;
       renderChannelStatus();
     }
@@ -290,8 +312,7 @@
     async function connectTelegram() {
       try {
         // Save the choice first, then open the bot; the master comes back and presses "check".
-        await api.saveNotificationSettings({ enabled: true, channel: "telegram", lang: LANG,
-          email: document.getElementById("notifyEmail").value.trim() || null });
+        await api.saveNotificationSettings({ enabled: true, channel: "telegram", lang: LANG });
         const { url } = await api.telegramLink();
         window.open(url, "_blank", "noopener");
       } catch (e) {
@@ -308,12 +329,60 @@
           enabled: document.getElementById("notifyEnabled").checked,
           channel: document.querySelector('input[name="channel"]:checked')?.value || "email",
           lang: LANG,
-          email: document.getElementById("notifyEmail").value.trim() || null,
         });
         toast(t("edit.notifySaved"));
         renderChannelStatus();
       } catch (err) {
         toast(t("common.error") + err.message);
+      }
+    });
+
+    // Changing the account email: the new address is confirmed with a code, like at sign-up.
+    let emailCodeSent = false;
+
+    function resetEmailForm() {
+      emailCodeSent = false;
+      document.getElementById("changeEmailForm").hidden = true;
+      document.getElementById("emailCodeField").hidden = true;
+      document.getElementById("emailCodeInfo").hidden = true;
+      document.getElementById("emailError").textContent = "";
+      document.getElementById("newEmail").value = "";
+      document.getElementById("newEmail").disabled = false;
+      document.getElementById("emailSubmit").innerHTML = `<span>${t("edit.sendCode")}</span>`;
+    }
+
+    document.getElementById("changeEmailBtn").addEventListener("click", () => {
+      resetEmailForm();
+      document.getElementById("changeEmailForm").hidden = false;
+      document.getElementById("newEmail").focus();
+    });
+    document.getElementById("emailCancel").addEventListener("click", resetEmailForm);
+    document.getElementById("changeEmailForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorBox = document.getElementById("emailError");
+      const email = document.getElementById("newEmail").value.trim();
+      errorBox.textContent = "";
+      try {
+        if (!emailCodeSent) {
+          const { debug_code } = await api.sendCode(email, "change_email");
+          emailCodeSent = true;
+          const info = document.getElementById("emailCodeInfo");
+          info.textContent = debug_code ? t("reg.devCode", { code: debug_code }) : t("edit.codeSentTo", { email });
+          info.hidden = false;
+          document.getElementById("emailCodeField").hidden = false;
+          document.getElementById("emailCode").value = debug_code || "";
+          document.getElementById("newEmail").disabled = true;
+          document.getElementById("emailSubmit").innerHTML = `<span>${t("edit.confirm")}</span>`;
+          document.getElementById("emailCode").focus();
+        } else {
+          const me = await api.changeEmail(email, document.getElementById("emailCode").value.trim());
+          document.getElementById("currentEmail").textContent = me.email;
+          resetEmailForm();
+          toast(t("edit.emailChanged"));
+          await loadNotifySettings().catch(() => {});
+        }
+      } catch (err) {
+        errorBox.textContent = err.message;
       }
     });
 
@@ -325,6 +394,7 @@
         return;
       }
       myPhone = me.phone || "";
+      document.getElementById("currentEmail").textContent = me.email || "—";
       await loadCategories().catch(() => {});
       loadProfile();
       await loadNotifySettings().catch(() => {});

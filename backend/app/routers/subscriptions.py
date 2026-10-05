@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import Master, MasterSubscription, SubscriptionPayment, SubscriptionPaymentStatus, utcnow
 from app.payments import PROVIDERS, get_provider
+from app.sms import get_sms_provider
 from app.routers.masters import require_master
 from app.schemas import (
     AdminSubscriptionOut,
@@ -43,6 +44,7 @@ def public_config():
     return PublicConfigOut(
         cities=CITIES,
         telegram_enabled=settings.telegram_enabled,
+        sms_enabled=not get_sms_provider().is_dev,
         subscriptions_enabled=settings.subscriptions_enabled,
         subscription_trial_days=settings.subscription_trial_days,
         subscription_price=settings.subscription_price,

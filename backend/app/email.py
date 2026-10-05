@@ -1,4 +1,4 @@
-"""Email delivery for (opt-in) master notifications.
+"""Email delivery: confirmation codes and (opt-in) master notifications.
 
 EMAIL_PROVIDER=console — letters are only written to the server log (development).
 EMAIL_PROVIDER=smtp    — sent through SMTP_HOST/SMTP_PORT with SMTP_USER/SMTP_PASSWORD from SMTP_FROM.
@@ -16,6 +16,8 @@ logger = logging.getLogger("master_ryadom.email")
 
 class EmailProvider:
     name = "base"
+    # True only for the dev provider: the API may then echo codes back so sign-up works without a mailbox.
+    is_dev = False
 
     def send(self, to: str, subject: str, text: str) -> None:
         raise NotImplementedError
@@ -23,6 +25,7 @@ class EmailProvider:
 
 class ConsoleEmail(EmailProvider):
     name = "console"
+    is_dev = True
 
     def send(self, to: str, subject: str, text: str) -> None:
         logger.warning("EMAIL → %s: %s\n%s", to, subject, text)

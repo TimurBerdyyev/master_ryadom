@@ -71,7 +71,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
     phone: Mapped[str] = mapped_column(String(32), unique=True, index=True)
-    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Confirmed with a code at sign-up; unique so it can be used to log in and reset the password.
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.client)
     photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -308,13 +309,13 @@ class SubscriptionPayment(Base):
     master: Mapped["Master"] = relationship()
 
 
-class PhoneCode(Base):
-    """One-time SMS code confirming a phone (sign-up) or authorising a password reset."""
-    __tablename__ = "phone_codes"
+class VerificationCode(Base):
+    """One-time code sent by email: confirms the address (sign-up, email change) or authorises a password reset."""
+    __tablename__ = "verification_codes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    phone: Mapped[str] = mapped_column(String(32), index=True)
-    purpose: Mapped[str] = mapped_column(String(16))  # "register" | "reset"
+    target: Mapped[str] = mapped_column(String(255), index=True)  # the email address the code was sent to
+    purpose: Mapped[str] = mapped_column(String(16))  # "register" | "reset" | "change_email"
     code_hash: Mapped[str] = mapped_column(String(128))
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     used: Mapped[bool] = mapped_column(Boolean, default=False)

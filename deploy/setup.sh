@@ -35,8 +35,9 @@ fi
 cat <<'NEXT'
 
 Дальше:
-  1. В .env впишите SMS_PROVIDER (реальный шлюз) и, при желании, TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME.
-     С SMS_PROVIDER=console сервер в режиме production не запустится — так задумано (DEPLOY.md, раздел 4).
+  1. В .env настройте почту: EMAIL_PROVIDER=smtp и SMTP_* — на неё приходят коды подтверждения.
+     С EMAIL_PROVIDER=console сервер в режиме production не запустится — так задумано (DEPLOY.md, раздел 5).
+     По желанию: TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME, SMS_PROVIDER.
   2. Запуск:
        docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
   3. Администратор:

@@ -39,6 +39,11 @@
             <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-phone"></use></svg><input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" /></span>
           </label>
           <label>
+            <span data-i18n="reg.email">Email</span>
+            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="email" type="email" autocomplete="email" required maxlength="255" placeholder="name@gmail.com" /></span>
+            <span class="hint" data-i18n="reg.emailHint">Пришлём на неё код подтверждения</span>
+          </label>
+          <label>
             <span data-i18n="login.password">Пароль</span>
             <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-lock"></use></svg><input id="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" /></span>
             <span class="hint" data-i18n="reg.pwHint">Минимум 6 символов</span>
@@ -49,12 +54,6 @@
             <span data-i18n="reg.cityLabel">Город, где вы работаете</span>
             <select id="city"></select>
             <span class="hint" data-i18n="reg.cityHint">Вы будете получать заказы из этого города</span>
-          </label>
-
-          <label id="emailField" hidden>
-            <span data-i18n="reg.email">Email</span>
-            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="email" type="email" autocomplete="email" maxlength="255" placeholder="name@gmail.com" /></span>
-            <span class="hint" data-i18n="reg.emailHint">На эту почту будем присылать новые заказы</span>
           </label>
 
           <!-- Masters only: explicit opt-in to notifications outside the site -->
@@ -91,7 +90,7 @@
         <form class="card" id="codeForm">
           <div class="notice" id="devCode" hidden></div>
           <label>
-            <span data-i18n="reg.code">Код из SMS</span>
+            <span data-i18n="reg.code">Код из письма</span>
             <input id="code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="\d{6}" maxlength="6" required placeholder="••••••" />
           </label>
           <div id="codeError" class="error" role="alert"></div>
@@ -120,8 +119,6 @@
       document.getElementById("notifyBox").hidden = !roleMaster.checked;
       document.getElementById("cityField").hidden = !roleMaster.checked;
       document.getElementById("city").required = roleMaster.checked;
-      document.getElementById("emailField").hidden = !roleMaster.checked;
-      document.getElementById("email").required = roleMaster.checked;
     }
     function syncConsent() {
       document.getElementById("channelPicker").hidden = !document.getElementById("notifyEnabled").checked;
@@ -146,6 +143,10 @@
         tg.disabled = true;
         document.getElementById("tgSub").textContent = t("reg.soon");
       }
+      if (!cfg.sms_enabled) {  // no SMS gateway yet
+        document.getElementById("chSms").disabled = true;
+        document.querySelector('label[for="chSms"] small').textContent = t("reg.soon");
+      }
     }).catch(() => {});
     document.getElementById("chEmail").checked = true;  // free and needs no extra setup
 
@@ -158,7 +159,7 @@
         password: document.getElementById("password").value,
         role: isMaster ? "master" : "client",
         city: isMaster ? document.getElementById("city").value : null,
-        email: isMaster ? document.getElementById("email").value.trim() : null,
+        email: document.getElementById("email").value.trim(),
         notify_enabled: notifyEnabled,
         notify_channel: document.querySelector('input[name="channel"]:checked')?.value || "email",
         lang: LANG,
@@ -167,7 +168,8 @@
 
     const codeStep = createCodeStep({
       purpose: "register",
-      getPhone: () => document.getElementById("phone").value,
+      getEmail: () => document.getElementById("email").value,
+      getExtra: () => ({ phone: document.getElementById("phone").value.trim() || null }),
       showStep: (onCode) => {
         document.getElementById("stepDetails").hidden = onCode;
         document.getElementById("stepCode").hidden = !onCode;

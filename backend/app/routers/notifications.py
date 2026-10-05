@@ -7,6 +7,7 @@ from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
 from app.models import Notification, NotificationSettings, User, UserRole
+from app.sms import get_sms_provider
 from app.schemas import (
     NotificationOut,
     NotificationSettingsIn,
@@ -42,6 +43,7 @@ def _settings_out(prefs: NotificationSettings, user: User) -> NotificationSettin
         email=user.email,
         telegram_connected=bool(prefs.telegram_chat_id),
         telegram_available=settings.telegram_enabled,
+        sms_available=not get_sms_provider().is_dev,
     )
 
 
@@ -76,8 +78,8 @@ def update_settings(
 ):
     if data.enabled and data.channel == "telegram" and not settings.telegram_enabled:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Telegram-бот пока не подключён")
-    if data.email:
-        current_user.email = data.email
+    if data.enabled and data.channel == "sms" and get_sms_provider().is_dev:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "SMS-уведомления пока недоступны")
     if data.enabled and data.channel == "email" and not current_user.email:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Укажите email")
     prefs = _master_prefs(db, current_user)

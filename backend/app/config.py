@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # SMS for phone confirmation codes and (opt-in) master notifications. "console" only logs
     # messages and shows the code on the page — for local development, never for production.
     sms_provider: str = "console"  # см. app/sms.py
-    sms_code_ttl_minutes: int = 5
+    code_ttl_minutes: int = 10  # email confirmation codes
 
     # Email for (opt-in) master notifications. "console" only logs letters; "smtp" sends via the server below
     # (any mailbox provider: Gmail/Yandex/Mail.ru app password, or a transactional service).

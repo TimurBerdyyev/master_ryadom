@@ -15,6 +15,7 @@ os.environ["UPLOAD_DIR"] = f"{_tmp}/uploads"
 os.environ["JWT_SECRET"] = "test-secret-that-is-long-enough-for-hs256-0123456789"
 os.environ["REDIS_URL"] = ""  # in-memory rate limits, reset between tests
 os.environ["SMS_PROVIDER"] = "console"
+os.environ["EMAIL_PROVIDER"] = "console"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -43,19 +44,23 @@ def reset_rate_limit():
 _counter = iter(range(100, 1000))
 
 
-def sms_code(client, phone, purpose="register"):
-    """The dev SMS provider (SMS_PROVIDER=console) echoes the code back in the response."""
-    r = client.post("/auth/send-code", json={"phone": phone, "purpose": purpose})
+def email_code(client, email, purpose="register", headers=None):
+    """The dev email provider (EMAIL_PROVIDER=console) echoes the code back in the response."""
+    r = client.post("/auth/send-code", json={"email": email, "purpose": purpose}, headers=headers or {})
     assert r.status_code == 200, r.text
     return r.json()["debug_code"]
 
 
+def email_for(phone):
+    return f"user{phone.lstrip('+')}@example.com"
+
+
 def register(client, role="client", name="Тест"):
     phone = f"+996700000{next(_counter)}"
+    email = email_for(phone)
     r = client.post("/auth/register", json={"name": name, "phone": phone, "password": "secret123", "role": role,
-                                            "code": sms_code(client, phone),
-                                            "city": "Бишкек" if role == "master" else None,
-                                            "email": f"m{phone[-4:]}@example.com" if role == "master" else None})
+                                            "email": email, "code": email_code(client, email),
+                                            "city": "Бишкек" if role == "master" else None})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}, phone
 
@@ -187,16 +192,18 @@ def test_idor(client):
 def test_auth_hardening(client):
     # cannot self-register as admin
     r = client.post("/auth/register", json={"name": "x", "phone": "+996711111111", "password": "secret123", "role": "admin",
-                                            "code": sms_code(client, "+996711111111")})
+                                            "email": "admin.try@example.com",
+                                            "code": email_code(client, "admin.try@example.com")})
     assert r.status_code == 422
 
     # phone normalization: formatted and plain are the same account
     r = client.post("/auth/register", json={"name": "x", "phone": "+996 722 333 444", "password": "secret123",
-                                            "code": sms_code(client, "+996722333444")})
+                                            "email": "norm@example.com", "code": email_code(client, "norm@example.com")})
     assert r.status_code == 200
-    assert client.post("/auth/send-code", json={"phone": "+996 722 333 444", "purpose": "register"}).status_code == 400
+    r = client.post("/auth/send-code", json={"email": "other@example.com", "phone": "+996722333444", "purpose": "register"})
+    assert r.status_code == 400 and "телефоном" in r.json()["detail"]
     assert client.post("/auth/login", json={"phone": "+996-722-333-444", "password": "secret123"}).status_code == 200
-    assert client.post("/auth/send-code", json={"phone": "abc", "purpose": "register"}).status_code == 422
+    assert client.post("/auth/send-code", json={"email": "x@y.co", "phone": "abc", "purpose": "register"}).status_code == 422
 
     # forged / tampered tokens
     forged = jwt.encode({"sub": "1"}, "wrong-secret-of-a-sufficient-length-0123456789", algorithm="HS256")
@@ -416,31 +423,41 @@ def test_existing_masters_get_trial_when_enabled(client, monkeypatch):
 
 
 
-# ---------- SMS codes and password reset ----------
+# ---------- email codes and password reset ----------
 
 def test_register_requires_valid_code(client):
-    phone = "+996755000001"
-    base = {"name": "X", "phone": phone, "password": "secret123"}
+    email = "new.user@example.com"
+    base = {"name": "X", "phone": "+996755000001", "password": "secret123", "email": email}
     # no code / wrong format
     assert client.post("/auth/register", json=base).status_code == 422
     assert client.post("/auth/register", json={**base, "code": "123"}).status_code == 422
     # no code was sent yet
     assert client.post("/auth/register", json={**base, "code": "000000"}).status_code == 400
 
-    code = sms_code(client, phone)
+    code = email_code(client, email)
     # resend is throttled
-    assert client.post("/auth/send-code", json={"phone": phone, "purpose": "register"}).status_code == 429
+    assert client.post("/auth/send-code", json={"email": email, "purpose": "register"}).status_code == 429
     wrong = "000000" if code != "000000" else "111111"
     assert client.post("/auth/register", json={**base, "code": wrong}).json()["detail"] == "Неверный код"
+    # the code belongs to this address only
+    assert client.post("/auth/register", json={**base, "email": "someone.else@example.com", "code": code}).status_code == 400
     assert client.post("/auth/register", json={**base, "code": code}).status_code == 200
-    # a code works once
-    assert client.post("/auth/register", json={**base, "phone": "+996755000001", "code": code}).status_code == 400
+    # the address is now taken
+    r = client.post("/auth/send-code", json={"email": "NEW.user@example.com", "purpose": "register"})
+    assert r.status_code == 400 and "email" in r.json()["detail"]
+
+
+def test_email_required_for_everyone(client):
+    base = {"name": "C", "phone": "+996755000009", "password": "secret123", "code": "123456"}
+    assert client.post("/auth/register", json=base).status_code == 422
+    assert client.post("/auth/register", json={**base, "email": "not-an-email"}).status_code == 422
+    assert client.post("/auth/send-code", json={"email": "bad@", "purpose": "register"}).status_code == 422
 
 
 def test_code_brute_force_is_capped(client):
-    phone = "+996755000002"
-    code = sms_code(client, phone)
-    base = {"name": "X", "phone": phone, "password": "secret123"}
+    email = "brute@example.com"
+    code = email_code(client, email)
+    base = {"name": "X", "phone": "+996755000002", "password": "secret123", "email": email}
     wrong = [c for c in ("000000", "111111", "222222", "333333", "444444", "555555") if c != code][:5]
     for w in wrong:
         assert client.post("/auth/register", json={**base, "code": w}).status_code == 400
@@ -449,32 +466,63 @@ def test_code_brute_force_is_capped(client):
     assert r.status_code == 400 and "запросите новый" in r.json()["detail"]
 
 
-def test_expired_code(client, monkeypatch):
+def test_expired_code(client):
     from datetime import timedelta
 
-    from app.models import PhoneCode, utcnow
-    phone = "+996755000003"
-    code = sms_code(client, phone)
+    from app.models import VerificationCode, utcnow
+    email = "late@example.com"
+    code = email_code(client, email)
     db = SessionLocal()
-    db.query(PhoneCode).filter(PhoneCode.phone == phone).update({PhoneCode.expires_at: utcnow() - timedelta(seconds=1)})
+    db.query(VerificationCode).filter(VerificationCode.target == email).update(
+        {VerificationCode.expires_at: utcnow() - timedelta(seconds=1)})
     db.commit()
     db.close()
-    r = client.post("/auth/register", json={"name": "X", "phone": phone, "password": "secret123", "code": code})
+    r = client.post("/auth/register", json={"name": "X", "phone": "+996755000003", "password": "secret123",
+                                            "email": email, "code": code})
     assert r.status_code == 400 and "устарел" in r.json()["detail"]
+
+
+def test_code_email_is_sent_in_users_language(client, monkeypatch):
+    from app import verification
+    letters = []
+
+    class Fake:
+        is_dev = True
+
+        def send(self, to, subject, text):
+            letters.append((to, subject, text))
+
+    monkeypatch.setattr(verification, "get_email_provider", lambda: Fake())
+    r = client.post("/auth/send-code", json={"email": "ky@example.com", "purpose": "register", "lang": "ky"})
+    code = r.json()["debug_code"]
+    to, subject, text = letters[-1]
+    assert to == "ky@example.com" and subject == f"Ырастоо коду: {code}" and code in text and "мүнөт" in text
+
+
+def test_login_by_email_or_phone(client):
+    headers, phone = register(client)
+    email = email_for(phone)
+    assert client.post("/auth/login", json={"phone": email.upper(), "password": "secret123"}).status_code == 200
+    assert client.post("/auth/login", json={"phone": phone, "password": "secret123"}).status_code == 200
+    assert client.post("/auth/login", json={"phone": email, "password": "wrong"}).status_code == 401
+    # the user sees their own email, other people never do
+    assert client.get("/auth/me", headers=headers).json()["email"] == email
+    master_h, _ = make_master(client)
+    master_id = client.get("/masters/me", headers=master_h).json()["id"]
+    assert "email" not in client.get(f"/masters/{master_id}", headers=headers).json()["user"]
 
 
 def test_password_reset(client):
     headers, phone = register(client)
-    # unknown phone: same answer, nothing sent (no account probing)
-    r = client.post("/auth/send-code", json={"phone": "+996755999999", "purpose": "reset"})
+    email = email_for(phone)
+    # unknown address: same answer, nothing sent (no account probing)
+    r = client.post("/auth/send-code", json={"email": "nobody@example.com", "purpose": "reset"})
     assert r.status_code == 200 and r.json()["debug_code"] is None
 
     import time
     time.sleep(1.1)  # tokens carry whole-second timestamps; make the reset strictly later than login
-    code = sms_code(client, phone, "reset")
-    # a sign-up code can't be used for a reset and vice versa
-    assert client.post("/auth/register", json={"name": "Z", "phone": phone, "password": "x" * 8, "code": code}).status_code == 400
-    r = client.post("/auth/reset-password", json={"phone": phone, "code": code, "password": "newpass123"})
+    code = email_code(client, email, "reset")
+    r = client.post("/auth/reset-password", json={"email": email, "code": code, "password": "newpass123"})
     assert r.status_code == 200
     new_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
 
@@ -482,9 +530,25 @@ def test_password_reset(client):
     assert client.get("/auth/me", headers=headers).status_code == 401
     assert client.get("/auth/me", headers=new_headers).status_code == 200
     assert client.post("/auth/login", json={"phone": phone, "password": "secret123"}).status_code == 401
-    assert client.post("/auth/login", json={"phone": phone, "password": "newpass123"}).status_code == 200
+    assert client.post("/auth/login", json={"phone": email, "password": "newpass123"}).status_code == 200
     # code is single-use
-    assert client.post("/auth/reset-password", json={"phone": phone, "code": code, "password": "other123"}).status_code == 400
+    assert client.post("/auth/reset-password", json={"email": email, "code": code, "password": "other123"}).status_code == 400
+
+
+def test_change_email_needs_a_code(client):
+    headers, phone = register(client)
+    other_h, other_phone = register(client)
+    # changing requires being logged in, and the new address must be free
+    assert client.post("/auth/send-code", json={"email": "fresh@example.com", "purpose": "change_email"}).status_code == 401
+    r = client.post("/auth/send-code", json={"email": email_for(other_phone), "purpose": "change_email"}, headers=headers)
+    assert r.status_code == 400
+
+    code = email_code(client, "fresh@example.com", "change_email", headers=headers)
+    assert client.post("/auth/change-email", json={"email": "fresh@example.com", "code": "000000" if code != "000000" else "111111"},
+                       headers=headers).status_code == 400
+    r = client.post("/auth/change-email", json={"email": "Fresh@Example.com", "code": code}, headers=headers)
+    assert r.status_code == 200 and r.json()["email"] == "fresh@example.com"
+    assert client.post("/auth/login", json={"phone": "fresh@example.com", "password": "secret123"}).status_code == 200
 
 
 def test_models_match_migrations():
@@ -505,10 +569,12 @@ def test_pre_migration_database_is_upgraded(tmp_path):
 
     legacy = create_engine(f"sqlite:///{tmp_path}/legacy.db")
     old_tables = [t for t in Base.metadata.sorted_tables
-                  if t.name not in {"master_subscriptions", "subscription_payments", "phone_codes", "notification_settings"}]
+                  if t.name not in {"master_subscriptions", "subscription_payments", "notification_settings",
+                                    "verification_codes"}]
     Base.metadata.create_all(legacy, tables=old_tables)
     with legacy.begin() as conn:  # columns added by later migrations didn't exist back then
         conn.execute(text("ALTER TABLE users DROP COLUMN password_changed_at"))
+        conn.execute(text("DROP INDEX ix_users_email"))
         conn.execute(text("DROP INDEX ix_orders_city"))
         conn.execute(text("ALTER TABLE orders DROP COLUMN city"))
         conn.execute(text("INSERT INTO categories (name) VALUES ('Сантехника')"))
@@ -516,7 +582,8 @@ def test_pre_migration_database_is_upgraded(tmp_path):
     upgrade_database(legacy)
 
     tables = set(inspect(legacy).get_table_names())
-    assert {"master_subscriptions", "subscription_payments", "phone_codes", "notification_settings"} <= tables
+    assert {"master_subscriptions", "subscription_payments", "verification_codes", "notification_settings"} <= tables
+    assert "phone_codes" not in tables
     assert "password_changed_at" in {c["name"] for c in inspect(legacy).get_columns("users")}
     with legacy.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM categories")).scalar() == 1  # data kept
@@ -540,6 +607,9 @@ def outbox(monkeypatch):
         def send(self, to, subject, text):
             sent.append(("email", to, f"{subject}\n{text}"))
 
+    # Pretend an SMS gateway is connected so the SMS channel can be chosen.
+    from app import sms
+    monkeypatch.setattr(sms.PROVIDERS["console"], "is_dev", False)
     monkeypatch.setattr(notify, "_submit", lambda fn, *args: fn(*args))
     monkeypatch.setattr(notify, "get_sms_provider", lambda: FakeSms())
     monkeypatch.setattr(notify, "get_email_provider", lambda: FakeEmail())
@@ -549,11 +619,13 @@ def outbox(monkeypatch):
 
 def register_master(client, notify_enabled=False, channel="sms", lang="ru", category="Сантехника", city="Бишкек"):
     phone = f"+996700000{next(_counter)}"
+    email = email_for(phone)
     r = client.post("/auth/register", json={
         "name": "Мастер", "phone": phone, "password": "secret123", "role": "master", "city": city,
-        "email": f"master{phone[-4:]}@example.com",
-        "code": sms_code(client, phone), "notify_enabled": notify_enabled, "notify_channel": channel, "lang": lang,
+        "email": email, "code": email_code(client, email),
+        "notify_enabled": notify_enabled, "notify_channel": channel, "lang": lang,
     })
+    assert r.status_code == 200, r.text
     headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
     client.post("/masters/me/services", headers=headers,
                 json={"category_id": category_id(client, category), "title": "Услуга", "price_from": 100})
@@ -647,16 +719,29 @@ def test_production_refuses_unsafe_settings(monkeypatch):
     monkeypatch.setattr(settings, "environment", "production")
     with pytest.raises(RuntimeError) as e:
         check_production_settings()
-    assert "SMS_PROVIDER=console" in str(e.value) and "CORS_ORIGINS" in str(e.value)
+    assert "EMAIL_PROVIDER=console" in str(e.value) and "CORS_ORIGINS" in str(e.value)
+
+
+def test_sms_channel_hidden_without_gateway(client):
+    assert client.get("/config").json()["sms_enabled"] is False
+    phone = "+996755300001"
+    email = email_for(phone)
+    r = client.post("/auth/register", json={
+        "name": "M", "phone": phone, "password": "secret123", "role": "master", "city": "Бишкек",
+        "email": email, "code": email_code(client, email), "notify_enabled": True, "notify_channel": "sms"})
+    assert r.status_code == 400 and "SMS" in r.json()["detail"]
+    master_h, _ = make_master(client)
+    assert client.get("/notifications/settings", headers=master_h).json()["sms_available"] is False
+    r = client.put("/notifications/settings", headers=master_h, json={"enabled": True, "channel": "sms", "lang": "ru"})
+    assert r.status_code == 400
 
 
 
 # ---------- cities: masters see orders from their own city ----------
 
 def test_master_must_choose_city(client):
-    phone = "+996755100001"
-    base = {"name": "M", "phone": phone, "password": "secret123", "role": "master", "code": sms_code(client, phone),
-            "email": "osh.master@example.com"}
+    base = {"name": "M", "phone": "+996755100001", "password": "secret123", "role": "master",
+            "email": "osh.master@example.com", "code": email_code(client, "osh.master@example.com")}
     r = client.post("/auth/register", json=base)
     assert r.status_code == 400 and "город" in r.json()["detail"]
     assert client.post("/auth/register", json={**base, "city": "Москва"}).status_code == 422
@@ -737,23 +822,14 @@ def test_city_migration_backfills_old_data(tmp_path):
 
 # ---------- email ----------
 
-def test_master_email_required_and_validated(client):
-    phone = "+996755200001"
-    base = {"name": "M", "phone": phone, "password": "secret123", "role": "master", "city": "Бишкек",
-            "code": sms_code(client, phone)}
-    r = client.post("/auth/register", json=base)
-    assert r.status_code == 400 and r.json()["detail"] == "Укажите email"
-    assert client.post("/auth/register", json={**base, "email": "not-an-email"}).status_code == 422
-    r = client.post("/auth/register", json={**base, "email": "  Usta@Example.COM "})
+def test_master_email_saved_normalized(client):
+    email = "Usta@Example.COM"
+    r = client.post("/auth/register", json={
+        "name": "M", "phone": "+996755200001", "password": "secret123", "role": "master", "city": "Бишкек",
+        "email": f"  {email} ", "code": email_code(client, "usta@example.com")})
     assert r.status_code == 200
     headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
     assert client.get("/notifications/settings", headers=headers).json()["email"] == "usta@example.com"
-
-    # clients don't need an email
-    client_phone = "+996755200002"
-    r = client.post("/auth/register", json={"name": "C", "phone": client_phone, "password": "secret123",
-                                            "code": sms_code(client, client_phone)})
-    assert r.status_code == 200
 
 
 def test_new_orders_by_email(client, outbox):
@@ -768,9 +844,28 @@ def test_new_orders_by_email(client, outbox):
     assert f"New order #{order['id']} — Plumbing" in mails[0][2]  # subject in the master's language
     assert "Leaking tap" in mails[0][2] and "700 som" in mails[0][2] and "Turn off" in mails[0][2]
 
-    # the master changes the address in settings
-    client.put("/notifications/settings", headers=master_h,
-               json={"enabled": True, "channel": "email", "lang": "en", "email": "new@example.com"})
+    # the master changes the address (confirmed with a code)
+    code = email_code(client, "new@example.com", "change_email", headers=master_h)
+    client.post("/auth/change-email", headers=master_h, json={"email": "new@example.com", "code": code})
     outbox.clear()
     client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"})
     assert [m[1] for m in outbox if m[0] == "email"] == ["new@example.com"]
+
+
+def test_email_migration_normalises_and_dedupes(tmp_path):
+    from alembic import command
+    from sqlalchemy import create_engine, text
+
+    from app.migrations import _config
+    engine = create_engine(f"sqlite:///{tmp_path}/emails.db")
+    cfg = _config(engine)
+    command.upgrade(cfg, "0004")
+    with engine.begin() as conn:
+        for uid, phone, email in [(1, "+996700000001", " Usta@Mail.COM "), (2, "+996700000002", "usta@mail.com"),
+                                  (3, "+996700000003", None)]:
+            conn.execute(text("INSERT INTO users (id, name, phone, email, password_hash, role, status, created_at) "
+                              "VALUES (:id, 'U', :phone, :email, 'x', 'client', 'active', '2026-01-01')"),
+                         {"id": uid, "phone": phone, "email": email})
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        assert dict(conn.execute(text("SELECT id, email FROM users")).all()) == {1: "usta@mail.com", 2: None, 3: None}

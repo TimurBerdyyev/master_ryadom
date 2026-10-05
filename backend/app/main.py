@@ -28,11 +28,8 @@ def check_production_settings() -> None:
     problems = []
     if settings.jwt_secret == DEFAULT_JWT_SECRET or len(settings.jwt_secret) < 32:
         problems.append("JWT_SECRET не задан или короче 32 символов")
-    get_email_provider()  # fail fast on a typo in EMAIL_PROVIDER
-    if settings.environment == "production" and settings.email_provider == "console":
-        logger.warning("EMAIL_PROVIDER=console: письма мастерам не отправляются — настройте SMTP (app/email.py).")
-    if get_sms_provider().is_dev:
-        problems.append("SMS_PROVIDER=console — подключите реальный SMS-шлюз (app/sms.py)")
+    if get_email_provider().is_dev:
+        problems.append("EMAIL_PROVIDER=console — настройте отправку почты (SMTP_*), иначе коды подтверждения не дойдут")
     if "*" in settings.cors_origins_list:
         problems.append("CORS_ORIGINS=* — укажите домен сайта")
     if "localhost" in settings.site_url:
@@ -52,11 +49,13 @@ async def lifespan(_app: FastAPI):
 
     upgrade_database()
 
-    get_provider()  # fail fast on a typo in PAYMENT_PROVIDER
-    if get_sms_provider().is_dev:
+    # Fail fast on a typo in PAYMENT_PROVIDER / SMS_PROVIDER / EMAIL_PROVIDER.
+    get_provider()
+    get_sms_provider()
+    if get_email_provider().is_dev:
         logger.warning(
-            "SMS_PROVIDER=console: SMS не отправляются, коды подтверждения видны на странице. "
-            "Только для разработки — на сервере подключите реальный SMS-шлюз (app/sms.py)."
+            "EMAIL_PROVIDER=console: письма не отправляются, коды подтверждения видны на странице. "
+            "Только для разработки — на сервере настройте SMTP (app/email.py)."
         )
 
     db = SessionLocal()

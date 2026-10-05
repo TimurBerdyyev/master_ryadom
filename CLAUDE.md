@@ -33,11 +33,13 @@
 - Проверять вёрстку на 390px и 1280px; анимации уважают `prefers-reduced-motion`.
 
 ## Телефон, SMS, уведомления
-- Регистрация требует SMS-код (`/auth/send-code` → `/auth/register` с `code`), восстановление пароля —
-  `/auth/send-code` (purpose=reset) → `/auth/reset-password`; смена пароля разлогинивает старые токены (`password_changed_at`).
-  Логика кодов — `app/phone_codes.py` (5 мин, 5 неверных попыток, повтор через 60 с, 5 SMS/час на номер).
-- SMS-шлюз — `app/sms.py`; `SMS_PROVIDER=console` (по умолчанию) пишет SMS в лог и **возвращает код в ответе API**
-  (`debug_code`) — только для разработки; с `ENVIRONMENT=production` сервер с ним не стартует.
+- Email обязателен для всех и уникален; подтверждается кодом из письма: `/auth/send-code` (purpose=register|reset|change_email)
+  → `/auth/register` / `/auth/reset-password` / `/auth/change-email`. Вход — по телефону или email (`/auth/login`, поле `phone`).
+  Смена пароля разлогинивает старые токены (`password_changed_at`). Коды — `app/verification.py`
+  (10 мин, 5 неверных попыток, повтор через 60 с, 5 писем/час на адрес). Email не попадает в публичные ответы (только `/auth/me`).
+- `EMAIL_PROVIDER=console` (по умолчанию) пишет письма в лог и **возвращает код в ответе API** (`debug_code`) —
+  только для разработки; с `ENVIRONMENT=production` сервер с ним не стартует. SMS (`app/sms.py`) сейчас только для
+  уведомлений и недоступны, пока `SMS_PROVIDER=console`.
 - Уведомления мастерам вне сайта — **только по согласию** (галочка при регистрации, по умолчанию выключена),
   канал Telegram или SMS, меняется в профиле. Вызов: `notify(db, user_id, title, text, kind=..., **params)`
   из `app/notify.py` — in-app запись + сообщение по каналу мастера на его языке, отправка после commit в фоне.

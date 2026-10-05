@@ -42,6 +42,13 @@ def _valid_email(value: str | None) -> str | None:
     return value
 
 
+def _required_email(value: str) -> str:
+    email = _valid_email(value)
+    if email is None:
+        raise ValueError("Укажите email")
+    return email
+
+
 def _required_city(value: str) -> str:
     city = _valid_city(value)
     if city is None:
@@ -54,16 +61,16 @@ class UserRegister(BaseModel):
     phone: str = Field(min_length=5, max_length=32)
     password: str = Field(min_length=6, max_length=PASSWORD_MAX_LENGTH)
     role: Literal[UserRole.client, UserRole.master] = UserRole.client
-    code: str = Field(pattern=r"^\d{6}$")  # SMS confirmation code from /auth/send-code
+    code: str = Field(pattern=r"^\d{6}$")  # confirmation code emailed by /auth/send-code
     # Masters only: explicit consent to notifications outside the site and the chosen channel.
     notify_enabled: bool = False
     notify_channel: Literal["telegram", "sms", "email"] = "email"
     lang: Literal["ru", "ky", "en"] = "ru"
     city: str | None = Field(None, max_length=100)  # required for masters: they get orders from this city
-    email: str | None = Field(None, max_length=255)  # required for masters: new orders can be emailed to them
+    email: str = Field(min_length=3, max_length=255)  # confirmed by the code sent to it
 
     _city = field_validator("city")(_valid_city)
-    _email = field_validator("email")(_valid_email)
+    _email = field_validator("email")(_required_email)
 
     @field_validator("name")
     @classmethod
@@ -90,34 +97,50 @@ def _valid_phone(value: str) -> str:
 
 
 class SendCodeIn(BaseModel):
-    phone: str = Field(min_length=5, max_length=32)
-    purpose: Literal["register", "reset"]
+    email: str = Field(min_length=3, max_length=255)
+    purpose: Literal["register", "reset", "change_email"]
+    # Sign-up only: checked before sending, so nobody waits for a code with an already used phone.
+    phone: str | None = Field(None, max_length=32)
+    lang: Literal["ru", "ky", "en"] = "ru"
 
-    _phone = field_validator("phone")(_valid_phone)
+    _email = field_validator("email")(_required_email)
+
+    @field_validator("phone")
+    @classmethod
+    def clean_phone(cls, value: str | None) -> str | None:
+        return _valid_phone(value) if value else None
 
 
 class SendCodeOut(BaseModel):
     sent: bool = True
-    # Only with the development SMS provider (SMS_PROVIDER=console), so sign-up works without real SMS.
+    # Only with the development email provider (EMAIL_PROVIDER=console), so sign-up works without a mailbox.
     debug_code: str | None = None
 
 
 class PasswordResetIn(BaseModel):
-    phone: str = Field(min_length=5, max_length=32)
+    email: str = Field(min_length=3, max_length=255)
     code: str = Field(pattern=r"^\d{6}$")
     password: str = Field(min_length=6, max_length=PASSWORD_MAX_LENGTH)
 
-    _phone = field_validator("phone")(_valid_phone)
+    _email = field_validator("email")(_required_email)
+
+
+class ChangeEmailIn(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    code: str = Field(pattern=r"^\d{6}$")
+
+    _email = field_validator("email")(_required_email)
 
 
 class UserLogin(BaseModel):
-    phone: str = Field(min_length=1, max_length=32)
+    phone: str = Field(min_length=1, max_length=255)  # phone number or email
     password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
     @field_validator("phone")
     @classmethod
-    def clean_phone(cls, value: str) -> str:
-        return normalize_phone(value)
+    def clean_login(cls, value: str) -> str:
+        value = value.strip()
+        return value.lower() if "@" in value else normalize_phone(value)
 
 
 class Token(BaseModel):
@@ -133,6 +156,11 @@ class UserOut(BaseModel):
     phone: str | None = None
     role: UserRole
     photo: str | None = None
+
+
+class MeOut(UserOut):
+    """The signed-in user's own data — includes the email, which is never shown to others."""
+    email: str | None = None
 
 
 class CategoryOut(BaseModel):
@@ -387,6 +415,7 @@ class AdminStats(BaseModel):
 class PublicConfigOut(BaseModel):
     cities: list[str] = []
     telegram_enabled: bool = False
+    sms_enabled: bool = False
     subscriptions_enabled: bool
     subscription_trial_days: int
     subscription_price: int
@@ -459,15 +488,13 @@ class NotificationSettingsOut(BaseModel):
     email: str | None = None
     telegram_connected: bool
     telegram_available: bool
+    sms_available: bool
 
 
 class NotificationSettingsIn(BaseModel):
     enabled: bool
     channel: Literal["telegram", "sms", "email"]
     lang: Literal["ru", "ky", "en"] = "ru"
-    email: str | None = Field(None, max_length=255)
-
-    _email = field_validator("email")(_valid_email)
 
 
 class TelegramLinkOut(BaseModel):

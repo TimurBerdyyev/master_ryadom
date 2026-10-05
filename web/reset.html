@@ -20,12 +20,12 @@
         <div class="auth-head">
           <div class="badge-icon"><svg class="i" aria-hidden="true"><use href="#i-key-round"></use></svg></div>
           <h1 data-i18n="reset.title">Восстановление пароля</h1>
-          <p data-i18n="reset.sub">Пришлём код в SMS на номер вашего аккаунта</p>
+          <p data-i18n="reset.sub">Пришлём код на почту, указанную в вашем аккаунте</p>
         </div>
         <form class="card" id="phoneForm">
           <label>
-            <span data-i18n="common.phone">Телефон</span>
-            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-phone"></use></svg><input id="phone" type="tel" autocomplete="tel" placeholder="+996 700 000 000" required maxlength="32" /></span>
+            <span data-i18n="reg.email">Email</span>
+            <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="email" type="email" autocomplete="email" placeholder="name@gmail.com" required maxlength="255" /></span>
           </label>
           <div id="phoneError" class="error" role="alert"></div>
           <button class="btn block large" type="submit" id="getCodeBtn"><span data-i18n="reg.getCode">Получить код</span><svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
@@ -43,7 +43,7 @@
         <form class="card" id="codeForm">
           <div class="notice" id="devCode" hidden></div>
           <label>
-            <span data-i18n="reg.code">Код из SMS</span>
+            <span data-i18n="reg.code">Код из письма</span>
             <input id="code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="\d{6}" maxlength="6" required placeholder="••••••" />
           </label>
           <label>
@@ -70,7 +70,7 @@
   <script>
     const codeStep = createCodeStep({
       purpose: "reset",
-      getPhone: () => document.getElementById("phone").value,
+      getEmail: () => document.getElementById("email").value,
       // The server never says whether the number exists, so neither do we.
       sentText: () => t("reset.sentGeneric"),
       showStep: (onCode) => {
@@ -102,7 +102,7 @@
       button.disabled = true;
       try {
         const { access_token } = await api.resetPassword({
-          phone: document.getElementById("phone").value,
+          email: document.getElementById("email").value.trim(),
           code: document.getElementById("code").value.trim(),
           password: document.getElementById("password").value,
         });
