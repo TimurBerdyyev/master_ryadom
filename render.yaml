@@ -1,0 +1,36 @@
+# Render Blueprint: Dashboard → New → Blueprint → choose this repository → Apply.
+# Creates the site (web client + API in one Docker service) and a free Postgres database.
+# Free plan: the service sleeps after 15 min idle (first visit ~1 min), the free database is
+# deleted after 30 days, uploaded photos are lost on restart. Fine for testing — see DEPLOY.md.
+services:
+  - type: web
+    name: master-ryadom
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/render.Dockerfile
+    dockerContext: ./
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: master-ryadom-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      # Test mode: no mail server needed — confirmation codes are shown on the page.
+      # For real users set ENVIRONMENT=production, EMAIL_PROVIDER=smtp and SMTP_* (DEPLOY.md).
+      - key: ENVIRONMENT
+        value: development
+      - key: EMAIL_PROVIDER
+        value: console
+      - key: REDIS_URL
+        value: ""
+      - key: SUBSCRIPTIONS_ENABLED
+        value: "false"
+
+databases:
+  - name: master-ryadom-db
+    plan: free

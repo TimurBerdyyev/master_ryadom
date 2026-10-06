@@ -94,7 +94,9 @@ uvicorn app.main:app --reload
 
 ## Деплой
 
-Пошаговая инструкция для сервера с HTTPS, бэкапами и чек-листом — [DEPLOY.md](DEPLOY.md).
+Пошаговая инструкция — [DEPLOY.md](DEPLOY.md). Самый простой способ для проверки — **Render**:
+New → Blueprint → этот репозиторий (`render.yaml`), без своего сервера. Для постоянной работы —
+свой сервер с Docker, HTTPS, бэкапами и чек-листом.
 Первичная настройка сервера — `sudo ./deploy/setup.sh`. Тесты автоматически запускаются на GitHub
 (SQLite и Postgres) при каждом push — `.github/workflows/tests.yml`.
 

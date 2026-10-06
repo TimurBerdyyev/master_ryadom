@@ -11,7 +11,7 @@ fail() { echo "  ✗ $1"; exit 1; }
 json() { python3 -c "import sys,json; print(json.load(sys.stdin)$1)"; }
 
 echo "Проверка $BASE"
-curl -fsS "$API/health" | grep -q '"ok"' && pass "API отвечает через nginx" || fail "API /health"
+curl -fsS "$API/health" | grep -q '"ok"' && pass "API отвечает (/api)" || fail "API /health"
 curl -fsS "$BASE/" | grep -q "Мастер рядом" && pass "сайт открывается" || fail "главная страница"
 curl -fsS "$BASE/js/icons.js" >/dev/null && pass "статика отдаётся" || fail "статика"
 CATS=$(curl -fsS "$API/categories" | json '.__len__()')

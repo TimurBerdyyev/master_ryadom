@@ -56,7 +56,8 @@
   о новых заказах — только заказы города мастера (+ старые заказы без города). Мастер без города видит пустую ленту.
 
 ## Деплой
-Пошагово — `DEPLOY.md` (Caddy с HTTPS → nginx → backend; Postgres, Redis; бэкапы `deploy/backup.sh`).
+Render (самый простой): `render.yaml` + `deploy/render.Dockerfile` — один сервис, backend сам отдаёт `web/`
+(`SERVE_WEB_DIR`), API под `/api`. Свой сервер — пошагово `DEPLOY.md` (Caddy с HTTPS → nginx → backend; Postgres, Redis; бэкапы `deploy/backup.sh`).
 `ENVIRONMENT=production` не даёт запуститься с дефолтным JWT, console-SMS, `CORS_ORIGINS=*`, `SITE_URL` на localhost.
 
 ## Языки (ru / ky / en)

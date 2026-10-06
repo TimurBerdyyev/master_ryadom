@@ -57,3 +57,21 @@ jobs:
       - name: Logs on failure
         if: failure()
         run: docker compose logs
+
+  render-image:
+    # The single-service image used on Render: web client at /, API at /api, honours $PORT.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start
+        run: |
+          docker build -f deploy/render.Dockerfile -t master-ryadom-render .
+          docker run -d --name app -p 10000:10000 -e PORT=10000 -e REDIS_URL= \
+            -e DATABASE_URL=sqlite:////tmp/app.db master-ryadom-render
+          for i in $(seq 1 60); do curl -fs http://localhost:10000/api/health && exit 0; sleep 2; done
+          docker logs app; exit 1
+      - name: Smoke test
+        run: ./deploy/smoke_test.sh http://localhost:10000
+      - name: Logs on failure
+        if: failure()
+        run: docker logs app

@@ -79,7 +79,7 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    if request.url.path.startswith("/uploads/"):
+    if request.url.path.startswith(("/uploads/", "/api/uploads/")):
         # Uploaded files are only ever images: forbid any script/plugin execution even if one slips through.
         response.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; sandbox"
     return response
@@ -110,3 +110,16 @@ app.include_router(subscriptions.admin_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+def _single_service_site(api: FastAPI) -> FastAPI:
+    """Web client at / and the API at /api in one process (what nginx does in docker compose)."""
+    site = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    site.middleware("http")(security_headers)
+    site.mount("/api", api)
+    site.mount("/", StaticFiles(directory=settings.serve_web_dir, html=True), name="web")
+    return site
+
+
+if settings.serve_web_dir:
+    app = _single_service_site(app)

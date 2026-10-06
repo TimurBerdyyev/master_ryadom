@@ -1,3 +1,6 @@
+import os
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_JWT_SECRET = "change-me-in-production"
@@ -43,7 +46,17 @@ class Settings(BaseSettings):
     telegram_bot_username: str = ""  # without @, e.g. master_ryadom_bot
     telegram_webhook_secret: str = ""  # random string; Telegram sends it back in a header
     # Public address of the web client, used for links inside SMS/Telegram messages.
-    site_url: str = "http://localhost:8080"
+    # Render sets RENDER_EXTERNAL_URL (https://<name>.onrender.com) — a sensible default there.
+    site_url: str = os.environ.get("RENDER_EXTERNAL_URL") or "http://localhost:8080"
+    # Single-service hosting (Render): the backend also serves the web client from this folder
+    # and the API moves under /api, exactly like behind nginx. Empty = API only (docker compose).
+    serve_web_dir: str = ""
+
+    @field_validator("database_url")
+    @classmethod
+    def sqlalchemy_scheme(cls, value: str) -> str:
+        # Some hosts hand out "postgres://", which SQLAlchemy 2 no longer accepts.
+        return "postgresql://" + value[len("postgres://"):] if value.startswith("postgres://") else value
 
     @property
     def telegram_enabled(self) -> bool:
