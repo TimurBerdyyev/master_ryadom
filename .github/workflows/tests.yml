@@ -38,3 +38,22 @@ jobs:
       - name: Dependency audit
         if: matrix.database == 'sqlite'
         run: pip-audit -r requirements.txt
+
+  docker-stack:
+    # Builds the real images and runs the whole stack (Postgres, Redis, backend, nginx) like on a server.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+      - name: Wait for the API
+        run: |
+          for i in $(seq 1 60); do curl -fs http://localhost:8080/api/health && exit 0; sleep 2; done
+          docker compose logs backend; exit 1
+      - name: Smoke test through nginx
+        run: ./deploy/smoke_test.sh http://localhost:8080
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs

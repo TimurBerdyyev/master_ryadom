@@ -3,6 +3,40 @@
 Схема: **Caddy** (HTTPS, сертификат Let's Encrypt) → **nginx** (сайт + `/api/`) → **backend** (FastAPI) →
 **Postgres** + **Redis**. Всё в Docker. Миграции базы применяются автоматически при старте backend.
 
+## 0. Бесплатный тестовый сервер (Oracle Cloud + DuckDNS + Brevo)
+
+Всё бесплатно и бессрочно; нужна банковская карта для проверки личности в Oracle (деньги не списываются).
+
+**Сервер — Oracle Cloud Always Free** (2 ядра ARM, 12 ГБ памяти, 200 ГБ диска — с запасом для проекта):
+1. Зарегистрируйтесь на <https://www.oracle.com/cloud/free/>; домашний регион выберите поближе (например Frankfurt) —
+   поменять его потом нельзя.
+2. Compute → Instances → Create instance: образ **Ubuntu 22.04/24.04**, Shape → Ampere **VM.Standard.A1.Flex**,
+   2 OCPU / 12 ГБ. Скачайте SSH-ключ (или вставьте свой публичный). Если пишет «Out of capacity» — попробуйте позже
+   или другой Availability Domain.
+3. Откройте порты: Networking → Virtual Cloud Networks → ваша сеть → Security List → Add Ingress Rules:
+   Source `0.0.0.0/0`, TCP, порты `80` и `443` (по одному правилу). Встроенный файрвол Ubuntu откроет `setup.sh`.
+4. Подключитесь: `ssh -i ключ.key ubuntu@<публичный-IP>`.
+
+**Домен — DuckDNS** (бесплатный поддомен `имя.duckdns.org`, HTTPS-сертификат выдаётся автоматически):
+войдите на <https://www.duckdns.org> через Google/GitHub, создайте поддомен и впишите в него публичный IP сервера.
+В `.env`: `DOMAIN=имя.duckdns.org`.
+
+**Почта — Brevo** (бесплатно 300 писем в день — хватит для теста; без карты):
+зарегистрируйтесь на <https://www.brevo.com>, подтвердите адрес отправителя (Senders), затем
+SMTP & API → SMTP: возьмите логин и ключ. В `.env`:
+```
+EMAIL_PROVIDER=smtp
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=<логин из Brevo>
+SMTP_PASSWORD=<SMTP-ключ из Brevo>
+SMTP_FROM=Мастер рядом <ваш-подтверждённый-адрес>
+SMTP_SECURITY=starttls
+```
+Альтернатива для пары тестов — Gmail с «паролем приложения» (`smtp.gmail.com`, порт 587).
+
+Дальше — шаги 1–3 ниже (`setup.sh`, `.env`, запуск), затем `./deploy/smoke_test.sh https://имя.duckdns.org`.
+
 ## 1. Сервер
 
 - VPS с Ubuntu 22.04+, 2 ГБ RAM достаточно для старта.
@@ -41,7 +75,14 @@ docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --b
 docker compose exec backend python -m app.create_admin "+996700000000" "надёжный-пароль" "Имя"
 ```
 
-Проверка: `https://ваш-домен` открывается с замком, `https://ваш-домен/api/health` → `{"status":"ok"}`.
+Проверка: `https://ваш-домен` открывается с замком, а скрипт проверит API, статику и базу:
+
+```bash
+./deploy/smoke_test.sh https://ваш-домен
+```
+
+Если сайт не открывается: `docker compose logs caddy` (сертификат), `docker compose logs backend` (настройки —
+в режиме production сервер пишет, что именно не так), а на Oracle — проверьте правила 80/443 в Security List.
 
 Обновление после изменений в коде:
 

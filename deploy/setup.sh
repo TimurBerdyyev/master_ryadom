@@ -11,6 +11,17 @@ if ! command -v docker >/dev/null 2>&1; then
   curl -fsSL https://get.docker.com | sh
 fi
 
+# Oracle Cloud Ubuntu images ship iptables rules that REJECT everything except SSH, even when the
+# cloud firewall (Security List) allows 80/443 — open the web ports and keep them after reboot.
+if command -v iptables >/dev/null 2>&1 && iptables -S INPUT 2>/dev/null | grep -q "REJECT"; then
+  for port in 80 443; do
+    iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null \
+      || iptables -I INPUT 5 -p tcp -m state --state NEW --dport "$port" -j ACCEPT
+  done
+  if command -v netfilter-persistent >/dev/null 2>&1; then netfilter-persistent save >/dev/null 2>&1 || true; fi
+  echo "→ Открыл порты 80/443 во встроенном файрволе (iptables)."
+fi
+
 if [ -f .env ]; then
   echo "→ .env уже есть — не трогаю. Проверьте значения по DEPLOY.md."
 else
@@ -38,9 +49,11 @@ cat <<'NEXT'
   1. В .env настройте почту: EMAIL_PROVIDER=smtp и SMTP_* — на неё приходят коды подтверждения.
      С EMAIL_PROVIDER=console сервер в режиме production не запустится — так задумано (DEPLOY.md, раздел 5).
      По желанию: TELEGRAM_BOT_TOKEN / TELEGRAM_BOT_USERNAME, SMS_PROVIDER.
-  2. Запуск:
+  2. Oracle Cloud: в панели откройте порты 80 и 443 (VCN → Security List → Ingress rules), см. DEPLOY.md.
+  3. Запуск:
        docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
-  3. Администратор:
+  4. Проверка: ./deploy/smoke_test.sh https://ваш-домен
+  5. Администратор:
        docker compose exec backend python -m app.create_admin "+996XXXXXXXXX" "пароль" "Имя"
-  4. Бэкапы: добавьте deploy/backup.sh в cron (DEPLOY.md, раздел 6).
+  6. Бэкапы: добавьте deploy/backup.sh в cron (DEPLOY.md, раздел «Бэкапы»).
 NEXT
