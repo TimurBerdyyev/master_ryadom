@@ -60,8 +60,10 @@ class UserRegister(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     phone: str = Field(min_length=5, max_length=32)
     password: str = Field(min_length=6, max_length=PASSWORD_MAX_LENGTH)
-    role: Literal[UserRole.client, UserRole.master] = UserRole.client
+    # Only masters register; clients use the site without an account.
+    role: Literal[UserRole.master] = UserRole.master
     code: str = Field(pattern=r"^\d{6}$")  # confirmation code emailed by /auth/send-code
+    accept_agreement: bool = False  # must be true: the master agreement (response time, fines)
     # Masters only: explicit consent to notifications outside the site and the chosen channel.
     notify_enabled: bool = False
     notify_channel: Literal["telegram", "sms", "email"] = "email"
@@ -204,6 +206,13 @@ class MasterOut(BaseModel):
     photos: list[PhotoOut] = []
 
 
+class MasterMeOut(MasterOut):
+    """The master's own profile: also their reliability record and agreement status."""
+    missed_requests: int = 0
+    rating_penalty: float = 0
+    agreement_accepted: bool = False
+
+
 class MasterRegister(BaseModel):
     description: str | None = Field(None, max_length=2000)
     experience_years: int | None = Field(None, ge=0, le=80)
@@ -254,7 +263,7 @@ class OrderOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    client_id: int
+    client_id: int | None = None
     category_id: int
     master_id: int | None = None
     city: str | None = None
@@ -297,6 +306,8 @@ class MasterBriefOut(BaseModel):
     rating: float
     verified: bool
     completed_orders: int
+    phone: str | None = None
+    photo: str | None = None
 
 
 class OrderOfferDetailOut(OrderOfferOut):
@@ -319,6 +330,8 @@ class OrderFeedOut(BaseModel):
     photos: list[PhotoOut] = []
     offers_count: int = 0
     my_offer: OrderOfferOut | None = None
+    deadline_at: datetime | None = None  # answer by this time (offer or decline)
+    my_status: str | None = None  # pending | offered | declined | missed | closed
 
 
 class ReviewCreate(BaseModel):
@@ -332,7 +345,7 @@ class ReviewOut(BaseModel):
     id: int
     order_id: int
     master_id: int
-    client_id: int
+    client_id: int | None = None
     rating: int
     text: str | None = None
     created_at: datetime
@@ -358,11 +371,15 @@ class ComplaintCreate(BaseModel):
     order_id: int | None = None
 
 
+class RequestComplaintCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
 class ComplaintOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    author_id: int
+    author_id: int | None = None
     target_user_id: int | None = None
     order_id: int | None = None
     text: str
@@ -419,6 +436,11 @@ class PublicConfigOut(BaseModel):
     subscriptions_enabled: bool
     subscription_trial_days: int
     subscription_price: int
+    # The master agreement's terms (shown on the agreement page and in the master's profile)
+    response_minutes: int = 20
+    missed_request_fine: int = 0
+    missed_request_rating_penalty: float = 0
+    agreement_version: str = ""
 
 
 class SubscriptionPlanOut(BaseModel):
@@ -499,3 +521,76 @@ class NotificationSettingsIn(BaseModel):
 
 class TelegramLinkOut(BaseModel):
     url: str
+
+
+class RequestCreate(BaseModel):
+    """A client's request — no account needed, just a name and a phone to be reached at."""
+    name: str = Field(min_length=1, max_length=255)
+    phone: str = Field(min_length=5, max_length=32)
+    category_id: int
+    city: str = Field(min_length=1, max_length=100)
+    description: str = Field(min_length=1, max_length=2000)
+    address: str | None = Field(None, max_length=500)
+    price: float | None = Field(None, ge=0, le=10_000_000)
+    date: datetime | None = None
+    time: str | None = Field(None, max_length=16, pattern=r"^\d{1,2}:\d{2}$")
+    website: str | None = None  # honeypot: humans never see this field, bots fill it in
+
+    _phone = field_validator("phone")(_valid_phone)
+    _city = field_validator("city")(_required_city)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Имя не может быть пустым")
+        return value
+
+
+class RequestOut(BaseModel):
+    """What the client sees through their private link."""
+    id: int
+    category_id: int
+    city: str | None = None
+    description: str
+    address: str | None = None
+    price: float | None = None
+    date: datetime | None = None
+    time: str | None = None
+    status: OrderStatus
+    created_at: datetime
+    response_deadline: datetime
+    client_name: str | None = None
+    client_phone: str | None = None
+    photos: list[PhotoOut] = []
+    offers: list[OrderOfferDetailOut] = []
+    master_id: int | None = None
+    master_contact: ContactOut | None = None
+    review_rating: int | None = None
+
+
+class RequestCreatedOut(BaseModel):
+    token: str  # shown once; the client keeps the private link
+    request: RequestOut
+
+
+class AdminViolationOut(BaseModel):
+    id: int
+    order_id: int
+    master_id: int
+    master_name: str
+    master_phone: str
+    deadline_at: datetime
+    fine: float
+
+
+class AdminUnansweredOut(BaseModel):
+    id: int
+    category_id: int
+    city: str | None = None
+    description: str
+    client_name: str | None = None
+    client_phone: str | None = None
+    created_at: datetime
+    masters_notified: int

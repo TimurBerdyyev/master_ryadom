@@ -26,6 +26,45 @@
       <svg class="i" aria-hidden="true"><use href="#i-sparkles"></use></svg><span data-i18n="edit.welcome">Добро пожаловать!</span>
     </div>
 
+    <!-- Masters registered before the agreement existed must accept it to get requests -->
+    <div class="card-box" id="agreeBanner" hidden style="margin-bottom:16px;border-color:var(--primary-100)">
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-scroll-text"></use></svg><span data-i18n="edit.agreeTitle">Примите договор с сервисом</span></h2>
+      <p class="muted" style="margin:6px 0 14px" data-i18n="edit.agreeText"></p>
+      <div class="row">
+        <button class="btn accent" type="button" id="agreeBtn"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.agreeBtn">Принимаю договор</span></button>
+        <a class="btn secondary" href="master-agreement.html" target="_blank" rel="noopener"><svg class="i" aria-hidden="true"><use href="#i-file-text"></use></svg><span data-i18n="edit.agreementLink">Договор с сервисом</span></a>
+      </div>
+    </div>
+
+    <div class="card-box reveal" style="margin-bottom:16px">
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-camera"></use></svg><span data-i18n="edit.avatarTitle">Ваше фото</span></h2>
+      <div class="avatar-edit" style="margin-top:14px">
+        <div id="avatarPreview"></div>
+        <div style="flex:1;min-width:200px">
+          <p class="muted" style="margin:0" data-i18n="edit.avatarHint"></p>
+          <div class="actions">
+            <label class="btn small" style="cursor:pointer">
+              <svg class="i" aria-hidden="true"><use href="#i-upload"></use></svg><span id="avatarUploadLabel" data-i18n="edit.avatarUpload">Загрузить фото</span>
+              <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" />
+            </label>
+            <button class="btn small ghost" type="button" id="avatarDelete" hidden><svg class="i" aria-hidden="true"><use href="#i-trash-2"></use></svg><span data-i18n="edit.avatarDelete">Удалить фото</span></button>
+          </div>
+          <div class="error" id="avatarError"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-box" id="trustCard" style="margin-bottom:16px" hidden>
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg><span data-i18n="edit.trustTitle">Гарантия и надёжность</span></h2>
+      <div class="notice" id="verifyNotice" style="margin-top:12px"></div>
+      <div class="trust-stats">
+        <div><b id="missedCount">0</b><span data-i18n="edit.missed">Пропущено заявок</span></div>
+        <div><b id="penaltyValue">0</b><span data-i18n="edit.penalty">Снижение рейтинга</span></div>
+      </div>
+      <p class="hint" id="ruleText" style="margin:12px 0 0"></p>
+      <a class="link" href="master-agreement.html" style="font-size:14px"><span data-i18n="edit.agreementLink">Договор с сервисом</span> →</a>
+    </div>
+
     <form class="card reveal" id="profileForm" style="max-width:none">
       <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-user-round"></use></svg><span data-i18n="edit.about">О себе</span></h2>
       <label>
@@ -136,6 +175,61 @@
 
     let categories = [];
 
+    function renderAvatar(master) {
+      const photo = master.user.photo;
+      document.getElementById("avatarPreview").innerHTML = avatarHtml(master.user.name, "avatar", photo);
+      document.getElementById("avatarDelete").hidden = !photo;
+      document.getElementById("avatarUploadLabel").textContent = t(photo ? "edit.avatarChange" : "edit.avatarUpload");
+    }
+
+    async function renderTrust(master) {
+      document.getElementById("agreeBanner").hidden = master.agreement_accepted;
+      const notice = document.getElementById("verifyNotice");
+      notice.className = master.verified ? "notice success" : "notice";
+      notice.innerHTML = `${icon(master.verified ? "badge-check" : "hourglass")}<span>${t(master.verified ? "edit.verifiedYes" : "edit.verifiedNo")}</span>`;
+      document.getElementById("missedCount").textContent = master.missed_requests;
+      document.getElementById("penaltyValue").textContent = master.rating_penalty ? `−${Number(master.rating_penalty).toFixed(1)}` : "0";
+      document.getElementById("trustCard").hidden = false;
+      try {
+        const cfg = await api.publicConfig();
+        document.getElementById("ruleText").textContent = t("edit.rule", { fine: cfg.missed_request_fine, penalty: cfg.missed_request_rating_penalty });
+      } catch (e) {
+        /* the rule line stays empty */
+      }
+    }
+
+    document.getElementById("avatarInput").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      document.getElementById("avatarError").textContent = "";
+      try {
+        renderAvatar(await api.uploadAvatar(file));
+        toast(t("edit.avatarSaved"));
+        renderNav();
+      } catch (err) {
+        document.getElementById("avatarError").textContent = t("edit.photoUploadError") + err.message;
+      }
+    });
+
+    document.getElementById("avatarDelete").addEventListener("click", async () => {
+      try {
+        renderAvatar(await api.deleteAvatar());
+        renderNav();
+      } catch (err) {
+        document.getElementById("avatarError").textContent = err.message;
+      }
+    });
+
+    document.getElementById("agreeBtn").addEventListener("click", async () => {
+      try {
+        renderTrust(await api.acceptAgreement());
+        toast(t("edit.agreed"));
+      } catch (err) {
+        toast(t("common.error") + err.message);
+      }
+    });
+
     async function loadProfile() {
       try {
         const master = await api.myMasterProfile();
@@ -144,6 +238,8 @@
         document.getElementById("city").innerHTML = await cityOptionsHtml(master.city || "");
         document.getElementById("district").value = master.district || "";
         renderServices(master.services);
+        renderAvatar(master);
+        renderTrust(master);
         const link = document.getElementById("publicLink");
         link.href = `master.html?id=${master.id}`;
         link.hidden = false;
@@ -390,7 +486,7 @@
       const me = await api.me();
       if (me.role !== "master") {
         document.querySelector("main").innerHTML = emptyState("briefcase", t("feed.onlyMasters"), t("edit.clientOnly"),
-          `<a class="btn" href="orders.html">${t("nav.myOrders")}</a>`);
+          `<a class="btn" href="my-requests.html">${t("nav.myRequests")}</a>`);
         return;
       }
       myPhone = me.phone || "";

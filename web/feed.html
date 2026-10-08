@@ -35,12 +35,13 @@
       <div>
         <h1 data-i18n="nav.feed">Новые заказы</h1>
         <p class="city-chip" id="cityChip" hidden></p>
-        <p class="muted" data-i18n="feed.sub">Открытые заказы в ваших категориях. Адрес и телефон клиента откроются, когда он выберет вас.</p>
+        <p class="muted" data-i18n="feed.sub">Заявки в ваших категориях и городе. Адрес и телефон клиента откроются, когда он выберет вас.</p>
       </div>
       <button class="btn secondary" onclick="load()"><svg class="i" aria-hidden="true"><use href="#i-refresh-cw"></use></svg><span data-i18n="feed.refresh">Обновить</span></button>
     </div>
 
     <div id="planBanner"></div>
+    <div class="notice" id="ruleNotice" hidden style="margin-bottom:16px"><svg class="i" aria-hidden="true"><use href="#i-timer"></use></svg><span data-i18n="feed.rule"></span></div>
     <div id="list" class="stack"></div>
   </main>
 
@@ -62,12 +63,27 @@
                  placeholder="${t("feed.pricePh")}" aria-label="${t("feed.priceAria")}" value="${mine ? Number(mine.price) : ""}" /></span>
           <input class="input" id="comment-${o.id}" type="text" maxlength="1000" aria-label="${t("feed.commentAria")}"
                  placeholder="${t("feed.commentPh")}" value="${mine && mine.comment ? esc(mine.comment) : ""}" />
-          <button class="btn ${mine ? "secondary" : "accent"}" type="submit">${icon(mine ? "pencil" : "send")}${mine ? t("feed.update") : t("feed.offer")}</button>
+          <span class="offer-actions">
+            <button class="btn ${mine ? "secondary" : "accent"}" type="submit">${icon(mine ? "pencil" : "send")}${mine ? t("feed.update") : t("feed.offer")}</button>
+            ${mine ? "" : `<button class="btn ghost" type="button" onclick="decline(${o.id})">${icon("ban")}${t("feed.decline")}</button>`}
+          </span>
         </form>`;
+    }
+
+    // "Answer within 14:32" while the master's 20-minute timer runs.
+    function deadlineHtml(o) {
+      if (o.my_offer || o.my_status === "offered") return `<span class="countdown done">${icon("circle-check")}${t("feed.answered")}</span>`;
+      if (!o.deadline_at || o.my_status !== "pending") return "";
+      const left = secondsLeft(o.deadline_at);
+      if (left <= 0) return `<span class="countdown over">${icon("hourglass")}${t("feed.overdue")}</span>`;
+      return `<span class="countdown${left < 300 ? " urgent" : ""}" data-deadline="${esc(o.deadline_at)}">${icon("timer")}<span>${t("feed.timeLeft", { time: formatCountdown(left) })}</span></span>`;
     }
 
     function render() {
       const list = document.getElementById("list");
+      // Keep what the master is typing when the list refreshes by itself.
+      const typed = {};
+      list.querySelectorAll(".offer-form input").forEach(input => { if (input.value) typed[input.id] = input.value; });
       if (!orders.length) {
         list.classList.remove("reveal");
         list.innerHTML = emptyState("inbox", t("feed.emptyTitle"), `${t("feed.emptyCityText")} ${t("feed.emptyText")}`,
@@ -85,6 +101,7 @@
               <span class="spacer"></span>
               ${o.my_offer ? `<span class="status-pill ok">${t("feed.youOffered", { price: formatPrice(o.my_offer.price) })}</span>` : `<span class="status-pill info">${t("feed.new")}</span>`}
             </div>
+            <div class="deadline-row" style="margin:12px 0 10px">${deadlineHtml(o)}</div>
             <div class="desc">${esc(o.description)}</div>
             ${o.photos.length ? `<div class="photo-grid" style="margin:14px 0 0;grid-template-columns:repeat(auto-fill,minmax(84px,1fr))">${o.photos.map(p =>
               `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="${t("detail.photoAlt")}" loading="lazy" /></a>`).join("")}</div>` : ""}
@@ -97,11 +114,15 @@
             ${offerForm(o)}
           </div>`;
       }).join("");
+      for (const [id, value] of Object.entries(typed)) {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+      }
     }
 
-    async function load() {
+    async function load(quiet = false) {
       const list = document.getElementById("list");
-      list.innerHTML = skeletons(3, 200);
+      if (!quiet) list.innerHTML = skeletons(3, 200);
       try {
         const me = await api.me();
         if (me.role !== "master") {
@@ -118,15 +139,24 @@
             `<a class="btn" href="master-profile-edit.html">${icon("map-pin")}${t("feed.chooseCity")}</a>`);
           return;
         }
+        if (!profile.agreement_accepted) {
+          list.innerHTML = emptyState("scroll-text", t("feed.agreeTitle"), t("feed.agreeText"),
+            `<a class="btn accent" href="master-profile-edit.html">${icon("scroll-text")}${t("feed.toProfile")}</a>`);
+          return;
+        }
         chip.innerHTML = `${icon("map-pin")}<b>${esc(cityName(profile.city))}</b> · <a class="link" href="master-profile-edit.html">${t("city.change")}</a>`;
         chip.hidden = false;
         const [feed, cats] = await Promise.all([api.orderFeed(), api.categories()]);
         orders = feed;
+        document.getElementById("ruleNotice").hidden = false;
         categories = Object.fromEntries(cats.map(c => [c.id, c.name]));
         render();
       } catch (e) {
         list.innerHTML = e.status === 402
           ? paywall()
+          : e.status === 403
+          ? emptyState("shield-check", t("feed.notVerifiedTitle"), t("feed.notVerifiedText"),
+              `<a class="btn" href="master-profile-edit.html">${icon("settings-2")}${t("feed.toProfile")}</a>`)
           : emptyState("triangle-alert", t("orders.loadError"), esc(e.message));
       }
     }
@@ -170,7 +200,38 @@
       }
     }
 
-    if (loggedIn) load();
+    async function decline(orderId) {
+      try {
+        await api.declineOrder(orderId);
+        toast(t("feed.declined"));
+        orders = orders.filter(o => o.id !== orderId);
+        render();
+      } catch (e) {
+        toast(t("common.error") + e.message);
+      }
+    }
+
+    if (loggedIn) {
+      load();
+      setInterval(() => {
+        document.querySelectorAll("[data-deadline]").forEach(el => {
+          const left = secondsLeft(el.dataset.deadline);
+          if (left <= 0) {
+            el.className = "countdown over";
+            el.innerHTML = `${icon("hourglass")}${t("feed.overdue")}`;
+            delete el.dataset.deadline;
+            return;
+          }
+          el.classList.toggle("urgent", left < 300);
+          el.querySelector("span").textContent = t("feed.timeLeft", { time: formatCountdown(left) });
+        });
+      }, 1000);
+      // New requests show up without pressing "Обновить".
+      setInterval(() => {
+        const busy = document.activeElement && document.activeElement.closest && document.activeElement.closest(".offer-form");
+        if (!document.hidden && !busy && orders) load(true);
+      }, 60000);
+    }
     renderNav();
   </script>
 </body>

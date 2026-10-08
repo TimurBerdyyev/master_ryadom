@@ -94,7 +94,9 @@ function initials(name) {
   return esc(String(name || "?").trim().split(/\s+/).map(p => p[0]).join("").slice(0, 2).toUpperCase());
 }
 
-function avatarHtml(name, cls = "avatar") {
+// The master's own photo when there is one, otherwise coloured initials.
+function avatarHtml(name, cls = "avatar", photo = null) {
+  if (photo) return `<img class="${cls} photo" src="${esc(uploadUrl(photo))}" alt="${esc(name)}" loading="lazy">`;
   return `<div class="${cls}" style="background:${avatarColor(name)}">${initials(name)}</div>`;
 }
 
@@ -109,7 +111,7 @@ function ratingHtml(rating) {
 }
 
 function verifiedBadge() {
-  return `<span class="badge">${icon("badge-check")}${t("common.verified")}</span>`;
+  return `<span class="badge guarantee" title="${t("guarantee.tip")}">${icon("shield-check")}${t("guarantee.badge")}</span>`;
 }
 
 function emptyState(iconName, title, text, actionHtml = "") {
@@ -192,6 +194,21 @@ function toast(message) {
   el._timer = setTimeout(() => el.classList.remove("show"), 2600);
 }
 
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    // Older browsers / insecure context: fall back to a temporary textarea.
+    const area = document.createElement("textarea");
+    area.value = text;
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+  toast(t("common.copied"));
+}
+
 function skeletons(count, height = 92) {
   return Array.from({ length: count }, () => `<div class="skeleton" style="height:${height}px"></div>`).join("");
 }
@@ -202,6 +219,51 @@ function requireLogin(next) {
   if (getToken()) return true;
   location.replace(`login.html?next=${encodeURIComponent(next)}`);
   return false;
+}
+
+// Clients have no account: each request is opened by a private link with a secret token.
+// We remember those links in this browser so "Мои заявки" can list them.
+const MY_REQUESTS_KEY = "myRequests";
+
+function myRequests() {
+  try {
+    const list = JSON.parse(localStorage.getItem(MY_REQUESTS_KEY) || "[]");
+    return Array.isArray(list) ? list.filter(r => r && typeof r.token === "string") : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function rememberRequest(token, id) {
+  const list = myRequests().filter(r => r.token !== token);
+  list.unshift({ token, id, savedAt: new Date().toISOString() });
+  localStorage.setItem(MY_REQUESTS_KEY, JSON.stringify(list.slice(0, 50)));
+}
+
+function forgetRequest(token) {
+  localStorage.setItem(MY_REQUESTS_KEY, JSON.stringify(myRequests().filter(r => r.token !== token)));
+}
+
+function requestLink(token) {
+  // A #fragment is never sent to the server, so the token stays out of logs and Referer headers.
+  return `${location.origin}${location.pathname.replace(/[^/]*$/, "")}order-detail.html#token=${encodeURIComponent(token)}`;
+}
+
+// The request token from "#token=..." (or "?token=..." if a messenger dropped the fragment).
+function tokenFromUrl() {
+  const fromHash = new URLSearchParams(location.hash.slice(1)).get("token");
+  return fromHash || new URLSearchParams(location.search).get("token");
+}
+
+// Seconds left until an ISO deadline (negative when it has passed).
+function secondsLeft(deadline) {
+  const d = new Date(deadline.endsWith("Z") || deadline.includes("+") ? deadline : deadline + "Z");
+  return Math.round((d - Date.now()) / 1000);
+}
+
+function formatCountdown(seconds) {
+  const s = Math.max(0, seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 function getToken() {
@@ -252,9 +314,9 @@ async function apiRequest(path, options = {}) {
   return res.json();
 }
 
-async function apiUpload(path, files) {
+async function apiUpload(path, files, field = "files") {
   const formData = new FormData();
-  for (const file of files) formData.append("files", file);
+  for (const file of files) formData.append(field, file);
 
   const headers = {};
   const token = getToken();
@@ -286,11 +348,21 @@ const api = {
   searchMasters: (params) => apiRequest(`/masters?${new URLSearchParams(params)}`),
   getMaster: (id) => apiRequest(`/masters/${id}`),
   masterReviews: (id) => apiRequest(`/masters/${id}/reviews`),
-  createOrder: (data) => apiRequest("/orders", { method: "POST", body: JSON.stringify(data) }),
+  // Client requests (no account; the token is the private link)
+  createRequest: (data) => apiRequest("/requests", { method: "POST", body: JSON.stringify(data) }),
+  getRequest: (token) => apiRequest(`/requests/${encodeURIComponent(token)}`),
+  acceptRequestOffer: (token, offerId) => apiRequest(`/requests/${encodeURIComponent(token)}/accept?offer_id=${encodeURIComponent(offerId)}`, { method: "POST" }),
+  completeRequest: (token) => apiRequest(`/requests/${encodeURIComponent(token)}/complete`, { method: "POST" }),
+  cancelRequest: (token) => apiRequest(`/requests/${encodeURIComponent(token)}/cancel`, { method: "POST" }),
+  reviewRequest: (token, data) => apiRequest(`/requests/${encodeURIComponent(token)}/review`, { method: "POST", body: JSON.stringify(data) }),
+  uploadRequestPhotos: (token, files) => apiUpload(`/requests/${encodeURIComponent(token)}/photos`, files),
+  requestComplaint: (token, text) => apiRequest(`/requests/${encodeURIComponent(token)}/complaint`, { method: "POST", body: JSON.stringify({ text }) }),
+  // Master side
   myOrders: () => apiRequest("/orders"),
   getOrder: (id) => apiRequest(`/orders/${id}`),
-  uploadOrderPhotos: (orderId, files) => apiUpload(`/orders/${orderId}/photos`, files),
-  deleteOrderPhoto: (orderId, photoId) => apiRequest(`/orders/${orderId}/photos/${photoId}`, { method: "DELETE" }),
+  uploadAvatar: (file) => apiUpload("/masters/me/avatar", [file], "file"),
+  deleteAvatar: () => apiRequest("/masters/me/avatar", { method: "DELETE" }),
+  acceptAgreement: () => apiRequest("/masters/me/accept-agreement", { method: "POST" }),
   uploadMyPhotos: (files) => apiUpload("/masters/me/photos", files),
   deleteMyPhoto: (id) => apiRequest(`/masters/me/photos/${id}`, { method: "DELETE" }),
   myMasterProfile: () => apiRequest("/masters/me"),
@@ -301,10 +373,8 @@ const api = {
   orderFeed: () => apiRequest("/orders/feed"),
   orderOffers: (id) => apiRequest(`/orders/${id}/offers`),
   makeOffer: (id, data) => apiRequest(`/orders/${id}/offer`, { method: "POST", body: JSON.stringify(data) }),
-  acceptOffer: (orderId, offerId) => apiRequest(`/orders/${orderId}/accept?offer_id=${encodeURIComponent(offerId)}`, { method: "POST" }),
+  declineOrder: (id) => apiRequest(`/orders/${id}/decline`, { method: "POST" }),
   setOrderStatus: (id, status) => apiRequest(`/orders/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
-  cancelOrder: (id) => apiRequest(`/orders/${id}/cancel`, { method: "POST" }),
-  leaveReview: (id, data) => apiRequest(`/orders/${id}/review`, { method: "POST", body: JSON.stringify(data) }),
   notifications: () => apiRequest("/notifications"),
   unreadCount: () => apiRequest("/notifications/unread-count"),
   readAllNotifications: () => apiRequest("/notifications/read-all", { method: "POST" }),
@@ -327,6 +397,8 @@ const api = {
   adminSetUserStatus: (id, status) => apiRequest(`/admin/users/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
   adminMasters: (params = {}) => apiRequest(`/admin/masters?${new URLSearchParams(params)}`),
   adminVerifyMaster: (id, verified) => apiRequest(`/admin/masters/${id}/verify`, { method: "PATCH", body: JSON.stringify({ verified }) }),
+  adminUnanswered: () => apiRequest("/admin/unanswered"),
+  adminViolations: () => apiRequest("/admin/violations"),
   adminOrders: (params = {}) => apiRequest(`/admin/orders?${new URLSearchParams(params)}`),
   adminComplaints: (params = {}) => apiRequest(`/admin/complaints?${new URLSearchParams(params)}`),
   adminSetComplaintStatus: (id, status) => apiRequest(`/admin/complaints/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),

@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_size_mb: int = 5
 
+    # Response promise: masters must answer a request (offer a price or decline) within this time,
+    # otherwise the miss is recorded with a fine and a rating penalty (see the master agreement).
+    response_minutes: int = 20
+    missed_request_fine: int = 200  # сом за пропущенную заявку (черновик — согласовать)
+    missed_request_rating_penalty: float = 0.1
+    # Only masters verified by the service are listed and receive requests ("гарантия сервиса").
+    masters_require_verification: bool = True
+    agreement_version: str = "2026-10"
+
     # Paid plan for masters. Off until launch: while disabled every master has full access
     # and no subscription records are created. See app/subscriptions.py.
     subscriptions_enabled: bool = False

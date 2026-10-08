@@ -79,6 +79,9 @@ class User(Base):
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus), default=UserStatus.active)
     # Tokens issued before this moment are rejected (password reset logs out other devices).
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Masters accept the service agreement at sign-up (response time, fines) — when and which version.
+    agreement_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    agreement_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     master: Mapped["Master"] = relationship(back_populates="user", uselist=False)
@@ -98,6 +101,9 @@ class Master(Base):
     rating: Mapped[float] = mapped_column(Float, default=0.0)
     completed_orders: Mapped[int] = mapped_column(Integer, default=0)
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Missed 20-minute responses: each one lowers the shown rating by a fixed step.
+    missed_requests: Mapped[int] = mapped_column(Integer, default=0)
+    rating_penalty: Mapped[float] = mapped_column(Float, default=0.0)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -139,7 +145,12 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    client_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # Clients don't register: a request carries their name and phone, and they manage it through
+    # a private link whose token is stored here only as a hash. client_id is set for old account-based orders.
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    client_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), index=True)
     master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True, index=True)
     description: Mapped[str] = mapped_column(Text)
@@ -183,7 +194,7 @@ class Review(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), unique=True)
     master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"), index=True)
-    client_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     rating: Mapped[int] = mapped_column(Integer)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -270,7 +281,8 @@ class Complaint(Base):
     __tablename__ = "complaints"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # None for complaints from clients, who have no account (sent through their request link).
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     target_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True)
     text: Mapped[str] = mapped_column(Text)
@@ -335,3 +347,21 @@ class NotificationSettings(Base):
     telegram_chat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     telegram_link_token: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class RequestDelivery(Base):
+    """A request shown to a master, and how the master answered it within the response window."""
+    __tablename__ = "request_deliveries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"), index=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    deadline_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    # pending -> offered | declined | missed | closed (the request was taken/cancelled in time)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    fine: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    order: Mapped["Order"] = relationship()
+    master: Mapped["Master"] = relationship()

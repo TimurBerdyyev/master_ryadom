@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title data-i18n="detail.docTitle">Заказ — Мастер рядом</title>
+  <meta name="robots" content="noindex" />
+  <meta name="referrer" content="no-referrer" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
@@ -23,8 +25,14 @@
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
-    const orderId = new URLSearchParams(location.search).get("id");
-    const loggedIn = requireLogin(`order-detail.html?id=${encodeURIComponent(orderId || "")}`);
+    // Two ways in: a client opens their request by its private link (#token=...), no account;
+    // the chosen master (or an admin) opens the job by id while logged in.
+    const token = tokenFromUrl();
+    const orderId = token ? null : new URLSearchParams(location.search).get("id");
+    const isClient = Boolean(token);
+    const loggedIn = isClient || requireLogin(`order-detail.html?id=${encodeURIComponent(orderId || "")}`);
+    const backHref = isClient ? "my-requests.html" : "orders.html";
+    const OPEN = ["searching", "offers_received"];
 
     const PROGRESS = [
       ["searching", t("detail.stSearch")],
@@ -45,7 +53,7 @@
       in_progress: [["completed", t("detail.workDone"), "circle-check"]],
     };
 
-    let me, order, offers, categoryName;
+    let order, offers, categoryName;
     let reviewRating = 5;
 
     function stepperHtml(status) {
@@ -61,37 +69,57 @@
       return `<div class="meta-tile">${icon(iconName)}<div><small>${label}</small><b>${value}</b></div></div>`;
     }
 
-    function contactHtml(contact, title, profileHref) {
+    function callButtons(phone) {
+      return `
+        <a class="btn small secondary" href="${esc(telLink(phone))}">${icon("phone")}${t("common.call")}</a>
+        <a class="btn small whatsapp" href="${esc(waLink(phone))}" target="_blank" rel="noopener noreferrer">${icon("message-circle")}WhatsApp</a>`;
+    }
+
+    function contactHtml(contact, title, profileHref, photo, note) {
       return `
         <div class="contact-box">
-          ${avatarHtml(contact.name)}
+          ${avatarHtml(contact.name, "avatar", photo)}
           <div style="flex:1;min-width:160px">
             <div class="muted" style="font-size:13px">${title}</div>
             <div style="font-weight:700;font-size:17px">${esc(contact.name)}</div>
             <div class="muted">${esc(contact.phone)}</div>
+            ${note ? `<div class="muted" style="font-size:13px;margin-top:4px">${note}</div>` : ""}
           </div>
           <div class="row">
             ${profileHref ? `<a class="btn small secondary" href="${profileHref}">${icon("user")}${t("common.profile")}</a>` : ""}
-            <a class="btn small secondary" href="${esc(telLink(contact.phone))}">${icon("phone")}${t("common.call")}</a>
-            <a class="btn small whatsapp" href="${esc(waLink(contact.phone))}" target="_blank" rel="noopener noreferrer">${icon("message-circle")}WhatsApp</a>
+            ${callButtons(contact.phone)}
           </div>
         </div>`;
     }
 
-    function offersHtml() {
-      const isOwner = order.client_id === me.id;
-      const canAccept = isOwner && ["searching", "offers_received"].includes(order.status);
-      if (!offers.length) {
-        return canAccept
-          ? `<div style="margin-top:16px">${emptyState("timer", t("detail.waitTitle"), t("detail.waitText"))}</div>`
-          : "";
+    // The 20-minute promise: a ring that empties while masters answer, then "we're on it".
+    function promiseHtml() {
+      if (!isClient || order.status !== "searching") return "";
+      const total = 20 * 60;
+      const left = secondsLeft(order.response_deadline);
+      if (left <= 0) {
+        return `
+          <div class="promise-box over" style="margin-top:16px">
+            <div class="promise-clock"><span>${icon("phone-call", "lg")}</span></div>
+            <div><h3>${t("detail.overdueTitle")}</h3><p>${t("detail.overdueText", { phone: esc(order.client_phone || "") })}</p></div>
+          </div>`;
       }
       return `
-        <div class="section-title">${isOwner ? `${t("detail.offersTitle")} <span class="muted" style="font-family:var(--font-text);font-weight:500">· ${offers.length}</span>` : t("detail.yourOffer")}</div>
+        <div class="promise-box" style="margin-top:16px">
+          <div class="promise-clock" id="promiseClock" style="--p:${Math.min(1, left / total)}"><span id="promiseTime">${formatCountdown(left)}</span></div>
+          <div><h3>${t("detail.waitTitle")}</h3><p>${t("detail.waitText")}</p><p class="muted" style="margin-top:6px">${t("detail.promise")}</p></div>
+        </div>`;
+    }
+
+    function offersHtml() {
+      const canAccept = isClient && OPEN.includes(order.status);
+      if (!offers.length) return "";
+      return `
+        <div class="section-title">${isClient ? `${t("detail.offersTitle")} <span class="muted" style="font-family:var(--font-text);font-weight:500">· ${offers.length}</span>` : t("detail.yourOffer")}</div>
         <div class="stack reveal">
           ${offers.map((o, i) => `
             <div class="offer-card ${o.status}">
-              ${avatarHtml(o.master.name)}
+              ${avatarHtml(o.master.name, "avatar", o.master.photo)}
               <div style="flex:1;min-width:180px">
                 <div class="row" style="gap:8px">
                   <a href="master.html?id=${o.master.id}" style="font-weight:700;font-size:16px">${esc(o.master.name)}</a>
@@ -100,6 +128,7 @@
                 </div>
                 <div class="meta">${ratingHtml(o.master.rating)}<span>${icon("briefcase")}${plural(o.master.completed_orders, "p.orders")}</span></div>
                 ${o.comment ? `<div class="comment">${esc(o.comment)}</div>` : ""}
+                ${canAccept && o.master.phone ? `<div class="row" style="margin-top:10px">${callButtons(o.master.phone)}</div>` : ""}
               </div>
               <div class="offer-side">
                 <div class="price">${formatPrice(o.price)}</div>
@@ -113,29 +142,27 @@
     }
 
     function actionsHtml() {
-      const isOwner = order.client_id === me.id;
-      const isAssigned = !isOwner && order.client_contact;
+      const isAssigned = !isClient && order.client_contact;
       const parts = [];
 
       if (isAssigned && MASTER_NEXT[order.status]) {
         parts.push(`
           <div class="card-box">
             <h2 class="form-section-title">${icon("refresh-cw")}${t("detail.updateStatus")}</h2>
-            <p class="muted" style="margin:6px 0 16px">${t("detail.clientNotified")}</p>
-            <div class="row">${MASTER_NEXT[order.status].map(([s, label, ic], i) =>
+            <div class="row" style="margin-top:16px">${MASTER_NEXT[order.status].map(([s, label, ic], i) =>
               `<button class="btn ${i ? "secondary" : ""}" onclick="setStatus('${s}')">${icon(ic)}${label}</button>`).join("")}</div>
           </div>`);
       }
 
-      if (isOwner && ["master_confirmed", "master_en_route", "in_progress"].includes(order.status)) {
+      if (isClient && ["master_confirmed", "master_en_route", "in_progress"].includes(order.status)) {
         parts.push(`
           <div class="card-box row">
             <div style="flex:1;min-width:200px"><b>${t("detail.doneQ")}</b><div class="muted">${t("detail.doneText")}</div></div>
-            <button class="btn success" onclick="setStatus('completed')">${icon("circle-check")}${t("detail.workDone")}</button>
+            <button class="btn success" onclick="complete()">${icon("circle-check")}${t("detail.workDone")}</button>
           </div>`);
       }
 
-      if (isOwner && order.status === "completed") {
+      if (isClient && order.status === "completed") {
         parts.push(`
           <form class="card" id="reviewForm" style="max-width:none" onsubmit="event.preventDefault(); sendReview();">
             <h2 class="form-section-title">${icon("thumbs-up")}${t("detail.rateTitle")}</h2>
@@ -149,25 +176,36 @@
           </form>`);
       }
 
-      const cancellable = isOwner && !["completed", "reviewed", "cancelled"].includes(order.status);
-      parts.push(`
-        <div class="row" style="justify-content:flex-end">
-          <button class="btn small ghost" onclick="toggleComplaint()">${icon("flag")}${t("detail.report")}</button>
-          ${cancellable ? `<button class="btn small secondary" onclick="cancelOrder()">${icon("circle-x")}${t("detail.cancel")}</button>` : ""}
-        </div>
-        <form class="card" id="complaintForm" hidden style="max-width:none" onsubmit="event.preventDefault(); sendComplaint();">
-          <h2 class="form-section-title">${icon("flag")}${t("detail.reportTitle")}</h2>
-          <label>${t("detail.reportLabel")}
-            <textarea id="complaintText" rows="3" maxlength="2000" required></textarea>
-          </label>
-          <div class="error" id="complaintError"></div>
-          <button class="btn danger" type="submit">${t("detail.sendReport")}</button>
-        </form>`);
+      if (isClient) {
+        const link = requestLink(token);
+        parts.push(`
+          <div class="card-box">
+            <h2 class="form-section-title">${icon("link")}${t("detail.linkTitle")}</h2>
+            <p class="muted" style="margin:6px 0 12px">${t("detail.linkText")}</p>
+            <div class="link-box">
+              <input type="text" readonly value="${esc(link)}" aria-label="${t("detail.linkTitle")}" />
+              <button class="btn secondary" type="button" data-copy="${esc(link)}">${icon("copy")}${t("common.copy")}</button>
+            </div>
+          </div>`);
+        const cancellable = !["completed", "reviewed", "cancelled"].includes(order.status);
+        parts.push(`
+          <div class="row" style="justify-content:flex-end">
+            <button class="btn small ghost" onclick="toggleComplaint()">${icon("flag")}${t("detail.report")}</button>
+            ${cancellable ? `<button class="btn small secondary" onclick="cancelRequest()">${icon("circle-x")}${t("detail.cancel")}</button>` : ""}
+          </div>
+          <form class="card" id="complaintForm" hidden style="max-width:none" onsubmit="event.preventDefault(); sendComplaint();">
+            <h2 class="form-section-title">${icon("flag")}${t("detail.reportTitle")}</h2>
+            <label>${t("detail.reportLabel")}
+              <textarea id="complaintText" rows="3" maxlength="2000" required></textarea>
+            </label>
+            <div class="error" id="complaintError"></div>
+            <button class="btn danger" type="submit">${t("detail.sendReport")}</button>
+          </form>`);
+      }
       return parts.join("");
     }
 
     function render() {
-      const isOwner = order.client_id === me.id;
       const tiles = [
         order.date ? metaTile("calendar", t("detail.when"), `${formatDate(order.date)}${order.time ? ", " + esc(order.time) : ""}`) : "",
         order.city ? metaTile("map-pin", t("common.city"), esc(cityName(order.city))) : "",
@@ -175,15 +213,16 @@
         order.price ? metaTile("wallet", order.master_id ? t("detail.price") : t("detail.budget"), formatPrice(order.price)) : "",
         metaTile("clock", t("detail.created"), formatDate(order.created_at, true)),
       ].join("");
+      const chosen = isClient && order.master_id ? offers.find(o => o.master.id === order.master_id) : null;
 
       document.getElementById("content").innerHTML = `
-        <a class="back-link" href="orders.html">${icon("arrow-left", "sm")}${isOwner ? t("nav.myOrders") : t("nav.myJobs")}</a>
+        <a class="back-link" href="${backHref}">${icon("arrow-left", "sm")}${isClient ? t("nav.myRequests") : t("nav.myJobs")}</a>
         <div class="card-box">
           <div class="row" style="gap:14px">
             ${categoryBadge(categoryName, "cat-dot lg")}
             <div style="flex:1;min-width:150px">
               <h1 style="margin:0;font-size:22px;overflow-wrap:anywhere">${esc(catName(categoryName))}</h1>
-              <div class="muted">${t("common.orderNum", { id: order.id })}</div>
+              <div class="muted">${isClient ? t("detail.reqTitle", { id: order.id }) : t("common.orderNum", { id: order.id })}</div>
             </div>
             ${statusPillHtml(order.status)}
           </div>
@@ -194,7 +233,9 @@
             `<a href="${esc(uploadUrl(p.url))}" target="_blank" rel="noopener"><img class="photo-thumb" src="${esc(uploadUrl(p.url))}" alt="${t("detail.photoAlt")}" loading="lazy" /></a>`).join("")}</div>` : ""}
         </div>
 
-        ${order.master_contact ? `<div style="margin-top:16px">${contactHtml(order.master_contact, t("detail.yourMaster"), `master.html?id=${order.master_id}`)}</div>` : ""}
+        ${promiseHtml()}
+        ${order.master_contact ? `<div style="margin-top:16px">${contactHtml(order.master_contact, t("detail.yourMaster"), `master.html?id=${order.master_id}`,
+            chosen ? chosen.master.photo : null, order.status === "master_selected" ? t("detail.callMaster") : "")}</div>` : ""}
         ${order.client_contact ? `<div style="margin-top:16px">${contactHtml(order.client_contact, t("detail.client"), null)}</div>` : ""}
 
         ${offersHtml()}
@@ -203,22 +244,27 @@
       if (document.getElementById("starInput")) setRating(reviewRating);
     }
 
+    function notFound(title) {
+      document.getElementById("content").innerHTML = emptyState(isClient ? "search-x" : "lock", esc(title), "",
+        `<a class="btn" href="${backHref}">${t("detail.toOrders")}</a>`);
+    }
+
     async function load() {
-      if (!/^\d+$/.test(orderId || "")) {
-        document.getElementById("content").innerHTML = emptyState("search-x", t("detail.notFound"), "",
-          `<a class="btn" href="orders.html">${t("detail.toOrders")}</a>`);
-        return;
-      }
       try {
-        const [user, o, cats] = await Promise.all([api.me(), api.getOrder(orderId), api.categories()]);
-        me = user;
-        order = o;
-        categoryName = cats.find(c => c.id === o.category_id)?.name || t("common.order");
-        offers = await api.orderOffers(orderId);
+        const cats = await api.categories();
+        if (isClient) {
+          order = await api.getRequest(token);
+          offers = order.offers;
+          rememberRequest(token, order.id);  // opened from a saved link on a new device
+        } else {
+          if (!/^\d+$/.test(orderId || "")) return notFound(t("detail.notFound"));
+          order = await api.getOrder(orderId);
+          offers = await api.orderOffers(orderId);
+        }
+        categoryName = cats.find(c => c.id === order.category_id)?.name || t("common.order");
         render();
       } catch (e) {
-        document.getElementById("content").innerHTML = emptyState("lock", esc(e.message), "",
-          `<a class="btn" href="orders.html">${t("detail.toOrders")}</a>`);
+        notFound(e.status === 404 && isClient ? t("myreq.gone") : e.message);
       }
     }
 
@@ -227,7 +273,7 @@
         await action();
         toast(successMessage);
         await load();
-        refreshUnread();
+        if (!isClient) refreshUnread();
       } catch (e) {
         toast(t("common.error") + e.message);
       }
@@ -235,16 +281,20 @@
 
     function accept(offerId, price) {
       if (!confirm(t("detail.confirmAccept", { price: formatPrice(price) }))) return;
-      run(() => api.acceptOffer(orderId, offerId), t("detail.chosenToast"));
+      run(() => api.acceptRequestOffer(token, offerId), t("detail.chosenToast"));
     }
 
     function setStatus(status) {
       run(() => api.setOrderStatus(orderId, status), t("detail.statusUpdated"));
     }
 
-    function cancelOrder() {
+    function complete() {
+      run(() => api.completeRequest(token), t("detail.statusUpdated"));
+    }
+
+    function cancelRequest() {
       if (!confirm(t("detail.confirmCancel"))) return;
-      run(() => api.cancelOrder(orderId), t("detail.cancelled"));
+      run(() => api.cancelRequest(token), t("detail.cancelled"));
     }
 
     function setRating(n) {
@@ -254,7 +304,7 @@
 
     async function sendReview() {
       try {
-        await api.leaveReview(orderId, { rating: reviewRating, text: document.getElementById("reviewText").value.trim() || null });
+        await api.reviewRequest(token, { rating: reviewRating, text: document.getElementById("reviewText").value.trim() || null });
         toast(t("detail.thanks"));
         load();
       } catch (e) {
@@ -269,7 +319,7 @@
 
     async function sendComplaint() {
       try {
-        await api.fileComplaint({ text: document.getElementById("complaintText").value.trim(), order_id: Number(orderId) });
+        await api.requestComplaint(token, document.getElementById("complaintText").value.trim());
         toast(t("detail.reportSent"));
         document.getElementById("complaintForm").hidden = true;
       } catch (e) {
@@ -277,7 +327,28 @@
       }
     }
 
+    document.getElementById("content").addEventListener("click", (e) => {
+      const button = e.target.closest("[data-copy]");
+      if (button) copyText(button.dataset.copy);
+    });
+
     if (loggedIn) load();
+    if (isClient) {
+      // Tick the countdown every second; fetch new offers every 15 s while the request is open
+      // (not while the client is typing a complaint).
+      setInterval(() => {
+        const time = document.getElementById("promiseTime");
+        if (!time || !order) return;
+        const left = secondsLeft(order.response_deadline);
+        if (left <= 0) return render();
+        time.textContent = formatCountdown(left);
+        document.getElementById("promiseClock").style.setProperty("--p", Math.min(1, left / 1200));
+      }, 1000);
+      setInterval(() => {
+        const typing = document.getElementById("complaintForm") && !document.getElementById("complaintForm").hidden;
+        if (order && OPEN.includes(order.status) && !document.hidden && !typing) load();
+      }, 15000);
+    }
     renderNav();
   </script>
 </body>

@@ -1,6 +1,8 @@
 # Мастер рядом — заметки для разработки
 
-Сервис поиска мастеров: клиент создаёт заказ → мастера его категории присылают цены → клиент выбирает → мастер ведёт статус → клиент оставляет отзыв.
+Сервис поиска мастеров: клиент **без регистрации** оставляет заявку (имя + телефон) → мастера его города и категории
+за 20 минут присылают цены или отказываются → клиент выбирает → мастер ведёт статус → клиент оставляет отзыв.
+Регистрируются только мастера (с принятием договора); клиенты видят мастеров и звонят им напрямую.
 
 ## Запуск и проверка
 - `./scripts/dev.sh` — API :8000 (SQLite `backend/local.db`) + сайт :8080 без кеша браузера.
@@ -15,6 +17,13 @@
 - Тесты можно прогнать на Postgres: `TEST_DATABASE_URL=postgresql://... python -m pytest`.
 - `backend/app/routers/orders.py` — весь жизненный цикл заказа: `MASTER_PROGRESS` задаёт допустимые статусы,
   контакты сторон (`client_contact`/`master_contact`) отдаются только после выбора мастера (`_order_out`).
+- `backend/app/routers/requests.py` — сторона клиента: заявка без аккаунта, доступ по секретной ссылке
+  (`#token=...`, в БД только SHA-256 токена). Защита от спама: honeypot `website`, лимиты по IP и телефону.
+- `backend/app/dispatch.py` — рассылка заявки мастерам (`RequestDelivery` с дедлайном) и обещание «20 минут»:
+  фоновая проверка раз в минуту (`main._missed_requests_loop`) фиксирует пропуск → штраф, `rating_penalty`,
+  уведомление. Рейтинг = средняя оценка − штрафные баллы (`recalc_rating`). Заявки без ответа видит админ.
+- Заявки получают только мастера, принявшие договор (`users.agreement_accepted_at`) и проверенные админом
+  (`MASTERS_REQUIRE_VERIFICATION`). Текст договора — `web/master-agreement.html` (черновик, нужен юрист).
 - `web/` — статические страницы без сборки. Общий код: `web/js/api.js` (все вызовы API + хелперы `esc`,
   `avatarHtml`, `formatPrice`, `statusPillHtml`, `toast`, `requireLogin`, `safeNext`), `web/js/nav.js` (шапка по роли).
 - Стили — один файл `web/css/style.css` на CSS-переменных (`--primary`, `--accent`, `--ink`, `--muted`, `--r-*`, `--shadow-*`).
@@ -33,7 +42,7 @@
 - Проверять вёрстку на 390px и 1280px; анимации уважают `prefers-reduced-motion`.
 
 ## Телефон, SMS, уведомления
-- Email обязателен для всех и уникален; подтверждается кодом из письма: `/auth/send-code` (purpose=register|reset|change_email)
+- Email обязателен для мастеров (клиенты не регистрируются) и уникален; подтверждается кодом из письма: `/auth/send-code` (purpose=register|reset|change_email)
   → `/auth/register` / `/auth/reset-password` / `/auth/change-email`. Вход — по телефону или email (`/auth/login`, поле `phone`).
   Смена пароля разлогинивает старые токены (`password_changed_at`). Коды — `app/verification.py`
   (10 мин, 5 неверных попыток, повтор через 60 с, 5 писем/час на адрес). Email не попадает в публичные ответы (только `/auth/me`).
@@ -44,7 +53,7 @@
   канал Telegram или SMS, меняется в профиле. Вызов: `notify(db, user_id, title, text, kind=..., **params)`
   из `app/notify.py` — in-app запись + сообщение по каналу мастера на его языке, отправка после commit в фоне.
   Шаблоны сообщений — `TEMPLATES` в `notify.py`.
-- Email мастера обязателен при регистрации (у клиентов — нет); канал `email` отправляет письма через `app/email.py`
+- Канал уведомлений `email` отправляет письма через `app/email.py`
   (`EMAIL_PROVIDER=console|smtp`, `SMTP_SECURITY=starttls|ssl|none`, TLS не отключается молча).
 - Telegram-бот — `app/telegram.py` (привязка по одноразовой ссылке `t.me/<bot>?start=<token>`),
   вебхук `/telegram/webhook` с секретом в заголовке; локально — `python -m app.telegram_poll`.
@@ -98,5 +107,5 @@ Render (самый простой): `render.yaml` + `deploy/render.Dockerfile` �
 - Телефоны нормализуются (`normalize_phone` в `schemas.py`) — сравнивать только нормализованные.
 
 ## Идеи на будущее
-Чат по заказу (таблица `messages` уже есть), аватар мастера, поиск по расстоянию на фронте (API: `sort=distance&lat&lon`),
+Чат по заказу (таблица `messages` уже есть), поиск по расстоянию на фронте (API: `sort=distance&lat&lon`),
 пагинация в админке, реальные SMS-шлюз и эквайринг, перевод описаний мастеров.

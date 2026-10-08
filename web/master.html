@@ -30,9 +30,9 @@
       const orderHref = `order.html${categoryId ? `?category_id=${categoryId}` : ""}`;
       const phoneBlock = master.user.phone
         ? `
-          <a class="btn secondary block" href="${esc(telLink(master.user.phone))}">${icon("phone")}${t("common.call")}</a>
+          <a class="btn block large" href="${esc(telLink(master.user.phone))}">${icon("phone")}${t("common.call")} · ${esc(master.user.phone)}</a>
           <a class="btn whatsapp block" href="${esc(waLink(master.user.phone))}" target="_blank" rel="noopener noreferrer">${icon("message-circle")}${t("master.whatsapp")}</a>`
-        : `<a class="btn secondary block" href="login.html?next=${encodeURIComponent("master.html?id=" + master.id)}">${icon("lock")}${t("master.loginToSee")}</a>`;
+        : "";
       return `
         <div class="card-box">
           <div class="stats-row">
@@ -41,10 +41,11 @@
             <div><b>${master.experience_years || "—"}</b><span>${t("master.statYears")}</span></div>
           </div>
           <div class="contact-actions">
-            <a class="btn accent block large" href="${orderHref}">${icon("plus")}${t("nav.createOrder")}</a>
             ${phoneBlock}
+            <a class="btn accent block" href="${orderHref}">${icon("timer")}${t("nav.createOrder")}</a>
           </div>
-          <p class="aside-note">${icon("shield-check")}<span>${t("master.note")}</span></p>
+          ${master.verified ? `<p class="aside-note guarantee-note">${icon("shield-check")}<span>${t("guarantee.tip")}</span></p>` : ""}
+          <p class="aside-note">${icon("clock")}<span>${t("master.note")}</span></p>
         </div>`;
     }
 
@@ -64,7 +65,7 @@
           <a class="back-link" href="masters.html">${icon("arrow-left", "sm")}${t("home.allMasters")}</a>
           <div class="profile-cover">
             <div class="profile-header">
-              ${avatarHtml(master.user.name)}
+              ${avatarHtml(master.user.name, "avatar", master.user.photo)}
               <div>
                 <h1>${esc(master.user.name)} ${master.verified ? verifiedBadge() : ""}</h1>
                 <div class="meta">

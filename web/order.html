@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title data-i18n="neworder.docTitle">Новый заказ — Мастер рядом</title>
+  <title data-i18n="neworder.docTitle">Оставить заявку — Мастер рядом</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="css/style.css" />
   <style>
@@ -74,13 +74,30 @@
   <main class="narrow">
     <div class="page-head">
       <div>
-        <h1 data-i18n="neworder.title">Новый заказ</h1>
-        <p class="muted" data-i18n="neworder.sub">Заявку увидят мастера выбранной категории — они предложат цену, а вы выберете лучшее предложение.</p>
+        <h1 data-i18n="neworder.title">Оставить заявку</h1>
+        <p class="muted" data-i18n="neworder.sub">Без регистрации. Мастера вашего города ответят за 20 минут — или мы сами найдём вам мастера и перезвоним.</p>
       </div>
     </div>
 
     <form class="card reveal" id="orderForm" style="max-width:none">
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="neworder.what">Что нужно сделать</span></h2>
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-user"></use></svg><span data-i18n="neworder.contacts">Ваши контакты</span></h2>
+      <div class="form-grid">
+        <label>
+          <span data-i18n="neworder.name">Как к вам обращаться</span>
+          <input id="clientName" type="text" required maxlength="100" autocomplete="name" data-i18n-ph="neworder.namePh" />
+        </label>
+        <label>
+          <span data-i18n="common.phone">Телефон</span>
+          <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-phone"></use></svg><input id="clientPhone" type="tel" required maxlength="20" autocomplete="tel" placeholder="+996 700 123 456" /></span>
+        </label>
+      </div>
+      <span class="hint" style="margin-top:-8px" data-i18n="neworder.phoneHint">Номер увидят только выбранный вами мастер и менеджер сервиса</span>
+      <!-- Honeypot: invisible to people, bots fill it in -->
+      <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden">
+        <label>Website <input id="website" type="text" tabindex="-1" autocomplete="off" /></label>
+      </div>
+
+      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="neworder.what">Что нужно сделать</span></h2>
       <div class="fieldset-title" id="catLabel" data-i18n="neworder.category">Категория</div>
       <div class="cat-picker" id="categoryPicker" role="radiogroup" aria-labelledby="catLabel"></div>
 
@@ -126,6 +143,7 @@
         <span class="hint" data-i18n="neworder.photosHint">JPEG, PNG или WebP — помогают мастеру оценить работу</span>
       </label>
 
+      <p class="hint" data-i18n="neworder.consent">Отправляя заявку, вы соглашаетесь, что мастер или менеджер сервиса может вам позвонить.</p>
       <div id="formError" class="error" role="alert"></div>
       <button class="btn accent large" type="submit" id="submitBtn"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span data-i18n="neworder.submit">Отправить заявку</span></button>
     </form>
@@ -136,18 +154,24 @@
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
-    const loggedIn = requireLogin("order.html" + location.search);
-
     const preselectCategory = new URLSearchParams(location.search).get("category_id");
     document.getElementById("date").min = new Date().toISOString().slice(0, 10);
 
-    function lastCity() {
+    function stored(key) {
       try {
-        return localStorage.getItem("lastCity") || "";
+        return localStorage.getItem(key) || "";
       } catch (e) {
         return "";
       }
     }
+
+    function lastCity() {
+      return stored("lastCity");
+    }
+
+    // Returning clients don't have to type their name and phone again.
+    document.getElementById("clientName").value = stored("clientName");
+    document.getElementById("clientPhone").value = stored("clientPhone");
 
     async function loadCities() {
       document.getElementById("city").innerHTML = await cityOptionsHtml(lastCity());
@@ -191,6 +215,9 @@
       const photoFiles = Array.from(document.getElementById("photos").files || []);
 
       const payload = {
+        name: document.getElementById("clientName").value.trim(),
+        phone: document.getElementById("clientPhone").value.trim(),
+        website: document.getElementById("website").value,
         category_id: Number(checked.value),
         city: document.getElementById("city").value,
         description: document.getElementById("description").value.trim(),
@@ -202,31 +229,33 @@
 
       button.disabled = true;
       try {
-        const order = await api.createOrder(payload);
+        const { token, request } = await api.createRequest(payload);
         try {
           localStorage.setItem("lastCity", payload.city);
+          localStorage.setItem("clientName", payload.name);
+          localStorage.setItem("clientPhone", payload.phone);
+          rememberRequest(token, request.id);
         } catch (e) {
-          /* storage unavailable */
+          /* storage unavailable — the success page still shows the link */
         }
         let photoWarning = "";
         if (photoFiles.length) {
           try {
-            await api.uploadOrderPhotos(order.id, photoFiles);
+            await api.uploadRequestPhotos(token, photoFiles);
           } catch (photoErr) {
             photoWarning = "&photo_error=1";
           }
         }
-        location.href = `order-success.html?id=${order.id}${photoWarning}`;
+        // The token goes in the #fragment: it never reaches server logs or Referer headers.
+        location.href = `order-success.html?id=${request.id}${photoWarning}#token=${encodeURIComponent(token)}`;
       } catch (e) {
         errorBox.textContent = t("neworder.sendError") + e.message;
         button.disabled = false;
       }
     });
 
-    if (loggedIn) {
-      loadCategories();
-      loadCities().catch(() => {});
-    }
+    loadCategories();
+    loadCities().catch(() => {});
     renderNav();
   </script>
 </body>

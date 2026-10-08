@@ -1,6 +1,7 @@
+import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,10 @@ from app.migrations import upgrade_database
 from app.payments import get_provider
 from app.email import get_email_provider
 from app.sms import get_sms_provider
-from app.routers import admin, auth, categories, complaints, masters, notifications, orders, reviews, subscriptions
+from app.routers import (
+    admin, auth, categories, complaints, masters, notifications, orders, requests, reviews, subscriptions,
+)
+from app.dispatch import check_missed
 from app.seed import seed_categories
 from app.subscriptions import ensure_all_masters
 
@@ -36,6 +40,24 @@ def check_production_settings() -> None:
         problems.append("SITE_URL указывает на localhost")
     if problems:
         raise RuntimeError("ENVIRONMENT=production, но настройки небезопасны:\n  - " + "\n  - ".join(problems))
+
+
+def _check_missed_once() -> None:
+    db = SessionLocal()
+    try:
+        check_missed(db)
+    finally:
+        db.close()
+
+
+async def _missed_requests_loop() -> None:
+    """Every minute: record misses for masters who didn't answer a request in time."""
+    while True:
+        try:
+            await asyncio.to_thread(_check_missed_once)
+        except Exception:
+            logger.exception("Проверка пропущенных заявок не удалась")
+        await asyncio.sleep(60)
 
 
 @asynccontextmanager
@@ -67,7 +89,11 @@ async def lifespan(_app: FastAPI):
                 logger.info("Подписки: пробный период начат для %s мастеров", started)
     finally:
         db.close()
+    checker = asyncio.create_task(_missed_requests_loop())
     yield
+    checker.cancel()
+    with suppress(asyncio.CancelledError):
+        await checker
 
 
 app = FastAPI(title="Мастер рядом API", lifespan=lifespan)
@@ -98,6 +124,7 @@ app.include_router(auth.router)
 app.include_router(categories.router)
 app.include_router(masters.router)
 app.include_router(orders.router)
+app.include_router(requests.router)
 app.include_router(reviews.router)
 app.include_router(notifications.router)
 app.include_router(notifications.telegram_router)

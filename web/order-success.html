@@ -19,8 +19,17 @@
       <h1 data-i18n="success.title">Заявка отправлена</h1>
       <p class="muted" style="font-size:16px;max-width:460px;margin:0 auto" id="successText"></p>
       <p class="error" id="photoError"></p>
+      <div class="link-card" id="linkCard" hidden>
+        <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-link"></use></svg><span data-i18n="success.linkTitle">Ваша личная ссылка на заявку</span></h2>
+        <p class="muted" data-i18n="success.linkText"></p>
+        <div class="link-box">
+          <input id="linkInput" type="text" readonly aria-label="Ссылка" />
+          <button class="btn secondary" type="button" id="copyBtn"><svg class="i" aria-hidden="true"><use href="#i-copy"></use></svg><span data-i18n="common.copy">Скопировать</span></button>
+        </div>
+        <p class="hint" data-i18n="success.privateWarn"></p>
+      </div>
       <div class="row" style="justify-content:center;margin-top:28px">
-        <a class="btn large" id="orderLink" href="orders.html"><span data-i18n="success.open">Открыть заказ</span><svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
+        <a class="btn large" id="orderLink" href="my-requests.html"><span data-i18n="success.open">Открыть заявку</span><svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
         <a class="btn secondary large" href="index.html" data-i18n="success.home">На главную</a>
       </div>
     </div>
@@ -36,7 +45,14 @@
     const validId = /^\d+$/.test(id || "");
     // id is digits-only here, so it is safe inside the translated markup
     document.getElementById("successText").innerHTML = t("success.text", { id: validId ? "#" + id : "" });
-    if (validId) document.getElementById("orderLink").href = `order-detail.html?id=${id}`;
+    const token = tokenFromUrl();
+    if (token) {
+      const link = requestLink(token);
+      document.getElementById("orderLink").href = link;
+      document.getElementById("linkInput").value = link;
+      document.getElementById("linkCard").hidden = false;
+      document.getElementById("copyBtn").addEventListener("click", () => copyText(link));
+    }
     if (params.get("photo_error")) {
       document.getElementById("photoError").textContent = t("success.photoError");
     }

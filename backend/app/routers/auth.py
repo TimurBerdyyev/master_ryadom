@@ -94,8 +94,10 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, PHONE_TAKEN)
     if _email_taken(db, data.email):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, EMAIL_TAKEN)
-    if data.role == UserRole.master and not data.city:
+    if not data.city:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Укажите город, в котором вы работаете")
+    if not data.accept_agreement:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Примите условия договора с сервисом")
     if data.notify_enabled and data.notify_channel == "sms" and get_sms_provider().is_dev:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "SMS-уведомления пока недоступны")
     check_code(db, data.email, "register", data.code)
@@ -104,8 +106,10 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         name=data.name,
         phone=data.phone,
         password_hash=hash_password(data.password),
-        role=data.role,
+        role=UserRole.master,
         email=data.email,
+        agreement_accepted_at=utcnow(),
+        agreement_version=settings.agreement_version,
     )
     db.add(user)
     try:
@@ -115,16 +119,15 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status.HTTP_400_BAD_REQUEST, PHONE_TAKEN)
 
-    if data.role == UserRole.master:
-        master = Master(user_id=user.id, city=data.city)
-        db.add(master)
-        db.flush()
-        if settings.subscriptions_enabled:
-            ensure_subscription(db, master)  # free trial starts at sign-up
-        # Notifications outside the site only with the master's explicit consent given in the form.
-        db.add(NotificationSettings(
-            user_id=user.id, enabled=data.notify_enabled, channel=data.notify_channel, lang=data.lang
-        ))
+    master = Master(user_id=user.id, city=data.city)
+    db.add(master)
+    db.flush()
+    if settings.subscriptions_enabled:
+        ensure_subscription(db, master)  # free trial starts at sign-up
+    # Notifications outside the site only with the master's explicit consent given in the form.
+    db.add(NotificationSettings(
+        user_id=user.id, enabled=data.notify_enabled, channel=data.notify_channel, lang=data.lang
+    ))
 
     db.commit()
     db.refresh(user)

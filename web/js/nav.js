@@ -61,10 +61,11 @@ async function renderNav() {
   ensureLangSwitch(nav);
   ensureNavToggle(nav);
 
+  // Clients have no account: they search, call, leave requests and come back via "Мои заявки".
   const guestNav = `
     ${navLink("masters.html", t("nav.find"), "search")}
-    ${navLink("register.html?role=master", t("nav.becomeMaster"), "briefcase")}
-    ${navLink("login.html", t("nav.login"), "user")}
+    ${navLink("my-requests.html", t("nav.myRequests"), "clipboard-list")}
+    ${navLink("login.html", t("nav.forMasters"), "briefcase")}
     <a class="btn small accent" href="${ROOT}order.html">${icon("plus")}${t("nav.createOrder")}</a>
   `;
 
@@ -82,14 +83,14 @@ async function renderNav() {
       links.push(`<span id="planLink"></span>`);
     } else {
       links.push(navLink("masters.html", t("nav.find"), "search"));
-      links.push(navLink("orders.html", t("nav.myOrders"), "clipboard-list"));
+      links.push(navLink("my-requests.html", t("nav.myRequests"), "clipboard-list"));
     }
     if (user.role === "admin") links.push(navLink("admin/index.html", t("nav.admin"), "shield-check"));
 
     nav.innerHTML = `
       ${links.join("")}
       <a class="nav-bell" href="${ROOT}notifications.html" title="${t("nav.notifications")}" aria-label="${t("nav.notifications")}">${icon("bell", "lg")}<span class="label">${t("nav.notifications")}</span><span class="count" id="unreadCount" hidden></span></a>
-      <span class="nav-user">${esc(user.name)}${avatarHtml(user.name, "avatar-xs")}</span>
+      <span class="nav-user">${esc(user.name)}${avatarHtml(user.name, "avatar-xs", user.photo)}</span>
       <a class="nav-link" href="#" onclick="logout(); return false;" title="${t("nav.logout")}">${icon("log-out")}<span class="nav-logout-label">${t("nav.logout")}</span></a>
     `;
     refreshUnread();

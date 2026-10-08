@@ -20,6 +20,7 @@
       <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg><span data-i18n="admin.tabUsers">Пользователи</span></a>
       <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="admin.tabMasters">Мастера</span></a>
       <a href="orders.html"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg><span data-i18n="admin.tabOrders">Заказы</span></a>
+      <a href="requests.html"><svg class="i" aria-hidden="true"><use href="#i-timer"></use></svg><span data-i18n="admin.tabUnanswered">Без ответа</span></a>
       <a href="complaints.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg><span data-i18n="admin.tabComplaints">Жалобы</span></a>
       <a href="subscriptions.html"><svg class="i" aria-hidden="true"><use href="#i-wallet"></use></svg><span data-i18n="admin.tabSubs">Подписки</span></a>
       <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="admin.tabCategories">Категории</span></a>
@@ -53,7 +54,7 @@
             </div>
             <div>${esc(c.text)}</div>
             <div class="muted" style="margin-top:6px">
-              ${t("admin.author", { id: c.author_id })}${c.target_user_id ? t("admin.againstUser", { id: c.target_user_id }) : ""}${c.order_id ? t("admin.inOrder", { id: c.order_id }) : ""}
+              ${c.author_id ? t("admin.author", { id: c.author_id }) : t("admin.anonymous")}${c.target_user_id ? t("admin.againstUser", { id: c.target_user_id }) : ""}${c.order_id ? t("admin.inOrder", { id: c.order_id }) : ""}
             </div>
             ${c.status === "open" ? `
               <div class="contact-actions">

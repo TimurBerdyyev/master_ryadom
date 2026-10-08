@@ -62,6 +62,14 @@ TEMPLATES = {
         "en": ("✅ The client chose your offer for order #{id}. Client contacts: {url}",
                "You were chosen for order #{id}. {url}"),
     },
+    "missed": {
+        "ru": ("⚠️ Вы не ответили на заказ #{id} вовремя. По договору — штраф {fine} сом и снижение рейтинга.\n{url}",
+               "Нет ответа на заказ #{id}: штраф {fine} сом. {url}"),
+        "ky": ("⚠️ #{id} буйрутмага убагында жооп берген жоксуз. Келишим боюнча — {fine} сом айып жана рейтинг төмөндөйт.\n{url}",
+               "#{id} буйрутмага жооп жок: {fine} сом айып. {url}"),
+        "en": ("⚠️ You didn't answer order #{id} in time. Under the agreement: a {fine} som fine and a lower rating.\n{url}",
+               "No answer to order #{id}: {fine} som fine. {url}"),
+    },
     "cancelled": {
         "ru": ("❌ Клиент отменил заказ #{id}.", "Клиент отменил заказ #{id}."),
         "ky": ("❌ Кардар #{id} буйрутманы жокко чыгарды.", "Кардар #{id} буйрутманы жокко чыгарды."),
@@ -73,6 +81,7 @@ SUBJECTS = {
                   "en": "New order #{id} — {category}"},
     "chosen": {"ru": "Вас выбрали для заказа #{id}", "ky": "Сизди #{id} буйрутмага тандашты",
                "en": "You were chosen for order #{id}"},
+    "missed": {"ru": "Пропущена заявка #{id}", "ky": "#{id} арыз өткөрүлүп жиберилди", "en": "Missed request #{id}"},
     "cancelled": {"ru": "Заказ #{id} отменён", "ky": "#{id} буйрутма жокко чыгарылды", "en": "Order #{id} was cancelled"},
 }
 UNSUBSCRIBE = {
@@ -81,7 +90,7 @@ UNSUBSCRIBE = {
     "en": "You received this email because you turned on notifications in your pro profile. Turn off: {url}",
 }
 BUDGET = {"ru": "Бюджет: {price} сом", "ky": "Бюджет: {price} сом", "en": "Budget: {price} som"}
-LINKS = {"new_order": "/feed.html", "chosen": "/order-detail.html?id={id}", "cancelled": "/orders.html"}
+LINKS = {"missed": "/master-profile-edit.html", "new_order": "/feed.html", "chosen": "/order-detail.html?id={id}", "cancelled": "/orders.html"}
 
 
 def notify(db: Session, user_id: int, title: str, text: str | None = None, kind: str | None = None, **params) -> None:
@@ -117,7 +126,8 @@ def render(kind: str, lang: str, channel: str, params: dict) -> str:
     telegram_text, sms_text = TEMPLATES[kind][lang]
     # Email gets the full text, like Telegram; SMS stays short.
     template = sms_text if channel == "sms" else telegram_text
-    text = template.format(id=params.get("id", ""), category=category, description=description, budget=budget, url=url)
+    text = template.format(id=params.get("id", ""), category=category, description=description, budget=budget, url=url,
+                           fine=params.get("fine", ""))
     return "\n".join(line for line in text.split("\n") if line.strip())
 
 

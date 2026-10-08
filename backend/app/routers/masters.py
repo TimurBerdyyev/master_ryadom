@@ -5,9 +5,10 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user, get_current_user_optional
+from app.config import settings
 from app.database import get_db
-from app.models import Category, Master, Photo, Service, User, UserRole, UserStatus
-from app.schemas import MasterOut, MasterProfileUpdate, PhotoOut, ServiceCreate, ServiceOut
+from app.models import Category, Master, Photo, Service, User, UserRole, UserStatus, utcnow
+from app.schemas import MasterMeOut, MasterOut, MasterProfileUpdate, PhotoOut, ServiceCreate, ServiceOut
 from app.subscriptions import filter_masters_with_access
 from app.uploads import delete_upload, save_upload
 
@@ -35,10 +36,10 @@ MASTER_LOAD_OPTIONS = (selectinload(Master.user), selectinload(Master.services),
 MAX_PAGE_SIZE = 100
 
 
-def mask_phone(masters_out: list[MasterOut]) -> list[MasterOut]:
-    for m in masters_out:
-        m.user.phone = None
-    return masters_out
+def _me_out(master: Master) -> MasterMeOut:
+    out = MasterMeOut.model_validate(master)
+    out.agreement_accepted = master.user.agreement_accepted_at is not None
+    return out
 
 
 @router.get("", response_model=list[MasterOut])
@@ -63,6 +64,8 @@ def search_masters(
         .filter(User.status == UserStatus.active)
     )
     query = filter_masters_with_access(query)
+    if settings.masters_require_verification:
+        query = query.filter(Master.verified.is_(True))  # "гарантия сервиса": only verified masters are listed
     if category_id is not None:
         # .any() instead of a join: a master with several services in one category must appear once
         query = query.filter(Master.services.any(Service.category_id == category_id))
@@ -98,18 +101,53 @@ def search_masters(
             query = query.order_by(Master.rating.desc(), Master.completed_orders.desc(), Master.id)
         masters = query.offset(offset).limit(limit).all()
 
-    result = [MasterOut.model_validate(m) for m in masters]
-    if current_user is None:
-        result = mask_phone(result)
-    return result
+    # Phones are public: clients call masters without registering.
+    return [MasterOut.model_validate(m) for m in masters]
 
 
-@router.get("/me", response_model=MasterOut)
+@router.get("/me", response_model=MasterMeOut)
 def get_my_master_profile(master: Master = Depends(require_master)):
-    return master
+    return _me_out(master)
 
 
-@router.patch("/me", response_model=MasterOut)
+@router.post("/me/accept-agreement", response_model=MasterMeOut)
+def accept_agreement(master: Master = Depends(require_master), db: Session = Depends(get_db)):
+    """For masters registered before the agreement existed (new masters accept it at sign-up)."""
+    master.user.agreement_accepted_at = utcnow()
+    master.user.agreement_version = settings.agreement_version
+    db.commit()
+    db.refresh(master)
+    return _me_out(master)
+
+
+@router.post("/me/avatar", response_model=MasterMeOut)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    master: Master = Depends(require_master),
+    db: Session = Depends(get_db),
+):
+    """The master's own photo, shown on their card and profile instead of initials."""
+    url = await save_upload(file, f"avatars/{master.id}")
+    old = master.user.photo
+    master.user.photo = url
+    db.commit()
+    if old:
+        delete_upload(old)
+    db.refresh(master)
+    return _me_out(master)
+
+
+@router.delete("/me/avatar", response_model=MasterMeOut)
+def delete_avatar(master: Master = Depends(require_master), db: Session = Depends(get_db)):
+    if master.user.photo:
+        delete_upload(master.user.photo)
+        master.user.photo = None
+        db.commit()
+    db.refresh(master)
+    return _me_out(master)
+
+
+@router.patch("/me", response_model=MasterMeOut)
 def update_my_master_profile(
     data: MasterProfileUpdate,
     master: Master = Depends(require_master),
@@ -119,7 +157,7 @@ def update_my_master_profile(
         setattr(master, field, value)
     db.commit()
     db.refresh(master)
-    return master
+    return _me_out(master)
 
 
 @router.post("/me/services", response_model=ServiceOut)
@@ -198,8 +236,10 @@ def get_master(
     master = db.query(Master).options(*MASTER_LOAD_OPTIONS).filter(Master.id == master_id).first()
     if not master or master.user.status != UserStatus.active:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Мастер не найден")
-
-    result = MasterOut.model_validate(master)
-    if current_user is None:
-        result.user.phone = None
-    return result
+    # Not yet verified: only the master themselves ("how clients see me") and admins can open it.
+    is_self_or_admin = current_user is not None and (
+        current_user.id == master.user_id or current_user.role == UserRole.admin
+    )
+    if settings.masters_require_verification and not master.verified and not is_self_or_admin:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Мастер не найден")
+    return MasterOut.model_validate(master)

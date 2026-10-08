@@ -20,6 +20,7 @@
       <a href="users.html"><svg class="i" aria-hidden="true"><use href="#i-users"></use></svg><span data-i18n="admin.tabUsers">Пользователи</span></a>
       <a href="masters.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="admin.tabMasters">Мастера</span></a>
       <a href="orders.html" class="active"><svg class="i" aria-hidden="true"><use href="#i-clipboard-list"></use></svg><span data-i18n="admin.tabOrders">Заказы</span></a>
+      <a href="requests.html"><svg class="i" aria-hidden="true"><use href="#i-timer"></use></svg><span data-i18n="admin.tabUnanswered">Без ответа</span></a>
       <a href="complaints.html"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg><span data-i18n="admin.tabComplaints">Жалобы</span></a>
       <a href="subscriptions.html"><svg class="i" aria-hidden="true"><use href="#i-wallet"></use></svg><span data-i18n="admin.tabSubs">Подписки</span></a>
       <a href="categories.html"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="admin.tabCategories">Категории</span></a>
@@ -64,12 +65,13 @@
         content.innerHTML = `
           <div class="table-wrap"><table class="admin-table">
             <thead>
-              <tr><th>#</th><th>${t("admin.description")}</th><th>${t("common.city")}</th><th>${t("common.address")}</th><th>${t("detail.price")}</th><th>${t("admin.photo")}</th><th>${t("admin.status")}</th><th>${t("detail.created")}</th></tr>
+              <tr><th>#</th><th>${t("admin.client")}</th><th>${t("admin.description")}</th><th>${t("common.city")}</th><th>${t("common.address")}</th><th>${t("detail.price")}</th><th>${t("admin.photo")}</th><th>${t("admin.status")}</th><th>${t("detail.created")}</th></tr>
             </thead>
             <tbody>
               ${orders.map(o => `
                 <tr>
                   <td>${o.id}</td>
+                  <td>${o.client_contact ? `${esc(o.client_contact.name)}<br><a class="link" href="${esc(telLink(o.client_contact.phone))}">${esc(o.client_contact.phone)}</a>` : "—"}</td>
                   <td>${esc(o.description.slice(0, 60))}</td>
                   <td>${o.city ? esc(cityName(o.city)) : "—"}</td>
                   <td>${o.address ? esc(o.address) : "—"}</td>

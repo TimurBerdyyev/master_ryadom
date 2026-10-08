@@ -48,6 +48,10 @@ def public_config():
         subscriptions_enabled=settings.subscriptions_enabled,
         subscription_trial_days=settings.subscription_trial_days,
         subscription_price=settings.subscription_price,
+        response_minutes=settings.response_minutes,
+        missed_request_fine=settings.missed_request_fine,
+        missed_request_rating_penalty=settings.missed_request_rating_penalty,
+        agreement_version=settings.agreement_version,
     )
 
 

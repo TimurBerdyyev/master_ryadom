@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n="reg.agreementTitle">Договор с сервисом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <!--
+    ЧЕРНОВИК. Текст договора составлен как основа и должен быть проверен юристом до запуска
+    (форма договора, порядок оплаты штрафов, реквизиты сервиса). Цифры (20 минут, штраф, снижение
+    рейтинга) подставляются из настроек сервера: RESPONSE_MINUTES, MISSED_REQUEST_FINE,
+    MISSED_REQUEST_RATING_PENALTY, AGREEMENT_VERSION.
+  -->
+  <main class="narrow">
+    <article class="card-box doc reveal">
+      <!-- Русский -->
+      <section data-doc-lang="ru">
+        <h1>Договор мастера с сервисом «Мастер рядом»</h1>
+        <p class="muted">Редакция <span data-term="version">2026-10</span>. Принимается при регистрации мастера отметкой «Я принимаю договор».</p>
+
+        <h2>1. Предмет</h2>
+        <ol>
+          <li>Сервис «Мастер рядом» (далее — Сервис) показывает профиль мастера клиентам и передаёт мастеру заявки клиентов из его города и категорий услуг.</li>
+          <li>Мастер оказывает услуги клиентам самостоятельно, сам договаривается с клиентом о цене и сроках и отвечает за качество работы.</li>
+        </ol>
+
+        <h2>2. Проверка и «Гарантия сервиса»</h2>
+        <ol>
+          <li>Мастер указывает достоверные имя, телефон, email, город, услуги и загружает своё настоящее фото.</li>
+          <li>Сервис вправе проверить мастера: связаться с ним, запросить документ, удостоверяющий личность, подтверждение опыта.</li>
+          <li>Пока проверка не пройдена, профиль не показывается клиентам и заявки не приходят. После проверки профиль получает знак «Гарантия сервиса».</li>
+        </ol>
+
+        <h2>3. Ответ на заявку в течение <span data-term="minutes">20</span> минут</h2>
+        <ol>
+          <li>Получив заявку, мастер обязуется в течение <b><span data-term="minutes">20</span> минут</b> ответить на неё в личном кабинете: предложить цену или нажать «Не могу».</li>
+          <li>Отказ («Не могу») нарушением не является.</li>
+          <li>Если клиент выбрал другого мастера или отменил заявку до истечения срока, ответ не требуется.</li>
+        </ol>
+
+        <h2>4. Ответственность</h2>
+        <ol>
+          <li>За каждую заявку, оставленную без ответа в срок, мастеру начисляется <b>штраф <span data-term="fine">200</span> сом</b> и рейтинг снижается на <b><span data-term="penalty">0,1</span></b>.</li>
+          <li>О каждом нарушении мастер получает уведомление. Сведения о пропущенных заявках видны в профиле мастера.</li>
+          <li>При систематических нарушениях, обмане клиентов или обоснованных жалобах Сервис вправе снять знак «Гарантия сервиса», приостановить или заблокировать профиль.</li>
+          <li>Порядок и сроки оплаты штрафов сообщает Сервис; неоплаченный штраф может быть основанием для приостановки получения заявок.</li>
+        </ol>
+
+        <h2>5. Работа с клиентами</h2>
+        <ol>
+          <li>Мастер называет честную цену, приезжает в согласованное время, вежлив с клиентом.</li>
+          <li>Контакты и адрес клиента мастер использует только для выполнения заказа и не передаёт третьим лицам.</li>
+          <li>Отзывы клиентов публикуются после выполненной работы; Сервис рассматривает жалобы клиентов и может связаться с мастером для разбирательства.</li>
+        </ol>
+
+        <h2>6. Срок действия и изменения</h2>
+        <ol>
+          <li>Договор действует с момента его принятия при регистрации и до удаления профиля мастера.</li>
+          <li>Сервис может изменять условия, заранее уведомив мастера; продолжение работы с заявками означает согласие с новой редакцией.</li>
+        </ol>
+      </section>
+
+      <!-- Кыргызча -->
+      <section data-doc-lang="ky" hidden>
+        <h1>Устанын «Мастер рядом» кызматы менен келишими</h1>
+        <p class="muted">Редакциясы <span data-term="version">2026-10</span>. Уста катталып жатканда «Келишимди кабыл алам» белгиси менен кабыл алынат.</p>
+
+        <h2>1. Келишимдин предмети</h2>
+        <ol>
+          <li>«Мастер рядом» кызматы (мындан ары — Кызмат) устанын профилин кардарларга көрсөтөт жана устага анын шаарындагы жана кызмат категорияларындагы кардарлардын арыздарын жөнөтөт.</li>
+          <li>Уста кардарларга кызматты өз алдынча көрсөтөт, баа жана мөөнөт боюнча кардар менен өзү макулдашат жана иштин сапаты үчүн жооп берет.</li>
+        </ol>
+
+        <h2>2. Текшерүү жана «Кызмат кепилдиги»</h2>
+        <ol>
+          <li>Уста чыныгы атын, телефонун, email'ин, шаарын, кызматтарын көрсөтөт жана өзүнүн чыныгы сүрөтүн жүктөйт.</li>
+          <li>Кызмат устаны текшерүүгө укуктуу: аны менен байланышып, инсандыгын күбөлөндүргөн документти, тажрыйбасын тастыктоону сурай алат.</li>
+          <li>Текшерүүдөн өтмөйүнчө профиль кардарларга көрсөтүлбөйт жана арыздар келбейт. Текшерүүдөн кийин профилге «Кызмат кепилдиги» белгиси коюлат.</li>
+        </ol>
+
+        <h2>3. Арызга <span data-term="minutes">20</span> мүнөттүн ичинде жооп берүү</h2>
+        <ol>
+          <li>Арыз келгенде уста <b><span data-term="minutes">20</span> мүнөттүн ичинде</b> жеке кабинетте жооп берүүгө милдеттенет: баа сунуштайт же «Ала албайм» баскычын басат.</li>
+          <li>Баш тартуу («Ала албайм») бузуу болуп эсептелбейт.</li>
+          <li>Эгер мөөнөт бүтө электе кардар башка устаны тандаса же арызды жокко чыгарса, жооп талап кылынбайт.</li>
+        </ol>
+
+        <h2>4. Жоопкерчилик</h2>
+        <ol>
+          <li>Мөөнөтүндө жооп берилбеген ар бир арыз үчүн устага <b><span data-term="fine">200</span> сом айып</b> салынат жана рейтинги <b><span data-term="penalty">0,1</span></b> төмөндөйт.</li>
+          <li>Ар бир бузуу тууралуу уста билдирүү алат. Өткөрүлгөн арыздар жөнүндө маалымат устанын профилинде көрүнөт.</li>
+          <li>Системалуу бузуулар, кардарларды алдоо же негиздүү даттануулар болсо, Кызмат «Кызмат кепилдиги» белгисин алып салууга, профилди убактылуу токтотууга же бөгөттөөгө укуктуу.</li>
+          <li>Айыптарды төлөөнүн тартибин жана мөөнөтүн Кызмат билдирет; төлөнбөгөн айып арыздарды алууну токтотууга негиз боло алат.</li>
+        </ol>
+
+        <h2>5. Кардарлар менен иштөө</h2>
+        <ol>
+          <li>Уста адилет баа айтат, макулдашылган убакта келет, кардар менен сылык мамиле кылат.</li>
+          <li>Кардардын байланыштарын жана дарегин уста буйрутманы аткаруу үчүн гана колдонот жана үчүнчү жактарга бербейт.</li>
+          <li>Кардарлардын пикирлери иш аткарылгандан кийин жарыяланат; Кызмат кардарлардын даттанууларын карайт жана маселени чечүү үчүн уста менен байланыша алат.</li>
+        </ol>
+
+        <h2>6. Мөөнөтү жана өзгөртүүлөр</h2>
+        <ol>
+          <li>Келишим каттоо учурунда кабыл алынган учурдан тартып устанын профили өчүрүлгөнгө чейин күчүндө болот.</li>
+          <li>Кызмат устага алдын ала билдирип, шарттарды өзгөртө алат; арыздар менен иштөөнү улантуу жаңы редакцияга макулдукту билдирет.</li>
+        </ol>
+      </section>
+
+      <!-- English -->
+      <section data-doc-lang="en" hidden>
+        <h1>Agreement between a pro and the «Мастер рядом» service</h1>
+        <p class="muted">Version <span data-term="version">2026-10</span>. Accepted at sign-up by ticking “I accept the agreement”.</p>
+
+        <h2>1. Subject</h2>
+        <ol>
+          <li>The «Мастер рядом» service (the Service) shows the pro's profile to clients and passes the pro client requests from their city and service categories.</li>
+          <li>The pro provides services to clients independently, agrees the price and timing with the client directly and is responsible for the quality of the work.</li>
+        </ol>
+
+        <h2>2. Vetting and the “Service guarantee”</h2>
+        <ol>
+          <li>The pro gives their real name, phone, email, city and services and uploads a real photo of themselves.</li>
+          <li>The Service may vet the pro: contact them and ask for an identity document and proof of experience.</li>
+          <li>Until vetted, the profile is not shown to clients and no requests are sent. Once vetted, the profile gets the “Service guarantee” badge.</li>
+        </ol>
+
+        <h2>3. Answering a request within <span data-term="minutes">20</span> minutes</h2>
+        <ol>
+          <li>On receiving a request, the pro undertakes to answer it in their account <b>within <span data-term="minutes">20</span> minutes</b>: offer a price or tap “Pass”.</li>
+          <li>Passing on a request is not a violation.</li>
+          <li>No answer is required if the client chose another pro or cancelled the request before the deadline.</li>
+        </ol>
+
+        <h2>4. Liability</h2>
+        <ol>
+          <li>For every request left unanswered in time the pro is charged a <b><span data-term="fine">200</span> som fine</b> and their rating goes down by <b><span data-term="penalty">0.1</span></b>.</li>
+          <li>The pro is notified of every violation. Missed requests are shown in the pro's profile.</li>
+          <li>For repeated violations, misleading clients or justified complaints, the Service may remove the “Service guarantee” badge, suspend or block the profile.</li>
+          <li>The Service announces how and when fines are paid; an unpaid fine may suspend the delivery of requests.</li>
+        </ol>
+
+        <h2>5. Working with clients</h2>
+        <ol>
+          <li>The pro quotes fair prices, arrives at the agreed time and is polite to the client.</li>
+          <li>The pro uses the client's contacts and address only to do the job and does not pass them on to anyone.</li>
+          <li>Client reviews are published after the work is done; the Service handles client complaints and may contact the pro about them.</li>
+        </ol>
+
+        <h2>6. Term and changes</h2>
+        <ol>
+          <li>The agreement applies from its acceptance at sign-up until the pro's profile is deleted.</li>
+          <li>The Service may change the terms with prior notice to the pro; continuing to work with requests means accepting the new version.</li>
+        </ol>
+      </section>
+
+      <div class="row" style="margin-top:24px">
+        <a class="btn" href="register.html"><svg class="i" aria-hidden="true"><use href="#i-briefcase"></use></svg><span data-i18n="nav.becomeMaster">Стать мастером</span></a>
+      </div>
+    </article>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    document.querySelectorAll("[data-doc-lang]").forEach(section => { section.hidden = section.dataset.docLang !== LANG; });
+
+    // The exact terms come from the server settings, so the text always matches what is enforced.
+    api.publicConfig().then(cfg => {
+      const penalty = Number(cfg.missed_request_rating_penalty).toLocaleString(LANG === "en" ? "en-GB" : "ru-RU");
+      const terms = { minutes: cfg.response_minutes, fine: cfg.missed_request_fine, penalty, version: cfg.agreement_version };
+      document.querySelectorAll("[data-term]").forEach(el => {
+        const value = terms[el.dataset.term];
+        if (value !== undefined && value !== "") el.textContent = value;
+      });
+    }).catch(() => {});
+    renderNav();
+  </script>
+</body>
+</html>

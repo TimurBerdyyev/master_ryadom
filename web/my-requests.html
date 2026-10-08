@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n="myreq.docTitle">Мои заявки — Мастер рядом</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="narrow">
+    <div class="page-head">
+      <div>
+        <h1 data-i18n="nav.myRequests">Мои заявки</h1>
+        <p class="muted" data-i18n="myreq.sub">Заявки, отправленные с этого устройства. На другом телефоне откройте заявку по её ссылке.</p>
+      </div>
+      <a class="btn accent" href="order.html"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="nav.createOrder">Оставить заявку</span></a>
+    </div>
+
+    <div id="list" class="stack"></div>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    let categories = {};
+
+    function countdownHtml(r) {
+      if (r.status !== "searching") return "";
+      const left = secondsLeft(r.response_deadline);
+      return left > 0
+        ? `<span class="countdown${left < 300 ? " urgent" : ""}">${icon("timer")}${t("detail.timeLeft", { time: formatCountdown(left) })}</span>`
+        : `<span class="countdown over">${icon("phone-call")}${t("detail.overdueTitle")}</span>`;
+    }
+
+    function cardHtml(saved, r) {
+      const link = requestLink(saved.token);
+      if (!r) {
+        return `
+          <div class="order-card req-card">
+            <div class="body"><div class="desc">${t("myreq.gone")}</div></div>
+            <button class="btn small secondary remove" type="button" data-forget="${esc(saved.token)}">${icon("trash-2")}${t("myreq.forget")}</button>
+          </div>`;
+      }
+      const cat = categories[r.category_id] || "";
+      const offers = r.offers.length;
+      const action = r.status === "offers_received" ? `<span class="btn small accent">${t("orders.chooseMaster")} ${icon("arrow-right")}</span>`
+        : r.status === "completed" ? `<span class="btn small">${t("orders.leaveReview")} ${icon("arrow-right")}</span>` : "";
+      return `
+        <a class="order-card" href="${esc(link)}">
+          <div class="top">
+            <span class="title">${categoryBadge(cat)}${esc(cat ? catName(cat) : t("common.order"))}</span>
+            <span class="num">#${r.id}</span>
+            <span class="spacer"></span>
+            ${statusPillHtml(r.status)}
+          </div>
+          <div class="desc">${esc(r.description.length > 180 ? r.description.slice(0, 180) + "…" : r.description)}</div>
+          <div class="foot">
+            ${r.city ? `<span>${icon("map-pin")}${esc(cityName(r.city))}</span>` : ""}
+            <span>${icon("calendar")}${formatDate(r.created_at)}</span>
+            ${offers ? `<span>${icon("hand-coins")}<b>${plural(offers, "p.offers")}</b></span>` : ""}
+            ${r.master_contact ? `<span>${icon("briefcase")}${esc(r.master_contact.name)}</span>` : ""}
+            <span class="spacer"></span>
+            ${countdownHtml(r)}
+            ${action}
+          </div>
+        </a>`;
+    }
+
+    async function load() {
+      const list = document.getElementById("list");
+      const saved = myRequests();
+      if (!saved.length) {
+        list.innerHTML = emptyState("clipboard-list", t("myreq.emptyTitle"), t("myreq.emptyText"),
+          `<a class="btn accent" href="order.html">${icon("plus")}${t("nav.createOrder")}</a>`);
+        return;
+      }
+      list.innerHTML = skeletons(Math.min(saved.length, 3), 150);
+      try {
+        categories = Object.fromEntries((await api.categories()).map(c => [c.id, c.name]));
+      } catch (e) {
+        /* cards just show "Заказ" */
+      }
+      const results = await Promise.all(saved.map(s => api.getRequest(s.token).catch(e => (e.status === 404 ? null : e))));
+      if (results.every(r => r instanceof Error)) {
+        list.innerHTML = emptyState("triangle-alert", t("orders.loadError"), esc(results[0].message));
+        return;
+      }
+      list.classList.add("reveal");
+      list.innerHTML = saved.map((s, i) => (results[i] instanceof Error ? "" : cardHtml(s, results[i]))).join("");
+    }
+
+    document.getElementById("list").addEventListener("click", (e) => {
+      const button = e.target.closest("[data-forget]");
+      if (!button) return;
+      forgetRequest(button.dataset.forget);
+      load();
+    });
+
+    load();
+    setInterval(() => { if (!document.hidden) load(); }, 60000);
+    renderNav();
+  </script>
+</body>
+</html>

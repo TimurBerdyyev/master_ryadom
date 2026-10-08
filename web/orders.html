@@ -103,6 +103,11 @@
       try {
         const [me, list, cats] = await Promise.all([api.me(), api.myOrders(), api.categories()]);
         isMaster = me.role === "master";
+        if (!isMaster) {
+          // Clients' requests live behind private links now.
+          location.replace("my-requests.html");
+          return;
+        }
         orders = list;
         categories = Object.fromEntries(cats.map(c => [c.id, c.name]));
         document.getElementById("title").textContent = isMaster ? t("nav.myJobs") : t("nav.myOrders");

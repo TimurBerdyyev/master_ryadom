@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title data-i18n="home.docTitle">Мастер рядом — найдите специалиста рядом с вами</title>
-  <meta name="description" content="Сантехники, электрики, ремонт и уборка рядом с вами. Опишите задачу — мастера сами предложат цену." />
+  <title data-i18n="home.docTitle">Мастер рядом — предложения мастеров за 20 минут</title>
+  <meta name="description" content="Проверенные сантехники, электрики, ремонт и уборка рядом с вами. Без регистрации: предложения мастеров за 20 минут — или мы сами найдём вам мастера." />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,9 +19,15 @@
   <main>
     <section class="hero">
       <div class="reveal">
-        <span class="hero-pill"><span class="dot"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg></span><span data-i18n="home.pill">Проверенные мастера в вашем городе</span></span>
-        <h1 data-i18n-html="home.h1">Мастер рядом —<br /><span class="hl">быстро и по честной цене</span></h1>
-        <p class="lead" data-i18n="home.lead">Опишите задачу за минуту. Мастера сами предложат цену, а вы выберете лучшего по рейтингу и отзывам.</p>
+        <span class="hero-pill"><span class="dot"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg></span><span data-i18n="home.pill">Гарантия сервиса: каждый мастер проверен</span></span>
+        <h1 data-i18n-html="home.h1">Предложения мастеров<br /><span class="hl">за 20 минут</span></h1>
+        <p class="lead" data-i18n="home.lead">…или мы сами найдём вам мастера. Без регистрации: оставьте заявку или позвоните мастеру напрямую.</p>
+
+        <div class="hero-actions">
+          <a class="btn accent large" href="order.html"><svg class="i" aria-hidden="true"><use href="#i-timer"></use></svg><span data-i18n="home.ctaRequest">Оставить заявку</span></a>
+          <span class="hero-note"><svg class="i" aria-hidden="true"><use href="#i-circle-check"></use></svg><span data-i18n="home.ctaFree">Бесплатно и без регистрации</span></span>
+        </div>
+        <p class="hero-or" data-i18n="home.orSearch">Или найдите мастера и позвоните сами</p>
 
         <form class="hero-search" role="search" onsubmit="event.preventDefault(); goSearch();">
           <svg class="i lg" aria-hidden="true"><use href="#i-search"></use></svg>
@@ -59,17 +65,17 @@
           <div class="price" data-i18n="home.mockPrice2">1 100 сом</div>
         </div>
         <div class="mock mock-toast">
-          <span class="tick"><svg class="i"><use href="#i-check"></use></svg></span>
-          <span data-i18n="home.mockToast">2 новых предложения</span>
+          <span class="tick"><svg class="i"><use href="#i-timer"></use></svg></span>
+          <span><span data-i18n="home.mockToast">2 новых предложения</span><small data-i18n="home.mockTimer">Ответ за 4 мин</small></span>
         </div>
       </div>
     </section>
 
     <div class="trust reveal">
-      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-badge-check"></use></svg></span><div><span data-i18n="home.trust1">Проверенные мастера</span><small data-i18n="home.trust1s">Отметка «Проверен» от модератора</small></div></div>
-      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-hand-coins"></use></svg></span><div><span data-i18n="home.trust2">Цена заранее</span><small data-i18n="home.trust2s">До того, как мастер выедет</small></div></div>
+      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-shield-check"></use></svg></span><div><span data-i18n="home.trust1">Гарантия сервиса</span><small data-i18n="home.trust1s">Проверяем мастеров и заключаем договор</small></div></div>
+      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-timer"></use></svg></span><div><span data-i18n="home.trust2">Ответ за 20 минут</span><small data-i18n="home.trust2s">Или мы сами найдём мастера</small></div></div>
       <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-star"></use></svg></span><div><span data-i18n="home.trust3">Честные отзывы</span><small data-i18n="home.trust3s">Только после выполненного заказа</small></div></div>
-      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-phone"></use></svg></span><div><span data-i18n="home.trust4">Связь напрямую</span><small data-i18n="home.trust4s">Звонок или WhatsApp</small></div></div>
+      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-phone"></use></svg></span><div><span data-i18n="home.trust4">Без регистрации</span><small data-i18n="home.trust4s">Звонок или WhatsApp напрямую</small></div></div>
     </div>
 
     <section class="section">
@@ -91,10 +97,28 @@
         </div>
       </div>
       <div class="steps">
-        <div class="step"><h3 data-i18n="home.step1">Опишите задачу</h3><p data-i18n="home.step1s">Расскажите, что случилось, приложите фото и удобное время.</p></div>
-        <div class="step"><h3 data-i18n="home.step2">Получите предложения</h3><p data-i18n="home.step2s">Мастера вашей категории пришлют свои цены и сроки.</p></div>
-        <div class="step"><h3 data-i18n="home.step3">Выберите мастера</h3><p data-i18n="home.step3s">Сравните цену, рейтинг и отзывы — и получите его номер.</p></div>
+        <div class="step"><h3 data-i18n="home.step1">Опишите задачу</h3><p data-i18n="home.step1s">Имя, телефон и что случилось — регистрация не нужна.</p></div>
+        <div class="step"><h3 data-i18n="home.step2">Получите предложения</h3><p data-i18n="home.step2s">Мастера отвечают в течение 20 минут — так прописано в договоре с ними.</p></div>
+        <div class="step"><h3 data-i18n="home.step3">Выберите мастера</h3><p data-i18n="home.step3s">Сравните цену, рейтинг и отзывы — и позвоните выбранному мастеру.</p></div>
         <div class="step"><h3 data-i18n="home.step4">Оцените работу</h3><p data-i18n="home.step4s">Ваш отзыв помогает другим клиентам и честным мастерам.</p></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="guarantee">
+        <div class="guarantee-head">
+          <span class="guarantee-seal"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg></span>
+          <div>
+            <h2 data-i18n="home.gTitle">Гарантия «Мастер рядом»</h2>
+            <p data-i18n="home.gSub">Мы отвечаем за мастеров, которых показываем</p>
+          </div>
+        </div>
+        <div class="guarantee-grid">
+          <div class="g-item"><span class="ico"><svg class="i" aria-hidden="true"><use href="#i-badge-check"></use></svg></span><h3 data-i18n="home.g1">Проверены сервисом</h3><p data-i18n="home.g1s">Знакомимся с каждым мастером, проверяем документы и опыт. Без проверки мастер не появится в поиске.</p></div>
+          <div class="g-item"><span class="ico"><svg class="i" aria-hidden="true"><use href="#i-handshake"></use></svg></span><h3 data-i18n="home.g2">Договор с каждым мастером</h3><p data-i18n="home.g2s">Мастер обязуется ответить на заявку за 20 минут. Не ответил — штраф и снижение рейтинга.</p></div>
+          <div class="g-item"><span class="ico"><svg class="i" aria-hidden="true"><use href="#i-phone-call"></use></svg></span><h3 data-i18n="home.g3">Не ответили — найдём сами</h3><p data-i18n="home.g3s">Если за 20 минут нет предложений, менеджер сервиса сам подберёт мастера и позвонит вам.</p></div>
+          <div class="g-item"><span class="ico"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg></span><h3 data-i18n="home.g4">Жалобы — под контролем</h3><p data-i18n="home.g4s">Пожалуйтесь по ссылке на заявку — мы разберёмся и примем меры к мастеру.</p></div>
+        </div>
       </div>
     </section>
 
@@ -111,10 +135,10 @@
 
     <div class="cta-band">
       <div>
-        <h2 data-i18n="home.ctaTitle">Вы мастер? Получайте заказы рядом с домом</h2>
-        <p data-i18n="home.ctaText">Создайте профиль, добавьте услуги и цены — клиенты из вашего города увидят вас в поиске.</p>
+        <h2 data-i18n="home.ctaTitle">Вы мастер? Получайте заявки рядом с домом</h2>
+        <p data-i18n="home.ctaText">Зарегистрируйтесь, примите договор и пройдите проверку — клиенты вашего города увидят вас со знаком «Гарантия сервиса».</p>
       </div>
-      <a class="btn secondary large" href="register.html?role=master"><span data-i18n="nav.becomeMaster">Стать мастером</span> <svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
+      <a class="btn secondary large" href="register.html"><span data-i18n="nav.becomeMaster">Стать мастером</span> <svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
     </div>
   </main>
 
@@ -128,15 +152,15 @@
         <h4 data-i18n="footer.clients">Клиентам</h4>
         <ul>
           <li><a href="masters.html" data-i18n="nav.find">Найти мастера</a></li>
-          <li><a href="order.html" data-i18n="nav.createOrder">Создать заказ</a></li>
-          <li><a href="orders.html" data-i18n="nav.myOrders">Мои заказы</a></li>
+          <li><a href="order.html" data-i18n="nav.createOrder">Оставить заявку</a></li>
+          <li><a href="my-requests.html" data-i18n="nav.myRequests">Мои заявки</a></li>
         </ul>
       </div>
       <div>
         <h4 data-i18n="footer.masters">Мастерам</h4>
         <ul>
-          <li><a href="register.html?role=master" data-i18n="nav.becomeMaster">Стать мастером</a></li>
-          <li><a href="feed.html" data-i18n="nav.feed">Новые заказы</a></li>
+          <li><a href="register.html" data-i18n="nav.becomeMaster">Стать мастером</a></li>
+          <li><a href="master-agreement.html" data-i18n="reg.agreementTitle">Договор с сервисом</a></li>
           <li><a href="login.html" data-i18n="nav.login">Войти</a></li>
         </ul>
       </div>
@@ -176,7 +200,7 @@
           return `
             <a class="top-master" href="master.html?id=${m.id}">
               <div class="head">
-                ${avatarHtml(m.user.name)}
+                ${avatarHtml(m.user.name, "avatar", m.user.photo)}
                 <div>
                   <div class="name">${esc(m.user.name)}</div>
                   <div class="meta">${ratingHtml(m.rating)}<span>${plural(m.completed_orders, "p.orders")}</span></div>

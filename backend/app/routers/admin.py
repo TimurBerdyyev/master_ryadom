@@ -16,7 +16,12 @@ from app.models import (
     UserRole,
     UserStatus,
 )
+from app.dispatch import unanswered_requests
+from app.models import RequestDelivery
+from app.routers.orders import _client_contact
 from app.schemas import (
+    AdminUnansweredOut,
+    AdminViolationOut,
     AdminStats,
     AdminUserOut,
     CategoryCreate,
@@ -114,10 +119,50 @@ def verify_master(master_id: int, data: MasterVerifyUpdate, db: Session = Depend
 
 @router.get("/orders", response_model=list[OrderOut])
 def list_orders(status_: OrderStatus | None = Query(None, alias="status"), db: Session = Depends(get_db)):
-    query = db.query(Order).options(selectinload(Order.photos))
+    query = db.query(Order).options(selectinload(Order.photos), selectinload(Order.client))
     if status_ is not None:
         query = query.filter(Order.status == status_)
-    return query.order_by(Order.created_at.desc()).all()
+    result = []
+    for order in query.order_by(Order.created_at.desc()).all():
+        out = OrderOut.model_validate(order)
+        out.client_contact = _client_contact(order)
+        result.append(out)
+    return result
+
+
+@router.get("/unanswered", response_model=list[AdminUnansweredOut])
+def list_unanswered(db: Session = Depends(get_db)):
+    """Requests no master answered in time — the service finds a master and calls the client itself."""
+    result = []
+    for order in unanswered_requests(db):
+        contact = _client_contact(order)
+        result.append(AdminUnansweredOut(
+            id=order.id, category_id=order.category_id, city=order.city, description=order.description,
+            client_name=contact.name if contact else None, client_phone=contact.phone if contact else None,
+            created_at=order.created_at,
+            masters_notified=db.query(RequestDelivery).filter(RequestDelivery.order_id == order.id).count(),
+        ))
+    return result
+
+
+@router.get("/violations", response_model=list[AdminViolationOut])
+def list_violations(db: Session = Depends(get_db)):
+    """Missed 20-minute responses with their fines (as set in the master agreement)."""
+    misses = (
+        db.query(RequestDelivery)
+        .options(selectinload(RequestDelivery.master).selectinload(Master.user))
+        .filter(RequestDelivery.status == "missed")
+        .order_by(RequestDelivery.deadline_at.desc())
+        .limit(500)
+        .all()
+    )
+    return [
+        AdminViolationOut(
+            id=d.id, order_id=d.order_id, master_id=d.master_id, master_name=d.master.user.name,
+            master_phone=d.master.user.phone, deadline_at=d.deadline_at, fine=float(d.fine or 0),
+        )
+        for d in misses
+    ]
 
 
 @router.get("/reviews", response_model=list[ReviewOut])

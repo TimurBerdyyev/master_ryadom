@@ -98,11 +98,12 @@
       const prices = m.services.map(s => s.price_from);
       const minPrice = prices.length ? Math.min(...prices) : null;
       const tags = [...new Set(m.services.map(s => s.title))].slice(0, 4);
+      // The whole card opens the profile (stretched link); the call buttons sit above it.
       return `
-        <a class="master-card" href="master.html?id=${m.id}">
-          ${avatarHtml(m.user.name)}
+        <div class="master-card">
+          ${avatarHtml(m.user.name, "avatar", m.user.photo)}
           <div>
-            <div class="name">${esc(m.user.name)} ${m.verified ? verifiedBadge() : ""}</div>
+            <div class="name"><a class="stretched" href="master.html?id=${m.id}">${esc(m.user.name)}</a> ${m.verified ? verifiedBadge() : ""}</div>
             <div class="meta">
               ${ratingHtml(m.rating)}
               <span>${icon("briefcase")}${plural(m.completed_orders, "p.orders")}</span>
@@ -114,9 +115,13 @@
           </div>
           <div class="side">
             ${minPrice !== null ? `<div class="price-from">${priceFromHtml(minPrice)}</div>` : "<span></span>"}
-            <span class="btn small secondary">${t("common.profile")} ${icon("arrow-right")}</span>
+            ${m.user.phone ? `
+              <div class="card-calls">
+                <a class="btn small secondary" href="${esc(telLink(m.user.phone))}">${icon("phone")}${t("common.call")}</a>
+                <a class="btn small whatsapp icon-only" href="${esc(waLink(m.user.phone))}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">${icon("message-circle")}</a>
+              </div>` : `<span class="btn small secondary">${t("common.profile")} ${icon("arrow-right")}</span>`}
           </div>
-        </a>`;
+        </div>`;
     }
 
     async function loadMasters() {

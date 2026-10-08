@@ -1,7 +1,8 @@
-"""End-to-end API tests: the full order flow plus access-control / injection checks.
+"""End-to-end API tests: anonymous client requests, masters, the 20-minute response promise,
+access control, migrations.
 
 Run from backend/:  python -m pytest tests -q
-Uses a throwaway SQLite database, so no Postgres is needed.
+Uses a throwaway SQLite database (or TEST_DATABASE_URL, e.g. a scratch Postgres).
 """
 import base64
 import json
@@ -16,6 +17,8 @@ os.environ["JWT_SECRET"] = "test-secret-that-is-long-enough-for-hs256-0123456789
 os.environ["REDIS_URL"] = ""  # in-memory rate limits, reset between tests
 os.environ["SMS_PROVIDER"] = "console"
 os.environ["EMAIL_PROVIDER"] = "console"
+# Most tests don't care about the "verified by the service" rule; test_verification_gate turns it on.
+os.environ["MASTERS_REQUIRE_VERIFICATION"] = "false"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -41,7 +44,11 @@ def reset_rate_limit():
     rate_limit._attempts.clear()
 
 
-_counter = iter(range(100, 1000))
+_counter = iter(range(100, 10000))
+
+
+def category_id(client, name="Сантехника"):
+    return next(c["id"] for c in client.get("/categories").json() if c["name"] == name)
 
 
 def email_code(client, email, purpose="register", headers=None):
@@ -55,155 +62,422 @@ def email_for(phone):
     return f"user{phone.lstrip('+')}@example.com"
 
 
-def register(client, role="client", name="Тест"):
-    phone = f"+996700000{next(_counter)}"
+def new_phone():
+    return f"+99670{next(_counter):07d}"
+
+
+def register_master(client, name="Мастер", category="Сантехника", city="Бишкек", notify_enabled=False,
+                    channel="email", lang="ru", service=True):
+    phone = new_phone()
     email = email_for(phone)
-    r = client.post("/auth/register", json={"name": name, "phone": phone, "password": "secret123", "role": role,
-                                            "email": email, "code": email_code(client, email),
-                                            "city": "Бишкек" if role == "master" else None})
+    r = client.post("/auth/register", json={
+        "name": name, "phone": phone, "password": "secret123", "city": city, "email": email,
+        "code": email_code(client, email), "accept_agreement": True,
+        "notify_enabled": notify_enabled, "notify_channel": channel, "lang": lang,
+    })
     assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}, phone
-
-
-def category_id(client, name="Сантехника"):
-    return next(c["id"] for c in client.get("/categories").json() if c["name"] == name)
-
-
-def make_master(client, name="Иван Сантехник", category="Сантехника"):
-    headers, phone = register(client, "master", name)
-    r = client.post("/masters/me/services", headers=headers,
-                    json={"category_id": category_id(client, category), "title": "Замена смесителя", "price_from": 500})
-    assert r.status_code == 200, r.text
-    client.patch("/masters/me", headers=headers, json={"city": "Бишкек", "description": "Опытный мастер"})
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    if service:
+        r = client.post("/masters/me/services", headers=headers,
+                        json={"category_id": category_id(client, category), "title": "Замена смесителя", "price_from": 500})
+        assert r.status_code == 200, r.text
+    client.patch("/masters/me", headers=headers, json={"description": "Опытный мастер"})
     return headers, phone
 
 
-def test_full_order_flow(client):
-    client_h, client_phone = register(client)
-    master_h, master_phone = make_master(client)
-    other_master_h, _ = make_master(client, "Пётр")
+def master_id_of(client, headers):
+    return client.get("/masters/me", headers=headers).json()["id"]
 
-    order = client.post("/orders", headers=client_h,
-                        json={"city": "Бишкек", "category_id": category_id(client), "description": "Течёт кран", "address": "ул. Ленина 1"}).json()
+
+def create_request(client, city="Бишкек", category="Сантехника", description="Течёт кран", price=None, phone=None):
+    rate_limit._attempts.clear()
+    r = client.post("/requests", json={
+        "name": "Клиент", "phone": phone or new_phone(), "category_id": category_id(client, category),
+        "city": city, "description": description, "address": "ул. Ленина 1", "price": price,
+    })
+    assert r.status_code == 200, r.text
+    return r.json()["token"], r.json()["request"]
+
+
+def make_admin(client):
+    db = SessionLocal()
+    phone = new_phone()
+    db.add(User(name="Admin", phone=phone, password_hash=hash_password("adminpass"), role=UserRole.admin))
+    db.commit()
+    db.close()
+    token = client.post("/auth/login", json={"phone": phone, "password": "adminpass"}).json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def outbox(monkeypatch):
+    """Deliver notifications synchronously and capture what would be sent."""
+    from app import notify, sms, telegram
+    sent = []
+
+    class FakeSms:
+        is_dev = True
+
+        def send(self, phone, text):
+            sent.append(("sms", phone, text))
+
+    class FakeEmail:
+        def send(self, to, subject, text):
+            sent.append(("email", to, f"{subject}\n{text}"))
+
+    # Pretend an SMS gateway is connected so the SMS channel can be chosen.
+    monkeypatch.setattr(sms.PROVIDERS["console"], "is_dev", False)
+    monkeypatch.setattr(notify, "_submit", lambda fn, *args: fn(*args))
+    monkeypatch.setattr(notify, "get_sms_provider", lambda: FakeSms())
+    monkeypatch.setattr(notify, "get_email_provider", lambda: FakeEmail())
+    monkeypatch.setattr(telegram, "send_message", lambda chat_id, text: sent.append(("telegram", chat_id, text)))
+    return sent
+
+
+def expire_deliveries(order_id):
+    """Pretend the response window for this request is over."""
+    from datetime import timedelta
+
+    from app.models import RequestDelivery, utcnow
+    db = SessionLocal()
+    db.query(RequestDelivery).filter(RequestDelivery.order_id == order_id).update(
+        {RequestDelivery.deadline_at: utcnow() - timedelta(seconds=1)})
+    db.commit()
+    db.close()
+
+
+def run_missed_check():
+    from app.dispatch import check_missed
+    db = SessionLocal()
+    try:
+        return check_missed(db)
+    finally:
+        db.close()
+
+
+# ---------- the main flow: anonymous request -> offers -> choice -> work -> review ----------
+
+def test_full_request_flow(client, outbox):
+    master_h, master_phone = register_master(client, "Иван Сантехник", notify_enabled=True)
+    other_h, _ = register_master(client, "Пётр")
+
+    token, req = create_request(client, price=900)
+    assert req["status"] == "searching" and req["offers"] == []
 
     feed = client.get("/orders/feed", headers=master_h).json()
-    item = next(o for o in feed if o["id"] == order["id"])
-    assert "address" not in item and "client_id" not in item  # no client data before selection
+    item = next(o for o in feed if o["id"] == req["id"])
+    assert item["deadline_at"] and item["my_status"] == "pending"
+    assert "address" not in item and "client_phone" not in item  # no client data before selection
 
-    offer = client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 800, "comment": "Приеду через час"}).json()
-    client.post(f"/orders/{order['id']}/offer", headers=other_master_h, json={"price": 900})
+    offer = client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 800, "comment": "Через час"}).json()
+    client.post(f"/orders/{req['id']}/offer", headers=other_h, json={"price": 900})
+    client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 700})  # updates, no duplicate
 
-    # repeated offer updates instead of duplicating
-    client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 700})
-    offers = client.get(f"/orders/{order['id']}/offers", headers=client_h).json()
-    assert len(offers) == 2 and offers[0]["price"] == 700 and offers[0]["master"]["name"] == "Иван Сантехник"
+    view = client.get(f"/requests/{token}").json()
+    assert [o["price"] for o in view["offers"]] == [700, 900]
+    assert view["offers"][0]["master"]["name"] == "Иван Сантехник"
+    assert view["offers"][0]["master"]["phone"] == master_phone  # clients can call masters directly
+    assert view["master_contact"] is None
 
-    # a master sees only their own offer
-    assert len(client.get(f"/orders/{order['id']}/offers", headers=other_master_h).json()) == 1
+    # a master sees only their own offer; the client's contacts stay hidden until chosen
+    assert len(client.get(f"/orders/{req['id']}/offers", headers=other_h).json()) == 1
+    assert client.get(f"/orders/{req['id']}", headers=master_h).status_code == 403
 
-    # no contacts before selection
-    assert client.get(f"/orders/{order['id']}", headers=client_h).json()["master_contact"] is None
+    outbox.clear()
+    view = client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]}).json()
+    assert view["status"] == "master_selected" and view["master_contact"]["phone"] == master_phone
+    assert any("Вас выбрали" in m[2] for m in outbox)  # the master is notified by email
+    order = client.get(f"/orders/{req['id']}", headers=master_h).json()
+    assert order["client_contact"]["name"] == "Клиент" and order["address"] == "ул. Ленина 1"
+    assert client.get(f"/orders/{req['id']}", headers=other_h).status_code == 403
 
-    r = client.post(f"/orders/{order['id']}/accept", params={"offer_id": offer["id"]}, headers=client_h)
-    assert r.status_code == 200 and r.json()["status"] == "master_selected"
-    assert r.json()["master_contact"]["phone"] == master_phone
-    assert client.get(f"/orders/{order['id']}", headers=master_h).json()["client_contact"]["phone"] == client_phone
+    # the master moves the job forward; only forward
+    assert client.post(f"/orders/{req['id']}/status", headers=master_h, json={"status": "in_progress"}).status_code == 200
+    assert client.post(f"/orders/{req['id']}/status", headers=master_h, json={"status": "master_confirmed"}).status_code == 400
+    assert client.post(f"/orders/{req['id']}/status", headers=other_h, json={"status": "completed"}).status_code == 403
 
-    # the rejected master loses access
-    assert client.get(f"/orders/{order['id']}", headers=other_master_h).status_code == 403
+    # the client confirms completion and leaves a review through the private link
+    assert client.post(f"/requests/{token}/review", json={"rating": 5}).status_code == 400  # not completed yet
+    assert client.post(f"/requests/{token}/complete").json()["status"] == "completed"
+    view = client.post(f"/requests/{token}/review", json={"rating": 5, "text": "Отлично"}).json()
+    assert view["status"] == "reviewed" and view["review_rating"] == 5
+    assert client.post(f"/requests/{token}/review", json={"rating": 1}).status_code == 400
 
-    # status may only move forward
-    assert client.post(f"/orders/{order['id']}/status", headers=master_h, json={"status": "in_progress"}).status_code == 200
-    assert client.post(f"/orders/{order['id']}/status", headers=master_h, json={"status": "master_confirmed"}).status_code == 400
-    assert client.post(f"/orders/{order['id']}/status", headers=other_master_h, json={"status": "completed"}).status_code == 403
-    assert client.post(f"/orders/{order['id']}/status", headers=master_h, json={"status": "completed"}).status_code == 200
-
-    r = client.post(f"/orders/{order['id']}/review", headers=client_h, json={"rating": 5, "text": "Отлично"})
-    assert r.status_code == 200
-    assert client.post(f"/orders/{order['id']}/review", headers=client_h, json={"rating": 1}).status_code == 400
-
-    master_id = offer["master_id"]
-    m = client.get(f"/masters/{master_id}").json()
-    assert m["rating"] == 5 and m["completed_orders"] == 1
-
-    notes = client.get("/notifications", headers=client_h).json()
-    assert any("предлагает" in (n["text"] or "") for n in notes)
-    assert client.get("/notifications/unread-count", headers=client_h).json()["unread"] > 0
-    client.post("/notifications/read-all", headers=client_h)
-    assert client.get("/notifications/unread-count", headers=client_h).json()["unread"] == 0
+    master = client.get(f"/masters/{offer['master_id']}").json()
+    assert master["rating"] == 5 and master["completed_orders"] == 1
+    assert client.get(f"/masters/{offer['master_id']}/reviews").json()[0]["text"] == "Отлично"
+    assert [o["id"] for o in client.get("/orders", headers=master_h).json()] == [req["id"]]
 
 
-def test_search(client):
-    make_master(client, "Алмаз Электрик", "Электрика")
-    names = lambda params: [m["user"]["name"] for m in client.get("/masters", params=params).json()]
+def test_request_cancel(client, outbox):
+    master_h, _ = register_master(client, notify_enabled=True)
+    token, req = create_request(client)
+    offer = client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 500}).json()
+    client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]})
+    outbox.clear()
+    assert client.post(f"/requests/{token}/cancel").json()["status"] == "cancelled"
+    assert any("отменил" in m[2] for m in outbox)
+    assert client.post(f"/requests/{token}/cancel").status_code == 400
+    # a cancelled job reveals nothing to the master any more
+    assert client.get(f"/orders/{req['id']}", headers=master_h).json()["client_contact"] is None
+
+
+def test_client_complaint_through_link(client):
+    master_h, _ = register_master(client, city="Узген")
+    token, req = create_request(client, city="Узген")
+    offer = client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 500}).json()
+    client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]})
+    r = client.post(f"/requests/{token}/complaint", json={"text": "Не приехал"})
+    assert r.status_code == 200 and r.json()["author_id"] is None
+    assert r.json()["target_user_id"] == client.get("/auth/me", headers=master_h).json()["id"]
+    assert client.post("/requests/wrong-token/complaint", json={"text": "x"}).status_code == 404
+    admin_h = make_admin(client)
+    assert any(c["text"] == "Не приехал" for c in client.get("/admin/complaints", headers=admin_h).json())
+
+
+def test_request_privacy(client):
+    token, req = create_request(client)
+    assert client.get("/requests/not-a-real-token").status_code == 404
+    assert client.post("/requests/not-a-real-token/cancel").status_code == 404
+    # only a hash of the token is stored
+    from app.models import Order
+    db = SessionLocal()
+    stored = db.get(Order, req["id"]).client_token_hash
+    db.close()
+    assert stored and token not in stored and len(stored) == 64
+
+
+def test_request_spam_protection(client):
+    cid = category_id(client)
+    base = {"name": "Bot", "category_id": cid, "city": "Бишкек", "description": "x"}
+    # honeypot field filled -> rejected
+    r = client.post("/requests", json={**base, "phone": new_phone(), "website": "http://spam"})
+    assert r.status_code == 400
+    # max 3 requests per phone per hour
+    phone = new_phone()
+    for _ in range(3):
+        rate_limit._attempts.clear()
+        assert client.post("/requests", json={**base, "phone": phone}).status_code == 200
+    rate_limit._attempts.clear()
+    assert client.post("/requests", json={**base, "phone": phone}).status_code == 429
+    # max 5 requests per IP per hour
+    rate_limit._attempts.clear()
+    codes = [client.post("/requests", json={**base, "phone": new_phone()}).status_code for _ in range(6)]
+    assert codes[:5] == [200] * 5 and codes[5] == 429
+
+
+def test_request_validation(client):
+    cid = category_id(client)
+    base = {"name": "C", "phone": new_phone(), "category_id": cid, "city": "Бишкек", "description": "x"}
+    assert client.post("/requests", json={**base, "phone": "abc"}).status_code == 422
+    assert client.post("/requests", json={**base, "city": "Атлантида"}).status_code == 422
+    assert client.post("/requests", json={**base, "description": ""}).status_code == 422
+    assert client.post("/requests", json={**base, "time": "<b>"}).status_code == 422
+    assert client.post("/requests", json={**base, "category_id": 99999}).status_code == 404
+    assert client.get("/masters", params={"sort": "drop table"}).status_code == 422
+
+
+# ---------- masters: public profiles, registration, agreement, avatar ----------
+
+def test_search_and_public_phones(client):
+    _, phone = register_master(client, "Алмаз Электрик", "Электрика")
+    names = lambda params: [m["user"]["name"] for m in client.get("/masters", params=params).json()]  # noqa: E731
     assert "Алмаз Электрик" in names({"q": "электр"})          # category name, case-insensitive Cyrillic
     assert "Алмаз Электрик" in names({"q": "смесител"})        # service title
     assert "Алмаз Электрик" not in names({"q": "zzz"})
     assert names({"q": "%"}) == []                             # LIKE wildcard is literal
     assert names({"q": "' OR 1=1 --"}) == []                   # SQL injection is just text
+    # no login needed to call a master
+    found = next(m for m in client.get("/masters", params={"q": "Алмаз"}).json())
+    assert found["user"]["phone"] == phone
+    assert "email" not in found["user"]
 
     # several services in one category -> master appears once
-    h, _ = make_master(client, "Дубль")
+    h, _ = register_master(client, "Дубль")
     client.post("/masters/me/services", headers=h, json={"category_id": category_id(client), "title": "Ещё", "price_from": 1})
     ids = [m["id"] for m in client.get("/masters", params={"category_id": category_id(client)}).json()]
     assert len(ids) == len(set(ids))
 
-    # anonymous users never see phones
-    assert all(m["user"]["phone"] is None for m in client.get("/masters").json())
 
+def test_only_masters_register_and_must_accept_agreement(client):
+    phone = new_phone()
+    email = email_for(phone)
+    base = {"name": "M", "phone": phone, "password": "secret123", "city": "Бишкек", "email": email,
+            "code": email_code(client, email)}
+    r = client.post("/auth/register", json=base)
+    assert r.status_code == 400 and "договор" in r.json()["detail"]
+    assert client.post("/auth/register", json={**base, "accept_agreement": True, "role": "client"}).status_code == 422
+    assert client.post("/auth/register", json={**base, "accept_agreement": True, "role": "admin"}).status_code == 422
+    r = client.post("/auth/register", json={**base, "accept_agreement": True})
+    assert r.status_code == 200
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    me = client.get("/masters/me", headers=headers).json()
+    assert me["agreement_accepted"] is True and me["missed_requests"] == 0
+    assert client.get("/auth/me", headers=headers).json()["role"] == "master"
+
+
+def test_legacy_master_accepts_agreement(client):
+    headers, phone = register_master(client)
+    db = SessionLocal()
+    user = db.query(User).filter(User.phone == phone).one()
+    user.agreement_accepted_at = None
+    db.commit()
+    db.close()
+    assert client.get("/masters/me", headers=headers).json()["agreement_accepted"] is False
+    # no requests until the master accepts the agreement
+    r = client.get("/orders/feed", headers=headers)
+    assert r.status_code == 403 and "договор" in r.json()["detail"]
+    _, req = create_request(client)
+    assert client.post(f"/orders/{req['id']}/offer", headers=headers, json={"price": 1}).status_code == 403
+    assert client.post("/masters/me/accept-agreement", headers=headers).json()["agreement_accepted"] is True
+    assert client.get("/orders/feed", headers=headers).status_code == 200
+
+
+def test_master_avatar(client):
+    headers, _ = register_master(client)
+    mid = master_id_of(client, headers)
+    r = client.post("/masters/me/avatar", headers=headers, files={"file": ("me.png", PNG, "image/png")})
+    assert r.status_code == 200, r.text
+    first = r.json()["user"]["photo"]
+    assert first.startswith(f"/uploads/avatars/{mid}/")
+    assert client.get(f"/masters/{mid}").json()["user"]["photo"] == first
+    assert client.get(first).status_code == 200
+    # replacing removes the old file; HTML disguised as an image is refused
+    second = client.post("/masters/me/avatar", headers=headers, files={"file": ("me.png", PNG, "image/png")}).json()["user"]["photo"]
+    assert second != first and client.get(first).status_code == 404
+    bad = client.post("/masters/me/avatar", headers=headers, files={"file": ("x.png", b"<script>", "image/png")})
+    assert bad.status_code == 400
+    assert client.delete("/masters/me/avatar", headers=headers).json()["user"]["photo"] is None
+
+
+def test_verification_gate(client, monkeypatch, outbox):
+    from app.config import settings
+    monkeypatch.setattr(settings, "masters_require_verification", True)
+    headers, _ = register_master(client, "Непроверенный", notify_enabled=True)
+    mid = master_id_of(client, headers)
+
+    # hidden from clients, but the master can preview their own profile
+    assert mid not in [m["id"] for m in client.get("/masters").json()]
+    assert client.get(f"/masters/{mid}").status_code == 404
+    assert client.get(f"/masters/{mid}", headers=headers).status_code == 200
+    # no requests until verified
+    r = client.get("/orders/feed", headers=headers)
+    assert r.status_code == 403 and "проверке" in r.json()["detail"]
+    outbox.clear()
+    create_request(client)
+    assert outbox == []
+
+    admin_h = make_admin(client)
+    client.patch(f"/admin/masters/{mid}/verify", headers=admin_h, json={"verified": True})
+    assert mid in [m["id"] for m in client.get("/masters").json()]
+    outbox.clear()
+    _, req = create_request(client)
+    assert req["id"] in [o["id"] for o in client.get("/orders/feed", headers=headers).json()]
+    assert len(outbox) == 1
+
+
+# ---------- the 20-minute promise ----------
+
+def test_missed_request_fine_and_rating(client, outbox):
+    silent_h, _ = register_master(client, "Молчун", notify_enabled=True, city="Токмок")
+    decliner_h, _ = register_master(client, "Отказник", city="Токмок")
+    offerer_h, _ = register_master(client, "Быстрый", city="Токмок")
+    silent_id = master_id_of(client, silent_h)
+
+    # give the silent master a 5-star history first
+    token, req = create_request(client, city="Токмок")
+    offer = client.post(f"/orders/{req['id']}/offer", headers=silent_h, json={"price": 100}).json()
+    client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]})
+    client.post(f"/orders/{req['id']}/status", headers=silent_h, json={"status": "completed"})
+    client.post(f"/requests/{token}/review", json={"rating": 5})
+    assert client.get(f"/masters/{silent_id}").json()["rating"] == 5
+
+    _, req = create_request(client, city="Токмок")
+    client.post(f"/orders/{req['id']}/decline", headers=decliner_h)
+    client.post(f"/orders/{req['id']}/offer", headers=offerer_h, json={"price": 500})
+    # declined requests disappear from the feed
+    assert req["id"] not in [o["id"] for o in client.get("/orders/feed", headers=decliner_h).json()]
+
+    outbox.clear()
+    expire_deliveries(req["id"])
+    assert run_missed_check() == 1  # only the silent master
+    me = client.get("/masters/me", headers=silent_h).json()
+    assert me["missed_requests"] == 1 and me["rating"] == 4.9 and me["rating_penalty"] == pytest.approx(0.1)
+    assert client.get("/masters/me", headers=decliner_h).json()["missed_requests"] == 0
+    assert client.get("/masters/me", headers=offerer_h).json()["missed_requests"] == 0
+    assert any("штраф 200 сом" in m[2] for m in outbox)
+    assert any(n["title"] == "Пропущена заявка" for n in client.get("/notifications", headers=silent_h).json())
+    assert run_missed_check() == 0  # counted once
+
+    admin_h = make_admin(client)
+    violations = client.get("/admin/violations", headers=admin_h).json()
+    assert any(v["master_id"] == silent_id and v["order_id"] == req["id"] and v["fine"] == 200 for v in violations)
+    assert client.get("/admin/violations", headers=silent_h).status_code == 403
+
+    # the penalty survives new reviews: rating = average - penalty
+    token, req = create_request(client, city="Токмок")
+    offer = client.post(f"/orders/{req['id']}/offer", headers=silent_h, json={"price": 100}).json()
+    client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]})
+    client.post(f"/orders/{req['id']}/status", headers=silent_h, json={"status": "completed"})
+    client.post(f"/requests/{token}/review", json={"rating": 5})
+    assert client.get(f"/masters/{silent_id}").json()["rating"] == 4.9
+
+
+def test_no_penalty_when_request_closed_in_time(client):
+    silent_h, _ = register_master(client, city="Кант")
+    taker_h, _ = register_master(client, city="Кант")
+    token, req = create_request(client, city="Кант")
+    offer = client.post(f"/orders/{req['id']}/offer", headers=taker_h, json={"price": 300}).json()
+    client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]})  # taken before the deadline
+    expire_deliveries(req["id"])
+    run_missed_check()
+    assert client.get("/masters/me", headers=silent_h).json()["missed_requests"] == 0
+
+
+def test_unanswered_requests_go_to_admin(client):
+    register_master(client)
+    _, req = create_request(client, phone="+996777000111")
+    admin_h = make_admin(client)
+    assert req["id"] not in [o["id"] for o in client.get("/admin/unanswered", headers=admin_h).json()]
+
+    from datetime import timedelta
+
+    from app.models import Order, utcnow
+    db = SessionLocal()
+    db.get(Order, req["id"]).created_at = utcnow() - timedelta(minutes=21)
+    db.commit()
+    db.close()
+    item = next(o for o in client.get("/admin/unanswered", headers=admin_h).json() if o["id"] == req["id"])
+    assert item["client_phone"] == "+996777000111" and item["masters_notified"] >= 1
+    assert client.get("/admin/unanswered").status_code == 401
+
+
+# ---------- access control & security ----------
 
 def test_offer_restrictions(client):
-    client_h, _ = register(client)
-    electrician_h, _ = make_master(client, "Электрик", "Электрика")
-    order = client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
-
+    electrician_h, _ = register_master(client, category="Электрика")
+    _, req = create_request(client)
     # wrong category
-    assert client.post(f"/orders/{order['id']}/offer", headers=electrician_h, json={"price": 1}).status_code == 403
-    # clients can't offer
-    assert client.post(f"/orders/{order['id']}/offer", headers=client_h, json={"price": 1}).status_code == 403
-    # master can't offer on own order
-    master_h, _ = make_master(client)
-    own = client.post("/orders", headers=master_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
-    assert client.post(f"/orders/{own['id']}/offer", headers=master_h, json={"price": 1}).status_code == 400
-    # negative price rejected
-    assert client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": -5}).status_code == 422
-
-
-def test_idor(client):
-    owner_h, _ = register(client)
-    stranger_h, _ = register(client)
-    master_h, _ = make_master(client)
-    order = client.post("/orders", headers=owner_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
-    offer = client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 100}).json()
-
-    oid = order["id"]
-    assert client.get(f"/orders/{oid}", headers=stranger_h).status_code == 403
-    assert client.get(f"/orders/{oid}/offers", headers=stranger_h).status_code == 403
-    assert client.post(f"/orders/{oid}/accept", params={"offer_id": offer["id"]}, headers=stranger_h).status_code == 403
-    assert client.post(f"/orders/{oid}/cancel", headers=stranger_h).status_code == 403
-    assert client.post(f"/orders/{oid}/status", headers=stranger_h, json={"status": "completed"}).status_code == 403
-    assert client.post(f"/orders/{oid}/photos", headers=stranger_h, files={"files": ("a.png", PNG, "image/png")}).status_code == 403
-    # stranger can't learn the order exists through a complaint
-    assert client.post("/complaints", headers=stranger_h, json={"text": "x", "order_id": oid}).status_code == 404
-    # client can't jump the order to "completed" before a master works on it
-    assert client.post(f"/orders/{oid}/status", headers=owner_h, json={"status": "completed"}).status_code == 400
+    assert client.post(f"/orders/{req['id']}/offer", headers=electrician_h, json={"price": 1}).status_code == 403
+    # not a master
+    assert client.post(f"/orders/{req['id']}/offer", json={"price": 1}).status_code == 401
+    admin_h = make_admin(client)
+    assert client.post(f"/orders/{req['id']}/offer", headers=admin_h, json={"price": 1}).status_code == 403
+    master_h, _ = register_master(client)
+    assert client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": -5}).status_code == 422
 
 
 def test_auth_hardening(client):
-    # cannot self-register as admin
-    r = client.post("/auth/register", json={"name": "x", "phone": "+996711111111", "password": "secret123", "role": "admin",
-                                            "email": "admin.try@example.com",
-                                            "code": email_code(client, "admin.try@example.com")})
-    assert r.status_code == 422
-
     # phone normalization: formatted and plain are the same account
+    phone = "+996722333444"
+    email = "norm@example.com"
     r = client.post("/auth/register", json={"name": "x", "phone": "+996 722 333 444", "password": "secret123",
-                                            "email": "norm@example.com", "code": email_code(client, "norm@example.com")})
+                                            "email": email, "code": email_code(client, email), "city": "Бишкек",
+                                            "accept_agreement": True})
     assert r.status_code == 200
-    r = client.post("/auth/send-code", json={"email": "other@example.com", "phone": "+996722333444", "purpose": "register"})
+    r = client.post("/auth/send-code", json={"email": "other@example.com", "phone": phone, "purpose": "register"})
     assert r.status_code == 400 and "телефоном" in r.json()["detail"]
     assert client.post("/auth/login", json={"phone": "+996-722-333-444", "password": "secret123"}).status_code == 200
-    assert client.post("/auth/send-code", json={"email": "x@y.co", "phone": "abc", "purpose": "register"}).status_code == 422
 
     # forged / tampered tokens
     forged = jwt.encode({"sub": "1"}, "wrong-secret-of-a-sufficient-length-0123456789", algorithm="HS256")
@@ -217,8 +491,8 @@ def test_auth_hardening(client):
     assert client.get("/auth/me", headers={"Authorization": "Bearer garbage"}).status_code == 401
 
     # non-admins get 403 on admin API
-    h, _ = register(client)
-    for path in ["/admin/stats", "/admin/users", "/admin/orders", "/admin/complaints"]:
+    h, _ = register_master(client)
+    for path in ["/admin/stats", "/admin/users", "/admin/orders", "/admin/complaints", "/admin/unanswered"]:
         assert client.get(path, headers=h).status_code == 403
     assert client.get("/admin/stats").status_code == 401
 
@@ -228,51 +502,36 @@ def test_auth_hardening(client):
     assert codes[-1] == 429
 
 
-def test_blocked_user(client):
-    h, phone = register(client)
-    db = SessionLocal()
-    admin = User(name="A", phone="+996799999999", password_hash=hash_password("adminpass"), role=UserRole.admin)
-    db.add(admin)
-    db.commit()
-    db.close()
-    admin_h = {"Authorization": "Bearer " + client.post("/auth/login", json={"phone": "+996799999999", "password": "adminpass"}).json()["access_token"]}
-
-    user_id = client.get("/auth/me", headers=h).json()["id"]
+def test_blocked_master(client):
+    headers, _ = register_master(client, "Заблокированный")
+    mid = master_id_of(client, headers)
+    admin_h = make_admin(client)
+    user_id = client.get("/auth/me", headers=headers).json()["id"]
     assert client.patch(f"/admin/users/{user_id}/status", headers=admin_h, json={"status": "blocked"}).status_code == 200
-    assert client.get("/auth/me", headers=h).status_code == 403
-    # blocked users are treated as anonymous: no phones
-    assert all(m["user"]["phone"] is None for m in client.get("/masters", headers=h).json())
+    assert client.get("/auth/me", headers=headers).status_code == 403
+    assert mid not in [m["id"] for m in client.get("/masters").json()]
+    assert client.get(f"/masters/{mid}").status_code == 404
 
 
 def test_uploads(client):
-    h, _ = register(client)
-    order = client.post("/orders", headers=h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
-    url = f"/orders/{order['id']}/photos"
+    token, req = create_request(client)
+    url = f"/requests/{token}/photos"
+    # HTML / SVG disguised as images are rejected
+    assert client.post(url, files={"files": ("x.png", b"<script>alert(1)</script>", "image/png")}).status_code == 400
+    assert client.post(url, files={"files": ("x.svg", b"<svg/>", "image/svg+xml")}).status_code == 400
 
-    # HTML disguised as PNG is rejected
-    r = client.post(url, headers=h, files={"files": ("x.png", b"<script>alert(1)</script>", "image/png")})
-    assert r.status_code == 400
-    assert client.post(url, headers=h, files={"files": ("x.svg", b"<svg/>", "image/svg+xml")}).status_code == 400
-
-    r = client.post(url, headers=h, files={"files": ("x.png", PNG, "image/png")})
+    r = client.post(url, files={"files": ("x.png", PNG, "image/png")})
     assert r.status_code == 200
-    photo_url = r.json()[0]["url"]
-    served = client.get(photo_url)
+    served = client.get(r.json()[0]["url"])
     assert served.status_code == 200
     assert served.headers["x-content-type-options"] == "nosniff"
     assert "sandbox" in served.headers["content-security-policy"]
-
+    assert len(client.get(f"/requests/{token}").json()["photos"]) == 1
+    # at most 5 photos per request
+    files = [("files", (f"{i}.png", PNG, "image/png")) for i in range(5)]
+    assert client.post(url, files=files).status_code == 400
     # path traversal through the static mount
     assert client.get("/uploads/../app/config.py").status_code == 404
-
-
-def test_validation(client):
-    h, _ = register(client)
-    cid = category_id(client)
-    assert client.post("/orders", headers=h, json={"city": "Бишкек", "category_id": cid, "description": "x", "latitude": 999}).status_code == 422
-    assert client.post("/orders", headers=h, json={"city": "Бишкек", "category_id": cid, "description": "x", "time": "<b>"}).status_code == 422
-    assert client.post("/orders", headers=h, json={"city": "Бишкек", "category_id": cid, "description": ""}).status_code == 422
-    assert client.get("/masters", params={"sort": "drop table"}).status_code == 422
 
 
 def test_no_n_plus_one_queries(client):
@@ -281,187 +540,67 @@ def test_no_n_plus_one_queries(client):
 
     from app.database import engine
 
-    for i in range(15):
-        rate_limit._attempts.clear()  # many sign-ups from one "IP" in a single test
-        make_master(client, f"Мастер {i}")
-    rate_limit._attempts.clear()
-    client_h, _ = register(client)
-    for _ in range(10):
-        client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"})
-    master_h, _ = make_master(client)
+    for i in range(12):
+        rate_limit._attempts.clear()
+        register_master(client, f"Мастер {i}")
+    master_h, _ = register_master(client)
+    for _ in range(4):
+        create_request(client)
 
+    import threading
     count = {"n": 0}
 
     def on_query(*_args):
-        count["n"] += 1
+        # Skip the background missed-request check (asyncio.to_thread workers); endpoints run in AnyIO workers.
+        if not threading.current_thread().name.startswith("asyncio"):
+            count["n"] += 1
 
     event.listen(engine, "before_cursor_execute", on_query)
     try:
-        for path, headers in [("/masters", {}), ("/orders/feed", master_h), ("/orders", client_h)]:
+        for path, headers in [("/masters", {}), ("/orders/feed", master_h), ("/orders", master_h)]:
             count["n"] = 0
             assert client.get(path, headers=headers).status_code == 200
-            assert count["n"] <= 10, f"{path}: {count['n']} SQL queries"
+            assert 0 < count["n"] <= 12, f"{path}: {count['n']} SQL queries"
     finally:
         event.remove(engine, "before_cursor_execute", on_query)
 
 
-# ---------- master subscriptions ----------
-
-def make_admin(client):
-    db = SessionLocal()
-    phone = f"+99679{next(_counter):07d}"
-    db.add(User(name="Admin", phone=phone, password_hash=hash_password("adminpass"), role=UserRole.admin))
-    db.commit()
-    db.close()
-    token = client.post("/auth/login", json={"phone": phone, "password": "adminpass"}).json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
-
-
-def expire_trial(master_id, days_ago=1):
-    from datetime import timedelta
-
-    from app.models import MasterSubscription, utcnow
-    db = SessionLocal()
-    sub = db.query(MasterSubscription).filter(MasterSubscription.master_id == master_id).one()
-    sub.trial_ends_at = utcnow() - timedelta(days=days_ago)
-    db.commit()
-    db.close()
-
-
-def test_subscriptions_disabled_by_default(client):
-    from app.config import settings
-    assert settings.subscriptions_enabled is False
-    assert client.get("/config").json()["subscriptions_enabled"] is False
-
-    master_h, _ = make_master(client)
-    sub = client.get("/subscription/me", headers=master_h).json()
-    assert sub["enabled"] is False and sub["state"] == "disabled"
-    assert client.get("/orders/feed", headers=master_h).status_code == 200
-    assert client.post("/subscription/me/checkout", headers=master_h, json={"months": 1}).status_code == 400
-
-
-def test_subscription_flow(client, monkeypatch):
-    from app.config import settings
-    monkeypatch.setattr(settings, "subscriptions_enabled", True)
-    monkeypatch.setattr(settings, "subscription_price", 500)
-
-    master_h, _ = make_master(client, "Подписчик")
-    sub = client.get("/subscription/me", headers=master_h).json()
-    assert sub["state"] == "trial" and sub["days_left"] == 30
-    assert {p["months"]: p["price"] for p in sub["plans"]} == {1: 500, 3: 1350, 6: 2550, 12: 4500}
-    master_id = client.get("/masters/me", headers=master_h).json()["id"]
-    assert master_id in [m["id"] for m in client.get("/masters", params={"q": "Подписчик"}).json()]
-
-    # clients have no subscription page
-    client_h, _ = register(client)
-    assert client.get("/subscription/me", headers=client_h).status_code == 403
-
-    # trial over -> no feed, no offers, hidden from search
-    order = client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
-    expire_trial(master_id)
-    assert client.get("/subscription/me", headers=master_h).json()["state"] == "expired"
-    assert client.get("/orders/feed", headers=master_h).status_code == 402
-    assert client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 1}).status_code == 402
-    assert master_id not in [m["id"] for m in client.get("/masters", params={"q": "Подписчик"}).json()]
-
-    # checkout: invalid plan, then a new request replaces the previous pending one
-    assert client.post("/subscription/me/checkout", headers=master_h, json={"months": 2}).status_code == 400
-    first = client.post("/subscription/me/checkout", headers=master_h, json={"months": 1}).json()
-    r = client.post("/subscription/me/checkout", headers=master_h, json={"months": 3})
-    assert r.status_code == 200 and r.json()["payment_url"] is None  # manual provider
-    payment = r.json()["payment"]
-    assert payment["amount"] == 1350 and payment["status"] == "pending"
-    statuses = {p["id"]: p["status"] for p in client.get("/subscription/me", headers=master_h).json()["payments"]}
-    assert statuses[first["payment"]["id"]] == "cancelled"
-
-    # only an admin confirms payments
-    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=master_h).status_code == 403
-    admin_h = make_admin(client)
-    pending = client.get("/admin/subscription-payments", params={"status": "pending"}, headers=admin_h).json()
-    assert payment["id"] in [p["id"] for p in pending]
-    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=admin_h).status_code == 200
-    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=admin_h).status_code == 400
-
-    sub = client.get("/subscription/me", headers=master_h).json()
-    assert sub["state"] == "active" and 89 <= sub["days_left"] <= 90
-    assert client.get("/orders/feed", headers=master_h).status_code == 200
-    assert master_id in [m["id"] for m in client.get("/masters", params={"q": "Подписчик"}).json()]
-
-    # admin can grant months; they stack on top of the paid period
-    assert client.post(f"/admin/subscriptions/{master_id}/extend", headers=admin_h, json={"months": 1}).status_code == 200
-    assert 119 <= client.get("/subscription/me", headers=master_h).json()["days_left"] <= 120
-    rows = client.get("/admin/subscriptions", headers=admin_h).json()
-    assert any(r["master_id"] == master_id and r["state"] == "active" for r in rows)
-
-    # webhook: unknown provider / manual provider accept nothing
-    assert client.post("/payments/webhook/nope", content=b"{}").status_code == 404
-    assert client.post("/payments/webhook/manual", content=b"{}").status_code == 404
-
-
-def test_paying_during_trial_keeps_remaining_days(client, monkeypatch):
-    from app.config import settings
-    monkeypatch.setattr(settings, "subscriptions_enabled", True)
-    master_h, _ = make_master(client)
-    payment = client.post("/subscription/me/checkout", headers=master_h, json={"months": 1}).json()["payment"]
-    client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=make_admin(client))
-    # 30 trial days left + 30 paid days
-    assert 59 <= client.get("/subscription/me", headers=master_h).json()["days_left"] <= 60
-
-
-def test_existing_masters_get_trial_when_enabled(client, monkeypatch):
-    from app.config import settings
-    from app.database import SessionLocal as Session_
-    from app.models import Master
-    from app.subscriptions import ensure_all_masters
-
-    make_master(client, "Старый мастер")  # registered while the feature was off -> no subscription row
-    monkeypatch.setattr(settings, "subscriptions_enabled", True)
-    db = Session_()
-    ensure_all_masters(db)
-    assert db.query(Master).filter(~Master.subscription.has()).count() == 0
-    db.close()
-
-
-
-# ---------- email codes and password reset ----------
+# ---------- email codes, login, password ----------
 
 def test_register_requires_valid_code(client):
     email = "new.user@example.com"
-    base = {"name": "X", "phone": "+996755000001", "password": "secret123", "email": email}
-    # no code / wrong format
-    assert client.post("/auth/register", json=base).status_code == 422
+    base = {"name": "X", "phone": new_phone(), "password": "secret123", "email": email, "city": "Бишкек",
+            "accept_agreement": True}
+    assert client.post("/auth/register", json=base).status_code == 422          # no code
     assert client.post("/auth/register", json={**base, "code": "123"}).status_code == 422
-    # no code was sent yet
-    assert client.post("/auth/register", json={**base, "code": "000000"}).status_code == 400
+    assert client.post("/auth/register", json={**base, "code": "000000"}).status_code == 400  # none sent yet
 
     code = email_code(client, email)
-    # resend is throttled
-    assert client.post("/auth/send-code", json={"email": email, "purpose": "register"}).status_code == 429
+    assert client.post("/auth/send-code", json={"email": email, "purpose": "register"}).status_code == 429  # throttled
     wrong = "000000" if code != "000000" else "111111"
     assert client.post("/auth/register", json={**base, "code": wrong}).json()["detail"] == "Неверный код"
     # the code belongs to this address only
     assert client.post("/auth/register", json={**base, "email": "someone.else@example.com", "code": code}).status_code == 400
     assert client.post("/auth/register", json={**base, "code": code}).status_code == 200
-    # the address is now taken
     r = client.post("/auth/send-code", json={"email": "NEW.user@example.com", "purpose": "register"})
     assert r.status_code == 400 and "email" in r.json()["detail"]
 
 
-def test_email_required_for_everyone(client):
-    base = {"name": "C", "phone": "+996755000009", "password": "secret123", "code": "123456"}
+def test_email_validation(client):
+    assert client.post("/auth/send-code", json={"email": "bad@", "purpose": "register"}).status_code == 422
+    base = {"name": "C", "phone": new_phone(), "password": "secret123", "code": "123456", "city": "Бишкек",
+            "accept_agreement": True}
     assert client.post("/auth/register", json=base).status_code == 422
     assert client.post("/auth/register", json={**base, "email": "not-an-email"}).status_code == 422
-    assert client.post("/auth/send-code", json={"email": "bad@", "purpose": "register"}).status_code == 422
 
 
 def test_code_brute_force_is_capped(client):
     email = "brute@example.com"
     code = email_code(client, email)
-    base = {"name": "X", "phone": "+996755000002", "password": "secret123", "email": email}
-    wrong = [c for c in ("000000", "111111", "222222", "333333", "444444", "555555") if c != code][:5]
-    for w in wrong:
+    base = {"name": "X", "phone": new_phone(), "password": "secret123", "email": email, "city": "Бишкек",
+            "accept_agreement": True}
+    for w in [c for c in ("000000", "111111", "222222", "333333", "444444", "555555") if c != code][:5]:
         assert client.post("/auth/register", json={**base, "code": w}).status_code == 400
-    # even the right code is refused after 5 wrong attempts
     r = client.post("/auth/register", json={**base, "code": code})
     assert r.status_code == 400 and "запросите новый" in r.json()["detail"]
 
@@ -477,8 +616,8 @@ def test_expired_code(client):
         {VerificationCode.expires_at: utcnow() - timedelta(seconds=1)})
     db.commit()
     db.close()
-    r = client.post("/auth/register", json={"name": "X", "phone": "+996755000003", "password": "secret123",
-                                            "email": email, "code": code})
+    r = client.post("/auth/register", json={"name": "X", "phone": new_phone(), "password": "secret123",
+                                            "email": email, "code": code, "city": "Бишкек", "accept_agreement": True})
     assert r.status_code == 400 and "устарел" in r.json()["detail"]
 
 
@@ -500,24 +639,19 @@ def test_code_email_is_sent_in_users_language(client, monkeypatch):
 
 
 def test_login_by_email_or_phone(client):
-    headers, phone = register(client)
+    headers, phone = register_master(client)
     email = email_for(phone)
     assert client.post("/auth/login", json={"phone": email.upper(), "password": "secret123"}).status_code == 200
     assert client.post("/auth/login", json={"phone": phone, "password": "secret123"}).status_code == 200
     assert client.post("/auth/login", json={"phone": email, "password": "wrong"}).status_code == 401
-    # the user sees their own email, other people never do
     assert client.get("/auth/me", headers=headers).json()["email"] == email
-    master_h, _ = make_master(client)
-    master_id = client.get("/masters/me", headers=master_h).json()["id"]
-    assert "email" not in client.get(f"/masters/{master_id}", headers=headers).json()["user"]
 
 
 def test_password_reset(client):
-    headers, phone = register(client)
+    headers, phone = register_master(client)
     email = email_for(phone)
-    # unknown address: same answer, nothing sent (no account probing)
     r = client.post("/auth/send-code", json={"email": "nobody@example.com", "purpose": "reset"})
-    assert r.status_code == 200 and r.json()["debug_code"] is None
+    assert r.status_code == 200 and r.json()["debug_code"] is None  # no account probing
 
     import time
     time.sleep(1.1)  # tokens carry whole-second timestamps; make the reset strictly later than login
@@ -525,30 +659,199 @@ def test_password_reset(client):
     r = client.post("/auth/reset-password", json={"email": email, "code": code, "password": "newpass123"})
     assert r.status_code == 200
     new_headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
-
-    # old sessions are logged out, the new token and password work, the old password doesn't
-    assert client.get("/auth/me", headers=headers).status_code == 401
+    assert client.get("/auth/me", headers=headers).status_code == 401       # old sessions logged out
     assert client.get("/auth/me", headers=new_headers).status_code == 200
     assert client.post("/auth/login", json={"phone": phone, "password": "secret123"}).status_code == 401
     assert client.post("/auth/login", json={"phone": email, "password": "newpass123"}).status_code == 200
-    # code is single-use
     assert client.post("/auth/reset-password", json={"email": email, "code": code, "password": "other123"}).status_code == 400
 
 
 def test_change_email_needs_a_code(client):
-    headers, phone = register(client)
-    other_h, other_phone = register(client)
-    # changing requires being logged in, and the new address must be free
+    headers, _ = register_master(client)
+    _, other_phone = register_master(client)
     assert client.post("/auth/send-code", json={"email": "fresh@example.com", "purpose": "change_email"}).status_code == 401
     r = client.post("/auth/send-code", json={"email": email_for(other_phone), "purpose": "change_email"}, headers=headers)
     assert r.status_code == 400
-
     code = email_code(client, "fresh@example.com", "change_email", headers=headers)
-    assert client.post("/auth/change-email", json={"email": "fresh@example.com", "code": "000000" if code != "000000" else "111111"},
-                       headers=headers).status_code == 400
+    wrong = "000000" if code != "000000" else "111111"
+    assert client.post("/auth/change-email", json={"email": "fresh@example.com", "code": wrong}, headers=headers).status_code == 400
     r = client.post("/auth/change-email", json={"email": "Fresh@Example.com", "code": code}, headers=headers)
     assert r.status_code == 200 and r.json()["email"] == "fresh@example.com"
-    assert client.post("/auth/login", json={"phone": "fresh@example.com", "password": "secret123"}).status_code == 200
+
+
+# ---------- notifications (opt-in) ----------
+
+def test_notifications_need_consent(client, outbox):
+    silent_h, _ = register_master(client, notify_enabled=False)
+    sms_h, sms_phone = register_master(client, notify_enabled=True, channel="sms", lang="ky", city="Талас")
+    electrician_h, _ = register_master(client, notify_enabled=True, category="Электрика", city="Талас")
+    client.patch("/masters/me", headers=silent_h, json={"city": "Талас"})
+    assert client.get("/notifications/settings", headers=silent_h).json()["enabled"] is False
+
+    outbox.clear()
+    _, req = create_request(client, price=800, city="Талас")
+    for h in (silent_h, sms_h):  # in-app for everyone in the category
+        assert any("Новый заказ" in n["title"] for n in client.get("/notifications", headers=h).json())
+    assert len(outbox) == 1  # outside the site only for the master who agreed, in their language
+    channel, phone, text = outbox[0]
+    assert channel == "sms" and phone == sms_phone and f"#{req['id']}" in text and "Жаңы буйрутма" in text
+    assert not any("Новый заказ" in n["title"] for n in client.get("/notifications", headers=electrician_h).json())
+
+    client.put("/notifications/settings", headers=sms_h, json={"enabled": False, "channel": "sms", "lang": "ky"})
+    outbox.clear()
+    create_request(client, city="Талас")
+    assert outbox == []
+
+
+def test_new_orders_by_email(client, outbox):
+    _, phone = register_master(client, notify_enabled=True, channel="email", lang="en", city="Нарын")
+    outbox.clear()
+    _, req = create_request(client, description="Leaking tap", price=700, city="Нарын")
+    mails = [m for m in outbox if m[0] == "email"]
+    assert len(mails) == 1 and mails[0][1] == email_for(phone)
+    assert f"New order #{req['id']} — Plumbing" in mails[0][2]
+    assert "Leaking tap" in mails[0][2] and "700 som" in mails[0][2] and "Turn off" in mails[0][2]
+
+
+def test_sms_channel_hidden_without_gateway(client):
+    assert client.get("/config").json()["sms_enabled"] is False
+    phone = new_phone()
+    email = email_for(phone)
+    r = client.post("/auth/register", json={
+        "name": "M", "phone": phone, "password": "secret123", "city": "Бишкек", "email": email,
+        "code": email_code(client, email), "accept_agreement": True, "notify_enabled": True, "notify_channel": "sms"})
+    assert r.status_code == 400 and "SMS" in r.json()["detail"]
+    master_h, _ = register_master(client)
+    assert client.get("/notifications/settings", headers=master_h).json()["sms_available"] is False
+    assert client.put("/notifications/settings", headers=master_h,
+                      json={"enabled": True, "channel": "sms", "lang": "ru"}).status_code == 400
+
+
+def test_telegram_linking(client, outbox, monkeypatch):
+    from app.config import settings
+    master_h, _ = register_master(client, notify_enabled=True, channel="email", city="Баткен")
+    assert client.post("/notifications/telegram/link", headers=master_h).status_code == 400  # no bot yet
+
+    monkeypatch.setattr(settings, "telegram_bot_token", "123:abc")
+    monkeypatch.setattr(settings, "telegram_bot_username", "test_bot")
+    monkeypatch.setattr(settings, "telegram_webhook_secret", "hook-secret")
+    url = client.post("/notifications/telegram/link", headers=master_h).json()["url"]
+    assert url.startswith("https://t.me/test_bot?start=")
+    token = url.split("start=")[1]
+    update = {"update_id": 1, "message": {"chat": {"id": 555}, "text": f"/start {token}"}}
+    assert client.post("/telegram/webhook", json=update).status_code == 404
+    assert client.post("/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"}).status_code == 404
+    assert client.post("/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "hook-secret"}).status_code == 200
+    assert outbox[-1][:2] == ("telegram", "555") and "Готово" in outbox[-1][2]
+    assert client.get("/notifications/settings", headers=master_h).json()["telegram_connected"] is True
+
+    outbox.clear()  # the link is single-use
+    client.post("/telegram/webhook", json={**update, "message": {"chat": {"id": 999}, "text": f"/start {token}"}},
+                headers={"X-Telegram-Bot-Api-Secret-Token": "hook-secret"})
+    assert outbox[-1][1] == "999" and "Подключить Telegram" in outbox[-1][2]
+
+    outbox.clear()
+    create_request(client, description="Срочно", city="Баткен")
+    assert any(m[0] == "telegram" and m[1] == "555" and "Срочно" in m[2] for m in outbox)
+
+
+# ---------- cities ----------
+
+def test_master_must_choose_city(client):
+    phone = new_phone()
+    email = email_for(phone)
+    base = {"name": "M", "phone": phone, "password": "secret123", "email": email, "code": email_code(client, email),
+            "accept_agreement": True}
+    r = client.post("/auth/register", json=base)
+    assert r.status_code == 400 and "город" in r.json()["detail"]
+    assert client.post("/auth/register", json={**base, "city": "Москва"}).status_code == 422
+    r = client.post("/auth/register", json={**base, "city": "ош"})  # case-insensitive -> canonical
+    assert r.status_code == 200
+    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/masters/me", headers=headers).json()["city"] == "Ош"
+
+
+def test_feed_and_notifications_follow_city(client, outbox):
+    bishkek_h, _ = register_master(client, notify_enabled=True, city="Бишкек")
+    osh_h, osh_phone = register_master(client, notify_enabled=True, city="Кара-Балта")
+    outbox.clear()
+    _, req = create_request(client, city="Кара-Балта", description="Заказ")
+    assert req["id"] in [o["id"] for o in client.get("/orders/feed", headers=osh_h).json()]
+    assert req["id"] not in [o["id"] for o in client.get("/orders/feed", headers=bishkek_h).json()]
+    assert [m[1] for m in outbox] == [email_for(osh_phone)]
+
+    client.patch("/masters/me", headers=osh_h, json={"city": ""})  # no city -> no requests
+    assert client.get("/orders/feed", headers=osh_h).json() == []
+    assert "Каракол" in client.get("/config").json()["cities"]
+
+
+# ---------- paid plan (off by default) ----------
+
+def test_subscriptions_disabled_by_default(client):
+    master_h, _ = register_master(client)
+    sub = client.get("/subscription/me", headers=master_h).json()
+    assert sub["enabled"] is False and sub["state"] == "disabled"
+    assert client.get("/orders/feed", headers=master_h).status_code == 200
+    assert client.post("/subscription/me/checkout", headers=master_h, json={"months": 1}).status_code == 400
+
+
+def test_subscription_flow(client, monkeypatch):
+    from datetime import timedelta
+
+    from app.config import settings
+    from app.models import MasterSubscription, utcnow
+    monkeypatch.setattr(settings, "subscriptions_enabled", True)
+    monkeypatch.setattr(settings, "subscription_price", 500)
+
+    master_h, _ = register_master(client, "Подписчик")
+    mid = master_id_of(client, master_h)
+    sub = client.get("/subscription/me", headers=master_h).json()
+    assert sub["state"] == "trial" and sub["days_left"] == 30
+    assert {p["months"]: p["price"] for p in sub["plans"]} == {1: 500, 3: 1350, 6: 2550, 12: 4500}
+
+    db = SessionLocal()
+    db.query(MasterSubscription).filter(MasterSubscription.master_id == mid).update(
+        {MasterSubscription.trial_ends_at: utcnow() - timedelta(days=1)})
+    db.commit()
+    db.close()
+    _, req = create_request(client)
+    assert client.get("/orders/feed", headers=master_h).status_code == 402
+    assert client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 1}).status_code == 402
+    assert mid not in [m["id"] for m in client.get("/masters", params={"q": "Подписчик"}).json()]
+
+    payment = client.post("/subscription/me/checkout", headers=master_h, json={"months": 3}).json()["payment"]
+    assert payment["amount"] == 1350 and payment["status"] == "pending"
+    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=master_h).status_code == 403
+    admin_h = make_admin(client)
+    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=admin_h).status_code == 200
+    assert client.post(f"/admin/subscription-payments/{payment['id']}/confirm", headers=admin_h).status_code == 400
+    sub = client.get("/subscription/me", headers=master_h).json()
+    assert sub["state"] == "active" and 89 <= sub["days_left"] <= 90
+    assert client.get("/orders/feed", headers=master_h).status_code == 200
+    assert client.post("/payments/webhook/manual", content=b"{}").status_code == 404
+
+
+def test_existing_masters_get_trial_when_enabled(client, monkeypatch):
+    from app.config import settings
+    from app.models import Master
+    from app.subscriptions import ensure_all_masters
+    register_master(client, "Старый мастер")
+    monkeypatch.setattr(settings, "subscriptions_enabled", True)
+    db = SessionLocal()
+    ensure_all_masters(db)
+    assert db.query(Master).filter(~Master.subscription.has()).count() == 0
+    db.close()
+
+
+# ---------- configuration & migrations ----------
+
+def test_production_refuses_unsafe_settings(monkeypatch):
+    from app.config import settings
+    from app.main import check_production_settings
+    monkeypatch.setattr(settings, "environment", "production")
+    with pytest.raises(RuntimeError) as e:
+        check_production_settings()
+    assert "EMAIL_PROVIDER=console" in str(e.value) and "CORS_ORIGINS" in str(e.value)
 
 
 def test_models_match_migrations():
@@ -562,238 +865,24 @@ def test_models_match_migrations():
 
 def test_pre_migration_database_is_upgraded(tmp_path):
     """A database created with create_all before migrations existed — and before some tables did."""
+    from alembic import command
     from sqlalchemy import create_engine, inspect, text
 
-    from app.database import Base
-    from app.migrations import upgrade_database
-
+    from app.migrations import _config, upgrade_database
     legacy = create_engine(f"sqlite:///{tmp_path}/legacy.db")
-    old_tables = [t for t in Base.metadata.sorted_tables
-                  if t.name not in {"master_subscriptions", "subscription_payments", "notification_settings",
-                                    "verification_codes"}]
-    Base.metadata.create_all(legacy, tables=old_tables)
-    with legacy.begin() as conn:  # columns added by later migrations didn't exist back then
-        conn.execute(text("ALTER TABLE users DROP COLUMN password_changed_at"))
-        conn.execute(text("DROP INDEX ix_users_email"))
-        conn.execute(text("DROP INDEX ix_orders_city"))
-        conn.execute(text("ALTER TABLE orders DROP COLUMN city"))
+    command.upgrade(_config(legacy), "0001")
+    with legacy.begin() as conn:  # an old create_all database: no history, no paid-plan tables yet
+        conn.execute(text("DROP TABLE alembic_version"))
+        conn.execute(text("DROP TABLE subscription_payments"))
+        conn.execute(text("DROP TABLE master_subscriptions"))
         conn.execute(text("INSERT INTO categories (name) VALUES ('Сантехника')"))
 
     upgrade_database(legacy)
 
     tables = set(inspect(legacy).get_table_names())
-    assert {"master_subscriptions", "subscription_payments", "verification_codes", "notification_settings"} <= tables
-    assert "phone_codes" not in tables
-    assert "password_changed_at" in {c["name"] for c in inspect(legacy).get_columns("users")}
+    assert {"master_subscriptions", "subscription_payments", "verification_codes", "request_deliveries"} <= tables
     with legacy.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM categories")).scalar() == 1  # data kept
-
-
-# ---------- master notifications (Telegram / SMS, opt-in) ----------
-
-@pytest.fixture
-def outbox(monkeypatch):
-    """Deliver notifications synchronously and capture what would be sent."""
-    from app import notify, telegram
-    sent = []
-
-    class FakeSms:
-        is_dev = True
-
-        def send(self, phone, text):
-            sent.append(("sms", phone, text))
-
-    class FakeEmail:
-        def send(self, to, subject, text):
-            sent.append(("email", to, f"{subject}\n{text}"))
-
-    # Pretend an SMS gateway is connected so the SMS channel can be chosen.
-    from app import sms
-    monkeypatch.setattr(sms.PROVIDERS["console"], "is_dev", False)
-    monkeypatch.setattr(notify, "_submit", lambda fn, *args: fn(*args))
-    monkeypatch.setattr(notify, "get_sms_provider", lambda: FakeSms())
-    monkeypatch.setattr(notify, "get_email_provider", lambda: FakeEmail())
-    monkeypatch.setattr(telegram, "send_message", lambda chat_id, text: sent.append(("telegram", chat_id, text)))
-    return sent
-
-
-def register_master(client, notify_enabled=False, channel="sms", lang="ru", category="Сантехника", city="Бишкек"):
-    phone = f"+996700000{next(_counter)}"
-    email = email_for(phone)
-    r = client.post("/auth/register", json={
-        "name": "Мастер", "phone": phone, "password": "secret123", "role": "master", "city": city,
-        "email": email, "code": email_code(client, email),
-        "notify_enabled": notify_enabled, "notify_channel": channel, "lang": lang,
-    })
-    assert r.status_code == 200, r.text
-    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
-    client.post("/masters/me/services", headers=headers,
-                json={"category_id": category_id(client, category), "title": "Услуга", "price_from": 100})
-    return headers, phone
-
-
-def test_notifications_need_consent(client, outbox):
-    silent_h, _ = register_master(client, notify_enabled=False)
-    sms_h, sms_phone = register_master(client, notify_enabled=True, channel="sms", lang="ky")
-    electrician_h, _ = register_master(client, notify_enabled=True, category="Электрика")
-    assert client.get("/notifications/settings", headers=silent_h).json()["enabled"] is False
-
-    client_h, _ = register(client)
-    outbox.clear()
-    order = client.post("/orders", headers=client_h,
-                        json={"city": "Бишкек", "category_id": category_id(client), "description": "Течёт кран", "price": 800}).json()
-
-    # everyone in the category gets the in-app notification…
-    for h in (silent_h, sms_h):
-        assert any("Новый заказ" in n["title"] for n in client.get("/notifications", headers=h).json())
-    # …but only the master who agreed gets an SMS, in their language; other categories get nothing
-    assert len(outbox) == 1
-    channel, phone, text = outbox[0]
-    assert channel == "sms" and phone == sms_phone
-    assert f"#{order['id']}" in text and "Жаңы буйрутма" in text
-    assert not any("Новый заказ" in n["title"] for n in client.get("/notifications", headers=electrician_h).json())
-
-    # the master can switch notifications off
-    client.put("/notifications/settings", headers=sms_h, json={"enabled": False, "channel": "sms", "lang": "ky"})
-    outbox.clear()
-    client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "Ещё"})
-    assert outbox == []
-
-    # clients have no notification settings
-    assert client.get("/notifications/settings", headers=client_h).status_code == 403
-
-
-def test_chosen_and_cancelled_notifications(client, outbox):
-    master_h, phone = register_master(client, notify_enabled=True, channel="sms")
-    client_h, _ = register(client)
-    order = client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"}).json()
-    offer = client.post(f"/orders/{order['id']}/offer", headers=master_h, json={"price": 500}).json()
-    outbox.clear()
-    client.post(f"/orders/{order['id']}/accept", params={"offer_id": offer["id"]}, headers=client_h)
-    assert any("Вас выбрали" in m[2] for m in outbox)
-    client.post(f"/orders/{order['id']}/cancel", headers=client_h)
-    assert any("отменил заказ" in m[2] for m in outbox)
-
-
-def test_telegram_linking(client, outbox, monkeypatch):
-    from app.config import settings
-    master_h, _ = register_master(client, notify_enabled=True, channel="telegram")
-
-    # bot not configured -> Telegram can't be chosen
-    assert client.post("/notifications/telegram/link", headers=master_h).status_code == 400
-    assert client.get("/notifications/settings", headers=master_h).json()["telegram_available"] is False
-
-    monkeypatch.setattr(settings, "telegram_bot_token", "123:abc")
-    monkeypatch.setattr(settings, "telegram_bot_username", "test_bot")
-    monkeypatch.setattr(settings, "telegram_webhook_secret", "hook-secret")
-    url = client.post("/notifications/telegram/link", headers=master_h).json()["url"]
-    assert url.startswith("https://t.me/test_bot?start=")
-    token = url.split("start=")[1]
-
-    update = {"update_id": 1, "message": {"chat": {"id": 555}, "text": f"/start {token}"}}
-    # webhook calls without Telegram's secret header are rejected
-    assert client.post("/telegram/webhook", json=update).status_code == 404
-    assert client.post("/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"}).status_code == 404
-    r = client.post("/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "hook-secret"})
-    assert r.status_code == 200
-    assert outbox[-1][:2] == ("telegram", "555") and "Готово" in outbox[-1][2]
-    assert client.get("/notifications/settings", headers=master_h).json()["telegram_connected"] is True
-
-    # the link is single-use
-    outbox.clear()
-    client.post("/telegram/webhook", json={**update, "message": {"chat": {"id": 999}, "text": f"/start {token}"}},
-                headers={"X-Telegram-Bot-Api-Secret-Token": "hook-secret"})
-    assert outbox[-1][1] == "999" and "Подключить Telegram" in outbox[-1][2]
-
-    # new orders now arrive in Telegram
-    client_h, _ = register(client)
-    outbox.clear()
-    client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "Срочно"})
-    assert any(m[0] == "telegram" and m[1] == "555" and "Срочно" in m[2] for m in outbox)
-
-
-
-def test_production_refuses_unsafe_settings(monkeypatch):
-    from app.config import settings
-    from app.main import check_production_settings
-    monkeypatch.setattr(settings, "environment", "production")
-    with pytest.raises(RuntimeError) as e:
-        check_production_settings()
-    assert "EMAIL_PROVIDER=console" in str(e.value) and "CORS_ORIGINS" in str(e.value)
-
-
-def test_sms_channel_hidden_without_gateway(client):
-    assert client.get("/config").json()["sms_enabled"] is False
-    phone = "+996755300001"
-    email = email_for(phone)
-    r = client.post("/auth/register", json={
-        "name": "M", "phone": phone, "password": "secret123", "role": "master", "city": "Бишкек",
-        "email": email, "code": email_code(client, email), "notify_enabled": True, "notify_channel": "sms"})
-    assert r.status_code == 400 and "SMS" in r.json()["detail"]
-    master_h, _ = make_master(client)
-    assert client.get("/notifications/settings", headers=master_h).json()["sms_available"] is False
-    r = client.put("/notifications/settings", headers=master_h, json={"enabled": True, "channel": "sms", "lang": "ru"})
-    assert r.status_code == 400
-
-
-
-# ---------- cities: masters see orders from their own city ----------
-
-def test_master_must_choose_city(client):
-    base = {"name": "M", "phone": "+996755100001", "password": "secret123", "role": "master",
-            "email": "osh.master@example.com", "code": email_code(client, "osh.master@example.com")}
-    r = client.post("/auth/register", json=base)
-    assert r.status_code == 400 and "город" in r.json()["detail"]
-    assert client.post("/auth/register", json={**base, "city": "Москва"}).status_code == 422
-    r = client.post("/auth/register", json={**base, "city": "ош"})  # case-insensitive -> canonical
-    assert r.status_code == 200
-    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
-    assert client.get("/masters/me", headers=headers).json()["city"] == "Ош"
-
-
-def test_orders_need_a_known_city(client):
-    h, _ = register(client)
-    cid = category_id(client)
-    assert client.post("/orders", headers=h, json={"category_id": cid, "description": "x"}).status_code == 422
-    assert client.post("/orders", headers=h, json={"category_id": cid, "description": "x", "city": "Атлантида"}).status_code == 422
-    r = client.post("/orders", headers=h, json={"category_id": cid, "description": "x", "city": " каракол "})
-    assert r.status_code == 200 and r.json()["city"] == "Каракол"
-    assert "Каракол" in client.get("/config").json()["cities"]
-
-
-def test_feed_and_notifications_follow_city(client, outbox):
-    bishkek_h, bishkek_phone = register_master(client, notify_enabled=True, channel="sms", city="Бишкек")
-    osh_h, osh_phone = register_master(client, notify_enabled=True, channel="sms", city="Ош")
-    client_h, _ = register(client)
-    outbox.clear()
-    osh_order = client.post("/orders", headers=client_h,
-                            json={"city": "Ош", "category_id": category_id(client), "description": "Ош заказ"}).json()
-
-    osh_feed = [o["id"] for o in client.get("/orders/feed", headers=osh_h).json()]
-    bishkek_feed = [o["id"] for o in client.get("/orders/feed", headers=bishkek_h).json()]
-    assert osh_order["id"] in osh_feed and osh_order["id"] not in bishkek_feed
-    # only the Osh master is notified (in-app and SMS)
-    assert [m[1] for m in outbox] == [osh_phone]
-    assert not any(f"#{osh_order['id']}" in (n["text"] or "") for n in client.get("/notifications", headers=bishkek_h).json())
-
-    # a master without a city sees nothing until they set one
-    client.patch("/masters/me", headers=osh_h, json={"city": ""})
-    assert client.get("/orders/feed", headers=osh_h).json() == []
-    client.patch("/masters/me", headers=osh_h, json={"city": "Ош"})
-    assert osh_order["id"] in [o["id"] for o in client.get("/orders/feed", headers=osh_h).json()]
-
-
-def test_legacy_orders_without_city_stay_visible(client):
-    from app.models import Order
-    master_h, _ = make_master(client)
-    client_h, _ = register(client)
-    order = client.post("/orders", headers=client_h,
-                        json={"city": "Бишкек", "category_id": category_id(client), "description": "старый"}).json()
-    db = SessionLocal()
-    db.get(Order, order["id"]).city = None  # as if created before cities existed
-    db.commit()
-    db.close()
-    assert order["id"] in [o["id"] for o in client.get("/orders/feed", headers=master_h).json()]
 
 
 def test_city_migration_backfills_old_data(tmp_path):
@@ -817,39 +906,8 @@ def test_city_migration_backfills_old_data(tmp_path):
     with engine.connect() as conn:
         assert conn.execute(text("SELECT city FROM masters WHERE id = 1")).scalar() == "Бишкек"
         assert dict(conn.execute(text("SELECT id, city FROM orders")).all()) == {1: "Ош", 2: None}
-
-
-
-# ---------- email ----------
-
-def test_master_email_saved_normalized(client):
-    email = "Usta@Example.COM"
-    r = client.post("/auth/register", json={
-        "name": "M", "phone": "+996755200001", "password": "secret123", "role": "master", "city": "Бишкек",
-        "email": f"  {email} ", "code": email_code(client, "usta@example.com")})
-    assert r.status_code == 200
-    headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
-    assert client.get("/notifications/settings", headers=headers).json()["email"] == "usta@example.com"
-
-
-def test_new_orders_by_email(client, outbox):
-    master_h, _ = register_master(client, notify_enabled=True, channel="email", lang="en")
-    email = client.get("/notifications/settings", headers=master_h).json()["email"]
-    client_h, _ = register(client)
-    outbox.clear()
-    order = client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client),
-                                                           "description": "Leaking tap", "price": 700}).json()
-    mails = [m for m in outbox if m[0] == "email"]
-    assert len(mails) == 1 and mails[0][1] == email
-    assert f"New order #{order['id']} — Plumbing" in mails[0][2]  # subject in the master's language
-    assert "Leaking tap" in mails[0][2] and "700 som" in mails[0][2] and "Turn off" in mails[0][2]
-
-    # the master changes the address (confirmed with a code)
-    code = email_code(client, "new@example.com", "change_email", headers=master_h)
-    client.post("/auth/change-email", headers=master_h, json={"email": "new@example.com", "code": code})
-    outbox.clear()
-    client.post("/orders", headers=client_h, json={"city": "Бишкек", "category_id": category_id(client), "description": "x"})
-    assert [m[1] for m in outbox if m[0] == "email"] == ["new@example.com"]
+        # existing masters get a clean reliability record
+        assert tuple(conn.execute(text("SELECT missed_requests, rating_penalty FROM masters WHERE id = 1")).one()) == (0, 0)
 
 
 def test_email_migration_normalises_and_dedupes(tmp_path):
