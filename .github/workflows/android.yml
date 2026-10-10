@@ -52,6 +52,8 @@ jobs:
             echo "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/release.p12"
             echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
             echo "signed=true" >> "$GITHUB_OUTPUT"
+            # Lengths and a fingerprint only (never the values) — to see which secret is wrong.
+            echo "::notice::Секреты: ключ $(echo -n "$KEYSTORE_BASE64" | wc -c) символов (отпечаток $(sha256sum "$RUNNER_TEMP/release.p12" | cut -c1-16)), пароль ${#STORE_PASSWORD} символов, псевдоним ${#KEY_ALIAS} символов"
             # Check the key and passwords up front so a mistake in the secrets gives a clear message.
             if ! keytool -list -keystore "$RUNNER_TEMP/release.p12" -storetype pkcs12 -storepass "$STORE_PASSWORD" > "$RUNNER_TEMP/key.txt" 2>&1; then
               echo "::error::Ключ не открылся: проверьте ANDROID_KEYSTORE_BASE64 (весь файл целиком) и ANDROID_KEYSTORE_PASSWORD — $(tail -1 "$RUNNER_TEMP/key.txt")"
