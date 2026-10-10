@@ -45,11 +45,22 @@ jobs:
         id: key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            echo "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/release.p12"
             echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
             echo "signed=true" >> "$GITHUB_OUTPUT"
+            # Check the key and passwords up front so a mistake in the secrets gives a clear message.
+            if ! keytool -list -keystore "$RUNNER_TEMP/release.p12" -storetype pkcs12 -storepass "$STORE_PASSWORD" > "$RUNNER_TEMP/key.txt" 2>&1; then
+              echo "::error::Ключ не открылся: проверьте ANDROID_KEYSTORE_BASE64 (весь файл целиком) и ANDROID_KEYSTORE_PASSWORD — $(tail -1 "$RUNNER_TEMP/key.txt")"
+              exit 1
+            fi
+            if ! grep -qi "^${KEY_ALIAS}," "$RUNNER_TEMP/key.txt"; then
+              echo "::error::В ключе нет псевдонима '${KEY_ALIAS}' (ANDROID_KEY_ALIAS). Есть: $(grep -i 'PrivateKeyEntry' "$RUNNER_TEMP/key.txt" | cut -d, -f1)"
+              exit 1
+            fi
           else
             echo "::warning::No ANDROID_KEYSTORE_BASE64 secret — building a debug-signed APK"
             echo "signed=false" >> "$GITHUB_OUTPUT"
@@ -68,9 +79,9 @@ jobs:
           # On failure, surface Gradle's error lines as annotations (visible on the run page).
           if ! ./gradlew --no-daemon "$task" > "$RUNNER_TEMP/gradle.log" 2>&1; then
             cat "$RUNNER_TEMP/gradle.log"
-            grep -E "error:|ERROR|What went wrong|> |e: |AAPT" "$RUNNER_TEMP/gradle.log" | head -25 | while IFS= read -r line; do
-              echo "::error::${line}"
-            done
+            # Only Gradle's "What went wrong" section (and compiler errors), not the task list.
+            { sed -n '/What went wrong/,/\* Try:/p' "$RUNNER_TEMP/gradle.log"; grep -E "^e: |error:|AAPT: error" "$RUNNER_TEMP/gradle.log"; } \
+              | grep -v -E "^\* Try:|^$" | head -20 | while IFS= read -r line; do echo "::error::${line}"; done
             exit 1
           fi
           tail -5 "$RUNNER_TEMP/gradle.log"
