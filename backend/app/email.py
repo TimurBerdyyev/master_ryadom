@@ -9,6 +9,8 @@ import smtplib
 import ssl
 from email.message import EmailMessage
 
+import certifi
+
 from app.config import settings
 
 logger = logging.getLogger("master_ryadom.email")
@@ -40,7 +42,8 @@ class SmtpEmail(EmailProvider):
         message["To"] = to
         message["Subject"] = subject
         message.set_content(text)
-        context = ssl.create_default_context()
+        # certifi's CA bundle: python.org builds on macOS ship without system root certificates.
+        context = ssl.create_default_context(cafile=certifi.where())
         if settings.smtp_security == "ssl":
             with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, context=context, timeout=20) as smtp:
                 self._deliver(smtp, message)

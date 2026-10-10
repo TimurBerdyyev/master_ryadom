@@ -10,3 +10,4 @@ bcrypt==4.2.0
 python-multipart==0.0.32
 redis==5.0.8
 httpx==0.28.1
+certifi==2026.7.22
