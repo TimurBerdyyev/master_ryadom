@@ -551,8 +551,9 @@ def test_no_n_plus_one_queries(client):
     count = {"n": 0}
 
     def on_query(*_args):
-        # Skip the background missed-request check (asyncio.to_thread workers); endpoints run in AnyIO workers.
-        if not threading.current_thread().name.startswith("asyncio"):
+        # Count only the endpoints (AnyIO worker threads), not background work: the missed-request check
+        # (asyncio.to_thread) and notification delivery (notify_* executor) left over from earlier requests.
+        if not threading.current_thread().name.startswith(("asyncio", "notify")):
             count["n"] += 1
 
     event.listen(engine, "before_cursor_execute", on_query)

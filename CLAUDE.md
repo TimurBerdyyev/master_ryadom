@@ -58,6 +58,15 @@
 - Telegram-бот — `app/telegram.py` (привязка по одноразовой ссылке `t.me/<bot>?start=<token>`),
   вебхук `/telegram/webhook` с секретом в заголовке; локально — `python -m app.telegram_poll`.
 
+## Мобильное приложение
+- `mobile/` — Android-приложение на Capacitor 7: оболочка вокруг живого сайта (`server.url`), подробно — `mobile/README.md`.
+  APK собирает GitHub Actions (`.github/workflows/android.yml`) и выкладывает в Releases; ссылка — на `web/app.html`.
+- Сайт в режиме приложения (User-Agent `MasterRyadomApp` или установлен на экран «Домой») ставит класс `in-app`
+  на `<html>` и рисует нижнюю панель вкладок (`IS_APP`, `renderTabbar` в `nav.js`). PWA: `web/manifest.webmanifest`,
+  `web/sw.js` (сеть в приоритете, кеш только как запасной вариант; `/api/` не кешируется). Новые страницы — с тегами
+  manifest/apple-touch-icon в `<head>`, как у остальных.
+- Ключ подписи APK — вне репозитория, в секретах GitHub. Потеряете — обновления не встанут поверх старой версии.
+
 ## Города
 - Список городов — `backend/app/cities.py` (`CITIES`, канонические русские названия; переводы — `city.*` в `i18n.js`).
   Сайт берёт список из `/config`, выбор только из списка (`cityOptionsHtml()`), сервер нормализует регистр (`normalize_city`).

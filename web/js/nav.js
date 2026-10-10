@@ -1,5 +1,44 @@
 const ROOT = location.pathname.includes("/admin/") ? "../" : "";
 
+// Opened as an app: the Android app (its WebView adds "MasterRyadomApp" to the user agent) or the site
+// installed to the home screen (iPhone "На экран Домой", Android Chrome "Установить").
+const IS_APP = /MasterRyadomApp/.test(navigator.userAgent)
+  || window.matchMedia("(display-mode: standalone)").matches
+  || window.navigator.standalone === true;
+if (IS_APP) document.documentElement.classList.add("in-app");
+
+// Installable site + offline page (sw.js). Not in the Android app: it always loads the live site.
+if ("serviceWorker" in navigator && !/MasterRyadomApp/.test(navigator.userAgent) && location.protocol !== "file:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register(`${ROOT}sw.js`).catch(() => {}));
+}
+
+// Bottom tab bar for the app on phones: the main sections one tap away.
+function renderTabbar(role) {
+  if (!IS_APP) return;
+  const items = role === "master"
+    ? [["feed.html", "inbox", t("tab.feed")], ["orders.html", "clipboard-list", t("tab.jobs")],
+       ["notifications.html", "bell", t("tab.notifications")], ["master-profile-edit.html", "user", t("tab.profile")]]
+    : role === "admin"
+    ? [["index.html", "house", t("tab.home")], ["masters.html", "search", t("tab.masters")],
+       ["admin/index.html", "shield-check", t("nav.admin")]]
+    : [["index.html", "house", t("tab.home")], ["masters.html", "search", t("tab.masters")],
+       ["order.html", "plus", t("tab.request"), true], ["my-requests.html", "clipboard-list", t("tab.myRequests")],
+       ["login.html", "briefcase", t("tab.forMasters")]];
+  const current = location.pathname.replace(/^.*?\/((admin\/)?[^/]*)$/, "$1") || "index.html";
+  let bar = document.getElementById("tabbar");
+  if (!bar) {
+    bar = document.createElement("nav");
+    bar.id = "tabbar";
+    bar.className = "tabbar";
+    bar.setAttribute("aria-label", t("nav.menu"));
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = items.map(([href, iconName, label, main]) => `
+    <a class="tab${main ? " main" : ""}${(current || "index.html") === href ? " active" : ""}" href="${ROOT}${href}">
+      <span class="tab-icon">${icon(iconName)}</span><span class="tab-label">${label}</span>
+    </a>`).join("");
+}
+
 function navLink(href, label, iconName) {
   const current = location.pathname.split("/").pop() || "index.html";
   const isActive = href.split("/").pop() === current && location.pathname.includes("/admin/") === href.startsWith("admin/");
@@ -66,11 +105,13 @@ async function renderNav() {
     ${navLink("masters.html", t("nav.find"), "search")}
     ${navLink("my-requests.html", t("nav.myRequests"), "clipboard-list")}
     ${navLink("login.html", t("nav.forMasters"), "briefcase")}
+    ${IS_APP ? "" : navLink("app.html", t("nav.app"), "smartphone")}
     <a class="btn small accent" href="${ROOT}order.html">${icon("plus")}${t("nav.createOrder")}</a>
   `;
 
   if (!getToken()) {
     nav.innerHTML = guestNav;
+    renderTabbar("guest");
     return;
   }
   try {
@@ -95,9 +136,11 @@ async function renderNav() {
     `;
     refreshUnread();
     if (user.role === "master") renderPlanLink();
+    renderTabbar(user.role);
   } catch (e) {
     clearToken();
     nav.innerHTML = guestNav;
+    renderTabbar("guest");
   }
 }
 

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Мастер рядом</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+           font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background: #f5f6fa; color: #0b1324; }
+    .box { max-width: 340px; padding: 24px; text-align: center; }
+    .logo { width: 72px; height: 72px; margin: 0 auto 20px; border-radius: 20px; display: flex; align-items: center;
+            justify-content: center; background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    p { margin: 0 0 22px; color: #687189; line-height: 1.5; font-size: 15px; }
+    button { border: 0; border-radius: 14px; padding: 14px 28px; font-size: 16px; font-weight: 600;
+             background: #2d5bff; color: #fff; }
+  </style>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
+</head>
+<body>
+  <!-- Shown by the service worker (sw.js) when a page can't be loaded offline. -->
+  <div class="box">
+    <div class="logo">
+      <svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true"><path d="M41.5 14a10 10 0 0 0-9.3 13.6L15.6 44.2a3.5 3.5 0 0 0 5 5l16.6-16.6A10 10 0 0 0 50 23.5l-6 6-5.5-1.5L37 22.5l6-6a10 10 0 0 0-1.5-2.5z" fill="#fff"/></svg>
+    </div>
+    <h1 id="title">Нет подключения</h1>
+    <p id="text">Проверьте интернет и попробуйте ещё раз. Если сервер просыпается, это займёт до минуты.</p>
+    <button id="retry" type="button">Повторить</button>
+  </div>
+  <script>
+    const T = {
+      ky: ["Байланыш жок", "Интернетти текшерип, кайра аракет кылыңыз. Сервер ойгонуп жатса, бир мүнөткө чейин созулат.", "Кайталоо"],
+      en: ["No connection", "Check your internet and try again. If the server is waking up, it can take up to a minute.", "Try again"],
+    };
+    let lang = "ru";
+    try { lang = localStorage.getItem("lang") || (navigator.language || "ru").slice(0, 2); } catch (e) { /* ignore */ }
+    if (T[lang]) {
+      document.getElementById("title").textContent = T[lang][0];
+      document.getElementById("text").textContent = T[lang][1];
+      document.getElementById("retry").textContent = T[lang][2];
+    }
+    document.getElementById("retry").addEventListener("click", () => { location.reload(); });
+  </script>
+</body>
+</html>

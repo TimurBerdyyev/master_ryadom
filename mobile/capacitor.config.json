@@ -1,0 +1,28 @@
+{
+  "appId": "kg.masterryadom.app",
+  "appName": "Мастер рядом",
+  "webDir": "www",
+  "server": {
+    "url": "https://master-ryadom.onrender.com",
+    "errorPath": "offline.html",
+    "androidScheme": "https"
+  },
+  "android": {
+    "appendUserAgent": "MasterRyadomApp/1.0",
+    "adjustMarginsForEdgeToEdge": "auto",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#2563eb",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#ffffff",
+      "overlaysWebView": false
+    }
+  }
+}

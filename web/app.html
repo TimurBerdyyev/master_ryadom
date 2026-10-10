@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title data-i18n="app.docTitle">Приложение — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="narrow">
+    <div class="app-hero reveal">
+      <img src="icons/icon-192.png" alt="" />
+      <div>
+        <h1 data-i18n="app.title">Приложение «Мастер рядом»</h1>
+        <p class="muted" data-i18n="app.sub">Мастера и заявки всегда под рукой: один тап — и вы на месте. Бесплатно.</p>
+      </div>
+    </div>
+
+    <div class="notice success" id="inAppNotice" hidden style="margin-bottom:16px">
+      <svg class="i" aria-hidden="true"><use href="#i-circle-check"></use></svg><span data-i18n="app.inApp">Вы уже в приложении</span>
+    </div>
+
+    <div class="platform-grid">
+      <section class="card-box platform-card" id="androidCard">
+        <h2><svg class="i" aria-hidden="true"><use href="#i-smartphone"></use></svg><span data-i18n="app.android">Android</span> <span class="status-pill info" id="androidMine" hidden data-i18n="app.yourPhone">Ваш телефон</span></h2>
+        <a class="btn accent large block" id="apkLink" href="https://github.com/TimurBerdyyev/master_ryadom/releases/latest/download/master-ryadom.apk">
+          <svg class="i" aria-hidden="true"><use href="#i-download"></use></svg><span data-i18n="app.download">Скачать для Android</span>
+        </a>
+        <p class="hint" style="margin:-6px 0 0;text-align:center" data-i18n="app.size">Файл APK, около 5 МБ</p>
+        <ol>
+          <li data-i18n="app.a1"></li>
+          <li data-i18n="app.a2"></li>
+          <li data-i18n="app.a3"></li>
+        </ol>
+        <button class="btn secondary block" type="button" id="installBtn" hidden><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="app.installChrome">Или установить из браузера</span></button>
+        <p class="hint" style="margin:0" data-i18n="app.androidNote"></p>
+      </section>
+
+      <section class="card-box platform-card" id="iphoneCard">
+        <h2><svg class="i" aria-hidden="true"><use href="#i-smartphone"></use></svg><span data-i18n="app.iphone">iPhone</span> <span class="status-pill info" id="iphoneMine" hidden data-i18n="app.yourPhone">Ваш телефон</span></h2>
+        <ol>
+          <li data-i18n="app.i1"></li>
+          <li data-i18n="app.i2"></li>
+          <li data-i18n="app.i3"></li>
+        </ol>
+        <p class="hint" style="margin:0" data-i18n="app.iphoneNote"></p>
+      </section>
+    </div>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const ua = navigator.userAgent;
+    const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/.test(ua);
+    document.getElementById("inAppNotice").hidden = !IS_APP;
+
+    // Show the visitor's own platform first and mark it.
+    const grid = document.querySelector(".platform-grid");
+    if (isIOS) {
+      grid.prepend(document.getElementById("iphoneCard"));
+      document.getElementById("iphoneCard").classList.add("highlight");
+      document.getElementById("iphoneMine").hidden = false;
+    } else if (isAndroid) {
+      document.getElementById("androidCard").classList.add("highlight");
+      document.getElementById("androidMine").hidden = false;
+    }
+
+    // Android Chrome can also install the site itself (no file to download).
+    let installPrompt = null;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      installPrompt = e;
+      document.getElementById("installBtn").hidden = false;
+    });
+    document.getElementById("installBtn").addEventListener("click", async () => {
+      if (!installPrompt) return;
+      installPrompt.prompt();
+      await installPrompt.userChoice;
+      installPrompt = null;
+      document.getElementById("installBtn").hidden = true;
+    });
+    renderNav();
+  </script>
+</body>
+</html>

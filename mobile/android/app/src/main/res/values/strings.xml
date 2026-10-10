@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Мастер рядом</string>
+    <string name="title_activity_main">Мастер рядом</string>
+    <string name="package_name">kg.masterryadom.app</string>
+    <string name="custom_url_scheme">kg.masterryadom.app</string>
+</resources>

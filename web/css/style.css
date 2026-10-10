@@ -3774,3 +3774,166 @@ img.avatar-lg {
   color: var(--ink-2) !important;
   font-weight: 500;
 }
+
+/* ---------- app mode (Android app / site installed to the home screen) ---------- */
+
+.tabbar {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .in-app body {
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .in-app .site-footer {
+    display: none;
+  }
+
+  .in-app .tabbar {
+    position: fixed;
+    z-index: 50;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, .96);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px -16px rgba(11, 19, 36, .25);
+  }
+
+  .tab {
+    flex: 1;
+    min-width: 0;
+    min-height: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border-radius: 12px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tab .tab-icon .i {
+    width: 23px;
+    height: 23px;
+  }
+
+  .tab .tab-label {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .tab.active {
+    color: var(--primary);
+  }
+
+  .tab:active {
+    background: var(--surface-2);
+  }
+
+  /* The central "new request" button */
+  .tab.main .tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 32px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 8px 18px -8px rgba(255, 107, 44, .8);
+  }
+
+  .tab.main {
+    color: var(--ink-2);
+  }
+
+  .toast {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* App download page */
+.app-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 22px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.app-hero img {
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+  box-shadow: 0 16px 34px -14px rgba(37, 99, 235, .7);
+}
+
+.app-hero h1 {
+  margin: 0 0 6px;
+}
+
+.app-hero p {
+  margin: 0;
+}
+
+.platform-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.platform-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.platform-card.highlight {
+  border-color: var(--primary-100);
+  box-shadow: 0 0 0 3px var(--primary-50);
+}
+
+.platform-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 20px;
+}
+
+.platform-card ol {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.platform-card li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 720px) {
+  .platform-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+    justify-items: center;
+  }
+}
