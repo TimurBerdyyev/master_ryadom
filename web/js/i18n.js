@@ -752,7 +752,7 @@ const I18N = {
   "app.sub": ["Мастера и заявки всегда под рукой: один тап — и вы на месте. Бесплатно.", "Усталар жана арыздар дайыма колуңузда: бир басуу менен ачылат. Акысыз.", "Pros and requests always at hand, one tap away. Free."],
   "app.android": ["Android", "Android", "Android"],
   "app.download": ["Скачать для Android", "Android үчүн жүктөө", "Download for Android"],
-  "app.size": ["Файл APK, около 5 МБ", "APK файл, болжол менен 5 МБ", "APK file, about 5 MB"],
+  "app.size": ["Файл APK, около 4 МБ", "APK файл, болжол менен 4 МБ", "APK file, about 4 MB"],
   "app.a1": ["Нажмите «Скачать» — файл master-ryadom.apk сохранится в «Загрузки».", "«Жүктөө» басыңыз — master-ryadom.apk файлы «Жүктөлүүлөргө» сакталат.", "Tap “Download” — master-ryadom.apk is saved to Downloads."],
   "app.a2": ["Откройте файл. Если телефон спросит — разрешите установку из этого источника («Неизвестные приложения»).", "Файлды ачыңыз. Телефон сураса — ушул булактан орнотууга уруксат бериңиз («Белгисиз тиркемелер»).", "Open the file. If the phone asks, allow installing from this source (“Unknown apps”)."],
   "app.a3": ["Нажмите «Установить» — значок «Мастер рядом» появится на экране.", "«Орнотуу» басыңыз — «Мастер рядом» белгиси экранда пайда болот.", "Tap “Install” — the «Мастер рядом» icon appears on your screen."],
