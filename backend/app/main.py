@@ -17,6 +17,7 @@ from app.routers import (
     admin, auth, categories, complaints, masters, notifications, orders, requests, reviews, subscriptions,
 )
 from app.dispatch import check_missed
+from app.create_admin import ensure_admin
 from app.seed import seed_categories
 from app.subscriptions import ensure_all_masters
 
@@ -83,6 +84,11 @@ async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
         seed_categories(db)
+        if settings.admin_phone and settings.admin_password:
+            if len(settings.admin_password) < 8:
+                logger.error("ADMIN_PASSWORD короче 8 символов — администратор не создан")
+            elif ensure_admin(settings.admin_phone, settings.admin_password):
+                logger.info("Администратор %s создан из ADMIN_PHONE/ADMIN_PASSWORD", settings.admin_phone)
         if settings.subscriptions_enabled:
             started = ensure_all_masters(db)
             if started:

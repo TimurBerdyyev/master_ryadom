@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Only masters verified by the service are listed and receive requests ("гарантия сервиса").
     masters_require_verification: bool = True
     agreement_version: str = "2026-10"
+    # Admin account created at startup if it doesn't exist (for hosts without a shell, e.g. Render free).
+    admin_phone: str = ""
+    admin_password: str = ""
 
     # Paid plan for masters. Off until launch: while disabled every master has full access
     # and no subscription records are created. See app/subscriptions.py.

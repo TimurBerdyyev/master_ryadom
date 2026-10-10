@@ -845,6 +845,19 @@ def test_existing_masters_get_trial_when_enabled(client, monkeypatch):
 
 # ---------- configuration & migrations ----------
 
+def test_admin_from_settings(client):
+    from app.create_admin import ensure_admin
+    phone = new_phone()
+    assert ensure_admin(phone, "first-password") is True
+    assert ensure_admin(phone, "other-password") is False  # restarts don't reset the password
+    db = SessionLocal()
+    user = db.query(User).filter(User.phone == phone).one()
+    db.close()
+    assert user.role == UserRole.admin
+    from app.auth import verify_password
+    assert verify_password("first-password", user.password_hash)
+
+
 def test_production_refuses_unsafe_settings(monkeypatch):
     from app.config import settings
     from app.main import check_production_settings
