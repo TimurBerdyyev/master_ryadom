@@ -157,7 +157,7 @@ def accept_offer(token: str, offer_id: int, db: Session = Depends(get_db)):
 @router.post("/{token}/complete", response_model=RequestOut)
 def complete(token: str, db: Session = Depends(get_db)):
     order = _get(db, token)
-    if order.status not in CLIENT_CAN_COMPLETE_FROM:
+    if order.status not in CLIENT_CAN_COMPLETE_FROM or order.master is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Недопустимая смена статуса")
     order.status = OrderStatus.completed
     notify(db, order.master.user_id, STATUS_TITLES[OrderStatus.completed], f"Заказ #{order.id}")
@@ -181,7 +181,7 @@ def cancel(token: str, db: Session = Depends(get_db)):
 @router.post("/{token}/review", response_model=RequestOut)
 def review(token: str, data: ReviewCreate, db: Session = Depends(get_db)):
     order = _get(db, token)
-    if order.status != OrderStatus.completed:
+    if order.status != OrderStatus.completed or order.master is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Отзыв можно оставить только для завершённого заказа")
     db.add(Review(order_id=order.id, master_id=order.master_id, rating=data.rating, text=data.text))
     order.status = OrderStatus.reviewed

@@ -765,6 +765,14 @@ const I18N = {
   "app.iphoneNote": ["Значок откроет «Мастер рядом» на весь экран, как обычное приложение. Версия в App Store появится позже.", "Белги «Мастер рядом» тиркемесин толук экранда ачат. App Store'догу версия кийинчерээк чыгат.", "The icon opens «Мастер рядом» full screen like a regular app. An App Store version is coming later."],
   "app.yourPhone": ["Ваш телефон", "Сиздин телефон", "Your phone"],
   "app.inApp": ["Вы уже в приложении", "Сиз тиркемедесиз", "You're already in the app"],
+  "srv.Заказ из другого города": ["Заказ из другого города", "Башка шаардын буйрутмасы", "This order is in another city"],
+  "srv.Слишком большой запрос": ["Слишком большой запрос", "Суроо өтө чоң", "The request is too large"],
+
+  // ---------- admin: delete accounts ----------
+  "admin.delete": ["Удалить", "Өчүрүү", "Delete"],
+  "admin.deleteConfirm": ["Удалить «{name}» навсегда? Профиль, фото, услуги и отзывы о мастере будут удалены. Заявки клиентов останутся. Отменить нельзя.", "«{name}» биротоло өчүрүлсүнбү? Профиль, сүрөттөр, кызматтар жана уста жөнүндө пикирлер өчүрүлөт. Кардарлардын арыздары калат. Кайтаруу мүмкүн эмес.", "Delete “{name}” permanently? The profile, photos, services and reviews of this pro will be removed. Clients' requests stay. This can't be undone."],
+  "admin.deleted": ["Удалено", "Өчүрүлдү", "Deleted"],
+  "srv.Нельзя удалить администратора": ["Нельзя удалить администратора", "Администраторду өчүрүүгө болбойт", "An admin can't be deleted"],
 };
 
 // Server messages with variable parts: [regex, key, (match) => vars]

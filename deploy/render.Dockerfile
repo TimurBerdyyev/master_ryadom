@@ -20,5 +20,6 @@ RUN useradd --system --uid 1000 --home /app app \
     && chown -R app:app /app/uploads
 USER app
 
-# Render passes the port in $PORT (10000 by default); --proxy-headers gives the real client IP for rate limits.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips '*'"]
+# Render passes the port in $PORT (10000 by default). No --proxy-headers: X-Forwarded-For can be forged by
+# the client; the real IP for rate limits comes from Cloudflare's CF-Connecting-IP (CLIENT_IP_HEADER).
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

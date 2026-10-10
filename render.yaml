@@ -20,8 +20,15 @@ services:
         generateValue: true
       - key: TELEGRAM_WEBHOOK_SECRET
         generateValue: true
+      # production: the server refuses to start with unsafe settings and hides /api/docs.
       - key: ENVIRONMENT
-        value: development
+        value: production
+      # Only our own site may call the API from a browser (the Android app opens the same site).
+      - key: CORS_ORIGINS
+        value: https://master-ryadom.onrender.com
+      # Render sits behind Cloudflare: the real visitor IP (for login/request limits) is in this header.
+      - key: CLIENT_IP_HEADER
+        value: cf-connecting-ip
       # Real email through Brevo. SMTP_USER / SMTP_PASSWORD are secrets: Render asks for them when the
       # Blueprint is applied (sync: false), they are never stored in git. Port 2525 because Render's free
       # plan blocks outgoing traffic to the usual SMTP ports 25/465/587.

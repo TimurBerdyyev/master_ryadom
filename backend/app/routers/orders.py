@@ -208,6 +208,9 @@ def offer_order(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Заказ больше не принимает предложения")
     if order.client_id is not None and order.client_id == current_user.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Нельзя предложить цену на свой заказ")
+    # Same rules as the feed: only requests from the master's city (old orders without a city are open to all).
+    if order.city is not None and order.city != master.city:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Заказ из другого города")
     if order.category_id not in {s.category_id for s in master.services}:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
+from app.accounts import delete_user
 from app.auth import require_admin
 from app.database import get_db
 from app.models import (
@@ -96,6 +97,18 @@ def update_user_status(user_id: int, data: UserStatusUpdate, db: Session = Depen
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_account(user_id: int, db: Session = Depends(get_db)):
+    """Delete a master (or an old client account) with their personal data; orders of clients stay."""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Пользователь не найден")
+    if user.role == UserRole.admin:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Нельзя удалить администратора")
+    delete_user(db, user)
+    db.commit()
 
 
 @router.get("/masters", response_model=list[MasterOut])

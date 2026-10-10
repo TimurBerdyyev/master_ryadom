@@ -69,10 +69,19 @@ def _hit_memory(key: str, max_attempts: int, window_seconds: int) -> bool:
         return True
 
 
+def client_ip(request: Request) -> str:
+    """The real client address for per-IP limits (see settings.client_ip_header)."""
+    if settings.client_ip_header:
+        value = request.headers.get(settings.client_ip_header, "").split(",")[0].strip()
+        if value:
+            return value[:64]
+    return request.client.host if request.client else "unknown"
+
+
 def rate_limit(prefix: str, max_attempts: int, window_seconds: int):
     def dependency(request: Request) -> None:
-        client_ip = request.client.host if request.client else "unknown"
-        key = f"rl:{prefix}:{client_ip}"
+        ip = client_ip(request)
+        key = f"rl:{prefix}:{ip}"
         client = _get_redis()
         try:
             allowed = _hit_redis(client, key, max_attempts, window_seconds) if client else \

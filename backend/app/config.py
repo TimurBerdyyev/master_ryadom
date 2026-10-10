@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
     cors_origins: str = "*"
+    # Header with the real client IP set by the edge proxy, e.g. "cf-connecting-ip" behind Cloudflare (Render).
+    # Empty = the socket address (nginx in docker compose already replaces X-Forwarded-For with it).
+    # Never use X-Forwarded-For directly: its first value is whatever the client sent.
+    client_ip_header: str = ""
     upload_dir: str = "uploads"
     max_upload_size_mb: int = 5
 

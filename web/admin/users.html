@@ -49,10 +49,12 @@
 
     const roleLabels = { client: t("admin.roleClient"), master: t("admin.roleMaster"), admin: t("admin.roleAdmin") };
 
+    let users = [];
+
     async function load() {
       const content = document.getElementById("content");
       try {
-        const users = await api.adminUsers();
+        users = await api.adminUsers();
         content.innerHTML = `
           <div class="table-wrap"><table class="admin-table">
             <thead>
@@ -68,9 +70,12 @@
                   <td>${statusPill(u.status)}</td>
                   <td>${formatDate(u.created_at)}</td>
                   <td>
+                    <div class="row" style="gap:6px;flex-wrap:nowrap">
                     ${u.role === "admin" ? "" : u.status === "blocked"
                       ? `<button class="btn small secondary" onclick="setStatus(${u.id}, 'active')">${t("admin.unblock")}</button>`
                       : `<button class="btn small danger-soft" onclick="setStatus(${u.id}, 'blocked')">${t("admin.block")}</button>`}
+                    ${u.role === "admin" ? "" : `<button class="btn small danger" onclick="removeUser(${u.id})" title="${t("admin.delete")}" aria-label="${t("admin.delete")}">${icon("trash-2")}</button>`}
+                    </div>
                   </td>
                 </tr>
               `).join("")}
@@ -80,6 +85,11 @@
       } catch (e) {
         content.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
       }
+    }
+
+    function removeUser(id) {
+      const user = users.find(u => u.id === id);
+      adminDeleteAccount(id, user ? user.name : `#${id}`, load);
     }
 
     async function setStatus(id, status) {

@@ -4,6 +4,7 @@ import os
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -102,18 +103,43 @@ async def lifespan(_app: FastAPI):
         await checker
 
 
-app = FastAPI(title="Мастер рядом API", lifespan=lifespan)
+IS_PRODUCTION = settings.environment == "production"
+# The API description (/docs) is handy in development; in production it only helps attackers map the API.
+app = FastAPI(
+    title="Мастер рядом API", lifespan=lifespan,
+    docs_url=None if IS_PRODUCTION else "/docs", redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+)
+
+# Pages: scripts only from our own files (inline handlers are used across the static pages), fonts from
+# Google Fonts, API calls only to our origin, no framing, no plugins. Limits what an injected script could do.
+PAGE_CSP = (
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
+    "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+)
+# Biggest legitimate body: 5 photos of MAX_UPLOAD_SIZE_MB each plus form overhead.
+MAX_BODY_BYTES = (settings.max_upload_size_mb * 5 + 1) * 1024 * 1024
 
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    length = request.headers.get("content-length")
+    if length and length.isdigit() and int(length) > MAX_BODY_BYTES:
+        return JSONResponse({"detail": "Слишком большой запрос"}, status_code=413)
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    if IS_PRODUCTION:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     if request.url.path.startswith(("/uploads/", "/api/uploads/")):
         # Uploaded files are only ever images: forbid any script/plugin execution even if one slips through.
         response.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; sandbox"
+    elif response.headers.get("content-type", "").startswith("text/html"):
+        response.headers.setdefault("Content-Security-Policy", PAGE_CSP)
     return response
 
 

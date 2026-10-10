@@ -41,10 +41,12 @@
   <script src="../js/nav.js"></script>
   <script src="guard.js"></script>
   <script>
+    let masters = [];
+
     async function load() {
       const content = document.getElementById("content");
       try {
-        const masters = await api.adminMasters();
+        masters = await api.adminMasters();
         content.innerHTML = `
           <div class="table-wrap"><table class="admin-table">
             <thead>
@@ -65,6 +67,7 @@
                     ${m.verified
                       ? `<button class="btn small secondary" onclick="setVerified(${m.id}, false)">${t("admin.unverify")}</button>`
                       : `<button class="btn small" onclick="setVerified(${m.id}, true)">${t("admin.verify")}</button>`}
+                    <button class="btn small danger" onclick="removeMaster(${m.id})" title="${t("admin.delete")}" aria-label="${t("admin.delete")}">${icon("trash-2")}</button>
                   </td>
                 </tr>
               `).join("")}
@@ -74,6 +77,11 @@
       } catch (e) {
         content.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
       }
+    }
+
+    function removeMaster(id) {
+      const master = masters.find(m => m.id === id);
+      if (master) adminDeleteAccount(master.user.id, master.user.name, load);
     }
 
     async function setVerified(id, verified) {

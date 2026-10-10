@@ -209,6 +209,18 @@ async function copyText(text) {
   toast(t("common.copied"));
 }
 
+// Admin: permanently delete an account after a confirmation that names the person.
+async function adminDeleteAccount(userId, name, onDone) {
+  if (!confirm(t("admin.deleteConfirm", { name }))) return;
+  try {
+    await api.adminDeleteUser(userId);
+    toast(t("admin.deleted"));
+    onDone();
+  } catch (e) {
+    toast(t("common.error") + e.message);
+  }
+}
+
 function skeletons(count, height = 92) {
   return Array.from({ length: count }, () => `<div class="skeleton" style="height:${height}px"></div>`).join("");
 }
@@ -394,6 +406,7 @@ const api = {
 
   adminStats: () => apiRequest("/admin/stats"),
   adminUsers: (params = {}) => apiRequest(`/admin/users?${new URLSearchParams(params)}`),
+  adminDeleteUser: (id) => apiRequest(`/admin/users/${id}`, { method: "DELETE" }),
   adminSetUserStatus: (id, status) => apiRequest(`/admin/users/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
   adminMasters: (params = {}) => apiRequest(`/admin/masters?${new URLSearchParams(params)}`),
   adminVerifyMaster: (id, verified) => apiRequest(`/admin/masters/${id}/verify`, { method: "PATCH", body: JSON.stringify({ verified }) }),

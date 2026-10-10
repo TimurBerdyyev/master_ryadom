@@ -502,6 +502,111 @@ def test_auth_hardening(client):
     assert codes[-1] == 429
 
 
+def test_rate_limit_ignores_forged_ip(client, monkeypatch):
+    """X-Forwarded-For is set by the client — changing it must not reset the login limit."""
+    from app.config import settings
+    body = {"phone": "+996700000777", "password": "bad"}
+    rate_limit._attempts.clear()
+    codes = [client.post("/auth/login", json=body, headers={"X-Forwarded-For": f"10.0.0.{i}"}).status_code
+             for i in range(11)]
+    assert codes[-1] == 429
+
+    # Behind Cloudflare (Render) the real IP comes from CF-Connecting-IP, which the client can't forge.
+    monkeypatch.setattr(settings, "client_ip_header", "cf-connecting-ip")
+    rate_limit._attempts.clear()
+    same = {"CF-Connecting-IP": "203.0.113.5"}
+    codes = [client.post("/auth/login", json=body, headers={**same, "X-Forwarded-For": f"10.1.0.{i}"}).status_code
+             for i in range(11)]
+    assert codes[-1] == 429
+    assert client.post("/auth/login", json=body, headers={"CF-Connecting-IP": "203.0.113.6"}).status_code == 401
+
+
+def test_offer_only_in_own_city(client):
+    master_h, _ = register_master(client, city="Кемин")
+    _, req = create_request(client, city="Арван")
+    r = client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 100})
+    assert r.status_code == 403 and "город" in r.json()["detail"]
+
+
+def test_photo_location_is_removed(client):
+    """EXIF (GPS of the client's home) must not survive the upload."""
+    import os
+
+    from app.config import settings
+    exif = b"\xff\xe1" + (len(b"Exif\x00\x00GPS-42.87,74.59") + 2).to_bytes(2, "big") + b"Exif\x00\x00GPS-42.87,74.59"
+    jfif = b"\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+    jpeg = b"\xff\xd8" + jfif + exif + b"\xff\xda\x00\x02" + b"\x11" * 20 + b"\xff\xd9"
+    token, _ = create_request(client)
+    url = client.post(f"/requests/{token}/photos", files={"files": ("p.jpg", jpeg, "image/jpeg")}).json()[0]["url"]
+    saved = open(os.path.join(settings.upload_dir, url.removeprefix("/uploads/")), "rb").read()
+    assert b"GPS" not in saved and b"Exif" not in saved
+    assert saved.startswith(b"\xff\xd8\xff\xe0") and saved.endswith(b"\x11" * 20 + b"\xff\xd9")
+
+    text = b"GPS\x0042.87,74.59"
+    ihdr = (13).to_bytes(4, "big") + b"IHDR" + b"\x00" * 13 + b"\x00" * 4
+    png = PNG[:8] + ihdr + len(text).to_bytes(4, "big") + b"tEXt" + text + b"\x00" * 4 + b"\x00" * 4 + b"IEND" + b"\x00" * 4
+    token, _ = create_request(client)
+    url = client.post(f"/requests/{token}/photos", files={"files": ("p.png", png, "image/png")}).json()[0]["url"]
+    saved = open(os.path.join(settings.upload_dir, url.removeprefix("/uploads/")), "rb").read()
+    assert b"GPS" not in saved and b"IHDR" in saved and b"IEND" in saved
+
+    # a file the stripper can't parse is stored unchanged rather than mangled
+    from app.uploads import strip_metadata
+    assert strip_metadata(PNG, "image/png") == PNG
+
+
+def test_huge_request_is_rejected(client):
+    from app.main import MAX_BODY_BYTES
+    r = client.post("/requests", content=b"x", headers={"Content-Type": "application/json",
+                                                       "Content-Length": str(MAX_BODY_BYTES + 1)})
+    assert r.status_code == 413
+
+
+def test_admin_deletes_master(client, outbox):
+    import os
+
+    from app.config import settings
+    master_h, phone = register_master(client, "Удаляемый", city="Кара-Суу", notify_enabled=True)
+    mid = master_id_of(client, master_h)
+    user_id = client.get("/auth/me", headers=master_h).json()["id"]
+    avatar = client.post("/masters/me/avatar", headers=master_h, files={"file": ("a.png", PNG, "image/png")}).json()["user"]["photo"]
+    client.post("/masters/me/photos", headers=master_h, files={"files": ("w.png", PNG, "image/png")})
+
+    # one finished job with a review, one job in progress, one open request with an offer
+    done_token, done = create_request(client, city="Кара-Суу")
+    offer = client.post(f"/orders/{done['id']}/offer", headers=master_h, json={"price": 100}).json()
+    client.post(f"/requests/{done_token}/accept", params={"offer_id": offer["id"]})
+    client.post(f"/orders/{done['id']}/status", headers=master_h, json={"status": "completed"})
+    client.post(f"/requests/{done_token}/review", json={"rating": 5})
+    work_token, work = create_request(client, city="Кара-Суу")
+    offer = client.post(f"/orders/{work['id']}/offer", headers=master_h, json={"price": 200}).json()
+    client.post(f"/requests/{work_token}/accept", params={"offer_id": offer["id"]})
+    client.post(f"/orders/{work['id']}/status", headers=master_h, json={"status": "in_progress"})
+    client.post(f"/requests/{work_token}/complaint", json={"text": "Пропал"})
+    open_token, open_req = create_request(client, city="Кара-Суу")
+    client.post(f"/orders/{open_req['id']}/offer", headers=master_h, json={"price": 300})
+
+    admin_h = make_admin(client)
+    assert client.delete(f"/admin/users/{user_id}", headers=master_h).status_code == 403
+    assert client.delete(f"/admin/users/{user_id}", headers=admin_h).status_code == 204
+    assert client.delete(f"/admin/users/{user_id}", headers=admin_h).status_code == 404
+
+    # the account and the public profile are gone, the old login token doesn't work
+    assert client.get("/auth/me", headers=master_h).status_code == 401
+    assert client.post("/auth/login", json={"phone": phone, "password": "secret123"}).status_code == 401
+    assert client.get(f"/masters/{mid}").status_code == 404
+    assert not os.path.exists(os.path.join(settings.upload_dir, avatar.removeprefix("/uploads/")))
+    # clients keep their requests: the unfinished one is looking for a pro again
+    view = client.get(f"/requests/{work_token}").json()
+    assert view["status"] == "searching" and view["master_contact"] is None
+    assert client.post(f"/requests/{work_token}/complete").status_code == 400
+    assert client.get(f"/requests/{done_token}").json()["status"] == "reviewed"
+    assert client.get(f"/requests/{open_token}").json()["offers"] == []
+    assert any(c["text"] == "Пропал" for c in client.get("/admin/complaints", headers=admin_h).json())
+    admin_id = client.get("/auth/me", headers=admin_h).json()["id"]
+    assert client.delete(f"/admin/users/{admin_id}", headers=admin_h).status_code == 400
+
+
 def test_blocked_master(client):
     headers, _ = register_master(client, "Заблокированный")
     mid = master_id_of(client, headers)
