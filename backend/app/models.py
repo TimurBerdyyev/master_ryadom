@@ -7,6 +7,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    UniqueConstraint,
     Integer,
     Numeric,
     String,
@@ -106,6 +107,9 @@ class Master(Base):
     rating_penalty: Mapped[float] = mapped_column(Float, default=0.0)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Live location on the clients' map: only while the master shares it (switch in the app) and it is fresh.
+    location_shared: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    location_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     user: Mapped["User"] = relationship(back_populates="master")
@@ -150,6 +154,8 @@ class Order(Base):
     client_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     client_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # The client's chat/notification key (from their browser), to tell them about offers by Web Push.
+    client_key_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     client_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), index=True)
     master_id: Mapped[int | None] = mapped_column(ForeignKey("masters.id"), nullable=True, index=True)
@@ -377,3 +383,59 @@ class PushDevice(Base):
     platform: Mapped[str] = mapped_column(String(16), default="android")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Conversation(Base):
+    """A chat between a client (no account: identified by a secret key from their browser) and a master."""
+    __tablename__ = "conversations"
+    __table_args__ = (UniqueConstraint("master_id", "client_key_hash", name="uq_conversation_master_client"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"), index=True)
+    # SHA-256 of the client's chat key; the key itself never leaves the client's browser except in requests.
+    client_key_hash: Mapped[str] = mapped_column(String(64), index=True)
+    client_name: Mapped[str] = mapped_column(String(100))
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_message_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    client_unread: Mapped[int] = mapped_column(Integer, default=0)
+    master_unread: Mapped[int] = mapped_column(Integer, default=0)
+    blocked_by_master: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    master: Mapped["Master"] = relationship()
+    messages: Mapped[list["ChatMessage"]] = relationship(back_populates="conversation", order_by="ChatMessage.id")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    sender: Mapped[str] = mapped_column(String(8))  # "client" | "master"
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+
+
+class AppSetting(Base):
+    """Small server-generated values that must survive restarts (e.g. the Web Push VAPID key)."""
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+
+
+class WebPushSubscription(Base):
+    """A browser (or the site installed as an app) that agreed to notifications: a master or a client."""
+    __tablename__ = "web_push_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    endpoint: Mapped[str] = mapped_column(String(1000), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(200))
+    auth: Mapped[str] = mapped_column(String(100))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    client_key_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    lang: Mapped[str] = mapped_column(String(2), default="ru")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

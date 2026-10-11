@@ -15,7 +15,7 @@ from app.payments import get_provider
 from app.email import get_email_provider
 from app.sms import get_sms_provider
 from app.routers import (
-    admin, auth, categories, complaints, masters, notifications, orders, requests, reviews, subscriptions,
+    admin, auth, categories, chats, complaints, masters, notifications, orders, requests, reviews, subscriptions,
 )
 from app.dispatch import check_missed
 from app.create_admin import ensure_admin
@@ -132,7 +132,7 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(self), microphone=(), camera=()")
     if IS_PRODUCTION:
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     if request.url.path.startswith(("/uploads/", "/api/uploads/")):
@@ -157,6 +157,7 @@ app.include_router(categories.router)
 app.include_router(masters.router)
 app.include_router(orders.router)
 app.include_router(requests.router)
+app.include_router(chats.router)
 app.include_router(reviews.router)
 app.include_router(notifications.router)
 app.include_router(notifications.telegram_router)

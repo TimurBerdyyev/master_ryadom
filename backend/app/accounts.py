@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Address,
+    ChatMessage,
     Complaint,
+    Conversation,
     Master,
     MasterSubscription,
     Message,
@@ -24,6 +26,7 @@ from app.models import (
     Service,
     SubscriptionPayment,
     User,
+    WebPushSubscription,
     WorkingHours,
 )
 from app.uploads import delete_upload
@@ -38,6 +41,12 @@ def delete_user(db: Session, user: User) -> None:
     master = db.query(Master).filter(Master.user_id == user.id).first()
     if master is not None:
         files += [p.url for p in db.query(Photo).filter(Photo.master_id == master.id)]
+        conversation_ids = [c.id for c in db.query(Conversation.id).filter(Conversation.master_id == master.id)]
+        if conversation_ids:
+            files += [m.photo for m in db.query(ChatMessage).filter(
+                ChatMessage.conversation_id.in_(conversation_ids), ChatMessage.photo.is_not(None))]
+            db.query(ChatMessage).filter(ChatMessage.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
+            db.query(Conversation).filter(Conversation.id.in_(conversation_ids)).delete(synchronize_session=False)
         for model in (Service, Photo, WorkingHours, OrderOffer, RequestDelivery, Review, MasterSubscription,
                       SubscriptionPayment):
             db.query(model).filter(model.master_id == master.id).delete(synchronize_session=False)
@@ -53,7 +62,7 @@ def delete_user(db: Session, user: User) -> None:
     db.query(Complaint).filter(Complaint.author_id == user.id).update({Complaint.author_id: None}, synchronize_session=False)
     db.query(Complaint).filter(Complaint.target_user_id == user.id).update(
         {Complaint.target_user_id: None}, synchronize_session=False)
-    for model in (Notification, NotificationSettings, Address, PushDevice):
+    for model in (Notification, NotificationSettings, Address, PushDevice, WebPushSubscription):
         db.query(model).filter(model.user_id == user.id).delete(synchronize_session=False)
     db.query(Message).filter(Message.sender_id == user.id).delete(synchronize_session=False)
     db.delete(user)

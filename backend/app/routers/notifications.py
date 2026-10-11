@@ -1,14 +1,15 @@
+import hashlib
 import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
-from app import push
+from app.auth import get_current_user, get_current_user_optional
+from app import push, webpush
 from app.config import settings
 from app.rate_limit import rate_limit
 from app.database import get_db
-from app.models import Notification, NotificationSettings, PushDevice, User, UserRole, utcnow
+from app.models import Notification, NotificationSettings, PushDevice, User, UserRole, WebPushSubscription, utcnow
 from app.sms import get_sms_provider
 from app.schemas import (
     NotificationOut,
@@ -16,6 +17,9 @@ from app.schemas import (
     NotificationSettingsOut,
     PushDeviceIn,
     PushTestOut,
+    WebPushEndpointIn,
+    WebPushKeyOut,
+    WebPushSubscriptionIn,
     TelegramLinkOut,
     UnreadCountOut,
 )
@@ -108,6 +112,7 @@ def telegram_link(current_user: User = Depends(get_current_user), db: Session = 
 
 MAX_DEVICES_PER_USER = 10
 push_test_rate_limit = rate_limit("push-test", max_attempts=10, window_seconds=600)
+web_push_rate_limit = rate_limit("web-push", max_attempts=30, window_seconds=3600)
 
 
 @router.post("/devices", status_code=status.HTTP_204_NO_CONTENT)
@@ -146,6 +151,42 @@ def test_push(current_user: User = Depends(get_current_user), db: Session = Depe
 def remove_device(data: PushDeviceIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """On logout: stop notifications to this phone."""
     db.query(PushDevice).filter(PushDevice.token == data.token, PushDevice.user_id == current_user.id).delete()
+    db.commit()
+
+
+
+@router.get("/web-push/key", response_model=WebPushKeyOut)
+def web_push_key(db: Session = Depends(get_db)):
+    """The server's public VAPID key for pushManager.subscribe()."""
+    return WebPushKeyOut(public_key=webpush.vapid_public_key(db))
+
+
+@router.post("/web-push/subscribe", status_code=status.HTTP_204_NO_CONTENT,
+             dependencies=[Depends(web_push_rate_limit)])
+def web_push_subscribe(
+    data: WebPushSubscriptionIn,
+    current_user: User | None = Depends(get_current_user_optional),
+    x_client_key: str | None = Header(None),
+    db: Session = Depends(get_db),
+):
+    """A browser agreed to notifications: tie it to the logged-in master and/or the client's key."""
+    key_hash = hashlib.sha256(x_client_key.encode()).hexdigest() if x_client_key and 32 <= len(x_client_key) <= 128 else None
+    if current_user is None and key_hash is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Нужен ключ чата")
+    subscription = db.query(WebPushSubscription).filter(WebPushSubscription.endpoint == data.endpoint).first()
+    if subscription is None:
+        subscription = WebPushSubscription(endpoint=data.endpoint)
+        db.add(subscription)
+    subscription.p256dh, subscription.auth, subscription.lang = data.keys.p256dh, data.keys.auth, data.lang
+    subscription.user_id = current_user.id if current_user else None
+    subscription.client_key_hash = key_hash
+    db.commit()
+
+
+@router.post("/web-push/unsubscribe", status_code=status.HTTP_204_NO_CONTENT)
+def web_push_unsubscribe(data: WebPushEndpointIn, db: Session = Depends(get_db)):
+    """Knowing the endpoint (a long secret URL from the browser) is enough to stop it."""
+    db.query(WebPushSubscription).filter(WebPushSubscription.endpoint == data.endpoint).delete()
     db.commit()
 
 

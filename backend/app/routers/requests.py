@@ -8,7 +8,7 @@ import hashlib
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import settings
@@ -92,7 +92,7 @@ def _out(order: Order) -> RequestOut:
 
 
 @router.post("", response_model=RequestCreatedOut, dependencies=[Depends(create_rate_limit)])
-def create_request(data: RequestCreate, db: Session = Depends(get_db)):
+def create_request(data: RequestCreate, db: Session = Depends(get_db), x_client_key: str | None = Header(None)):
     if data.website:  # honeypot filled in: a bot
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Не удалось отправить заявку")
     if db.get(Category, data.category_id) is None:
@@ -108,6 +108,8 @@ def create_request(data: RequestCreate, db: Session = Depends(get_db)):
         client_name=data.name,
         client_phone=data.phone,
         client_token_hash=_hash(token),
+        # The browser's notification key: Web Push about offers goes to the browsers subscribed with it.
+        client_key_hash=_hash(x_client_key) if x_client_key and 32 <= len(x_client_key) <= 128 else None,
         category_id=data.category_id,
         city=data.city,
         description=data.description,

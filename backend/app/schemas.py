@@ -211,6 +211,7 @@ class MasterMeOut(MasterOut):
     missed_requests: int = 0
     rating_penalty: float = 0
     agreement_accepted: bool = False
+    location_shared: bool = False
 
 
 class MasterRegister(BaseModel):
@@ -432,6 +433,111 @@ class AdminStats(BaseModel):
 class PushDeviceIn(BaseModel):
     token: str = Field(min_length=20, max_length=512)
     platform: Literal["android", "ios"] = "android"
+
+
+_chat_text = Annotated[str, Field(min_length=1, max_length=2000)]
+
+
+class ChatStartIn(BaseModel):
+    master_id: int
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+    text: _chat_text
+
+    @field_validator("name", "text")
+    @classmethod
+    def _strip(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Заполните обязательные поля")
+        return value
+
+
+class ChatMessageIn(BaseModel):
+    text: _chat_text
+
+    @field_validator("text")
+    @classmethod
+    def _strip(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Заполните обязательные поля")
+        return value
+
+
+class ChatMessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    sender: Literal["client", "master"]
+    text: str | None = None
+    photo: str | None = None
+    created_at: datetime
+
+
+class ConversationOut(BaseModel):
+    id: int
+    master: MasterBriefOut
+    client_name: str
+    last_message: str | None = None
+    last_is_photo: bool = False
+    last_sender: str | None = None
+    last_message_at: datetime
+    unread: int = 0
+    blocked: bool = False
+
+
+class LocationIn(BaseModel):
+    lat: Latitude
+    lon: Longitude
+    accuracy: float | None = Field(None, ge=0, le=100_000)
+
+
+class NearbyMasterOut(BaseModel):
+    id: int
+    name: str
+    photo: str | None = None
+    phone: str | None = None
+    rating: float
+    completed_orders: int
+    verified: bool
+    lat: float
+    lon: float
+    distance_km: float
+    minutes_ago: int
+    price_from: float | None = None
+
+
+class WebPushKeys(BaseModel):
+    p256dh: str = Field(min_length=80, max_length=200)
+    auth: str = Field(min_length=16, max_length=100)
+
+
+# Push services of Chrome/Android, Firefox, Safari/iPhone and Edge. The server POSTs to the endpoint, so any
+# other host is refused — otherwise a "subscription" could make the server call internal addresses (SSRF).
+WEB_PUSH_HOSTS = ("fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com")
+
+
+class WebPushEndpointIn(BaseModel):
+    endpoint: str = Field(min_length=20, max_length=1000, pattern=r"^https://")
+
+    @field_validator("endpoint")
+    @classmethod
+    def _known_push_service(cls, value: str) -> str:
+        from urllib.parse import urlsplit
+        parts = urlsplit(value)
+        host = (parts.hostname or "").lower()
+        if parts.port not in (None, 443) or not any(host == h or host.endswith("." + h) for h in WEB_PUSH_HOSTS):
+            raise ValueError("Неизвестный сервис уведомлений")
+        return value
+
+
+class WebPushSubscriptionIn(WebPushEndpointIn):
+    keys: WebPushKeys
+    lang: Literal["ru", "ky", "en"] = "ru"
+
+
+class WebPushKeyOut(BaseModel):
+    public_key: str
 
 
 class PushTestOut(BaseModel):

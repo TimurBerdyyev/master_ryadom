@@ -1,3 +1,4 @@
+from datetime import timedelta
 from math import asin, cos, radians, sin, sqrt
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -8,7 +9,9 @@ from app.auth import get_current_user, get_current_user_optional
 from app.config import settings
 from app.database import get_db
 from app.models import Category, Master, Photo, Service, User, UserRole, UserStatus, utcnow
-from app.schemas import MasterMeOut, MasterOut, MasterProfileUpdate, PhotoOut, ServiceCreate, ServiceOut
+from app.schemas import (
+    LocationIn, MasterMeOut, MasterOut, MasterProfileUpdate, NearbyMasterOut, PhotoOut, ServiceCreate, ServiceOut,
+)
 from app.subscriptions import filter_masters_with_access
 from app.uploads import delete_upload, save_upload
 
@@ -103,6 +106,63 @@ def search_masters(
 
     # Phones are public: clients call masters without registering.
     return [MasterOut.model_validate(m) for m in masters]
+
+
+@router.get("/nearby", response_model=list[NearbyMasterOut])
+def nearby_masters(
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+    category_id: int | None = None,
+    radius_km: float = Query(15, gt=0, le=100),
+    db: Session = Depends(get_db),
+):
+    """Masters sharing their live location near the client (the map). Only fresh positions are shown."""
+    fresh_after = utcnow() - timedelta(minutes=settings.live_location_minutes)
+    query = (
+        db.query(Master)
+        .options(selectinload(Master.user), selectinload(Master.services))
+        .join(User, Master.user_id == User.id)
+        .filter(User.status == UserStatus.active, Master.location_shared.is_(True),
+                Master.location_updated_at >= fresh_after, Master.latitude.is_not(None), Master.longitude.is_not(None))
+    )
+    query = filter_masters_with_access(query)
+    if settings.masters_require_verification:
+        query = query.filter(Master.verified.is_(True))
+    if category_id is not None:
+        query = query.filter(Master.services.any(Service.category_id == category_id))
+    now = utcnow()
+    result = []
+    for m in query.limit(500).all():
+        distance = haversine_km(lat, lon, m.latitude, m.longitude)
+        if distance > radius_km:
+            continue
+        prices = [s.price_from for s in m.services if category_id is None or s.category_id == category_id]
+        result.append(NearbyMasterOut(
+            id=m.id, name=m.user.name, photo=m.user.photo, phone=m.user.phone, rating=m.rating,
+            completed_orders=m.completed_orders, verified=m.verified,
+            lat=round(m.latitude, 4), lon=round(m.longitude, 4), distance_km=round(distance, 1),
+            minutes_ago=max(0, int((now - m.location_updated_at).total_seconds() // 60)),
+            price_from=min(prices) if prices else None,
+        ))
+    return sorted(result, key=lambda r: r.distance_km)[:100]
+
+
+@router.put("/me/location", status_code=status.HTTP_204_NO_CONTENT)
+def share_location(data: LocationIn, master: Master = Depends(require_master), db: Session = Depends(get_db)):
+    """The app sends the master's position while "Показывать меня на карте" is on."""
+    master.latitude, master.longitude = data.lat, data.lon
+    master.location_shared = True
+    master.location_updated_at = utcnow()
+    db.commit()
+
+
+@router.delete("/me/location", status_code=status.HTTP_204_NO_CONTENT)
+def stop_sharing_location(master: Master = Depends(require_master), db: Session = Depends(get_db)):
+    """Hide from the map right away (the stored position is forgotten too)."""
+    master.location_shared = False
+    master.latitude = master.longitude = None
+    master.location_updated_at = None
+    db.commit()
 
 
 @router.get("/me", response_model=MasterMeOut)

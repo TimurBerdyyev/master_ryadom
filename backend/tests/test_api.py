@@ -607,6 +607,237 @@ def test_admin_deletes_master(client, outbox):
     assert client.delete(f"/admin/users/{admin_id}", headers=admin_h).status_code == 400
 
 
+CLIENT_KEY = {"X-Client-Key": "client-chat-key-0123456789abcdef-AAAA"}
+OTHER_KEY = {"X-Client-Key": "client-chat-key-0123456789abcdef-BBBB"}
+
+
+def test_chat_between_client_and_master(client, fcm):
+    master_h, _ = register_master(client, "Чат Мастер", city="Исфана")
+    mid = master_id_of(client, master_h)
+    client.post("/notifications/devices", headers=master_h, json={"token": "chat-phone-token-0123456789"})
+
+    # a client without an account writes from the master's profile
+    assert client.post("/chats", json={"master_id": mid, "name": "Айгуль", "text": "Здравствуйте"}).status_code == 401
+    fcm.clear()
+    chat = client.post("/chats", headers=CLIENT_KEY, json={"master_id": mid, "name": "Айгуль", "text": "Сколько стоит замена крана?"}).json()
+    assert chat["master"]["name"] == "Чат Мастер" and chat["last_message"] == "Сколько стоит замена крана?"
+    assert fcm == [("chat-phone-token-0123456789", "Новое сообщение", "Айгуль: Сколько стоит замена крана?", f"/chat.html?id={chat['id']}")]
+    # a second message while still unread: no second notification
+    client.post(f"/chats/{chat['id']}/messages", headers=CLIENT_KEY, json={"text": "Сегодня сможете?"})
+    assert len(fcm) == 1
+    # writing again from the profile reuses the same chat
+    again = client.post("/chats", headers=CLIENT_KEY, json={"master_id": mid, "name": "Айгуль", "text": "Ау"}).json()
+    assert again["id"] == chat["id"]
+
+    # the master sees the chat with 3 unread, reads, answers
+    chats = client.get("/chats", headers=master_h).json()
+    assert [c["unread"] for c in chats if c["id"] == chat["id"]] == [3]
+    assert client.get("/chats/unread", headers=master_h).json()["unread"] == 3
+    texts = [m["text"] for m in client.get(f"/chats/{chat['id']}/messages", headers=master_h).json()]
+    assert texts == ["Сколько стоит замена крана?", "Сегодня сможете?", "Ау"]
+    assert client.get("/chats/unread", headers=master_h).json()["unread"] == 0
+    reply = client.post(f"/chats/{chat['id']}/messages", headers=master_h, json={"text": "Да, 800 сом"}).json()
+    assert reply["sender"] == "master"
+
+    # the client gets only new messages (polling with after_id)
+    assert client.get("/chats/unread", headers=CLIENT_KEY).json()["unread"] == 1
+    new = client.get(f"/chats/{chat['id']}/messages", params={"after_id": reply["id"] - 1}, headers=CLIENT_KEY).json()
+    assert [m["text"] for m in new] == ["Да, 800 сом"]
+    photo = client.post(f"/chats/{chat['id']}/photos", headers=CLIENT_KEY, files={"file": ("p.png", PNG, "image/png")}).json()
+    assert photo["photo"].startswith(f"/uploads/chats/{chat['id']}/")
+
+    # privacy: another browser, another master, no key
+    assert client.get(f"/chats/{chat['id']}/messages", headers=OTHER_KEY).status_code == 404
+    other_h, _ = register_master(client, city="Исфана")
+    assert client.get(f"/chats/{chat['id']}/messages", headers=other_h).status_code == 404
+    assert client.get("/chats", headers=OTHER_KEY).json() == []
+    assert client.get(f"/chats/{chat['id']}/messages", headers={"X-Client-Key": "short"}).status_code == 401
+    assert client.post("/chats", headers=CLIENT_KEY, json={"master_id": mid, "name": " ", "text": "x"}).status_code == 422
+
+    # the master blocks a spammer
+    assert client.post(f"/chats/{chat['id']}/block", headers=CLIENT_KEY).status_code == 403
+    assert client.post(f"/chats/{chat['id']}/block", headers=master_h).json()["blocked"] is True
+    assert client.post(f"/chats/{chat['id']}/messages", headers=CLIENT_KEY, json={"text": "!!!"}).status_code == 403
+
+
+def test_chat_with_unverified_master_is_impossible(client, monkeypatch):
+    from app.config import settings
+    monkeypatch.setattr(settings, "masters_require_verification", True)
+    master_h, _ = register_master(client, city="Кемин")
+    mid = master_id_of(client, master_h)
+    r = client.post("/chats", headers=CLIENT_KEY, json={"master_id": mid, "name": "А", "text": "Привет"})
+    assert r.status_code == 404
+
+
+def test_live_location_on_the_map(client):
+    from datetime import timedelta
+
+    from app.models import Master, utcnow
+    near_h, _ = register_master(client, "Рядом", city="Бишкек")
+    far_h, _ = register_master(client, "Далеко", city="Бишкек")
+    electric_h, _ = register_master(client, "Электрик", category="Электрика", city="Бишкек")
+    silent_h, _ = register_master(client, "Не делится", city="Бишкек")
+    plumbing = category_id(client)
+    me = (42.8746, 74.5698)  # Bishkek centre
+
+    client.put("/masters/me/location", headers=near_h, json={"lat": 42.8800, "lon": 74.5800})
+    client.put("/masters/me/location", headers=far_h, json={"lat": 42.4500, "lon": 75.2000})  # ~70 km
+    client.put("/masters/me/location", headers=electric_h, json={"lat": 42.8750, "lon": 74.5700})
+    assert client.put("/masters/me/location", json={"lat": 1, "lon": 1}).status_code == 401
+    assert client.put("/masters/me/location", headers=near_h, json={"lat": 100, "lon": 1}).status_code == 422
+    assert client.get("/masters/me", headers=near_h).json()["location_shared"] is True
+
+    found = client.get("/masters/nearby", params={"lat": me[0], "lon": me[1], "category_id": plumbing}).json()
+    names = [m["name"] for m in found]
+    assert "Рядом" in names and "Далеко" not in names and "Электрик" not in names and "Не делится" not in names
+    near = next(m for m in found if m["name"] == "Рядом")
+    assert near["distance_km"] < 2 and near["minutes_ago"] == 0 and near["price_from"] == 500 and near["phone"]
+
+    # stale positions disappear
+    db = SessionLocal()
+    db.query(Master).filter(Master.id == master_id_of(client, near_h)).update(
+        {Master.location_updated_at: utcnow() - timedelta(hours=2)})
+    db.commit()
+    db.close()
+    assert "Рядом" not in [m["name"] for m in client.get("/masters/nearby", params={"lat": me[0], "lon": me[1]}).json()]
+
+    # turning sharing off removes the master and forgets the position
+    client.delete("/masters/me/location", headers=electric_h)
+    assert "Электрик" not in [m["name"] for m in client.get("/masters/nearby", params={"lat": me[0], "lon": me[1]}).json()]
+    assert client.get("/masters/me", headers=electric_h).json()["location_shared"] is False
+
+
+def _browser_keys():
+    """A fake browser's push keys, as pushManager.subscribe() would produce."""
+    import os as os_
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    from app.webpush import b64url
+    private = ec.generate_private_key(ec.SECP256R1())
+    public = private.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    auth = os_.urandom(16)
+    return private, {"p256dh": b64url(public), "auth": b64url(auth)}
+
+
+def _browser_decrypt(private, keys, body: bytes) -> dict:
+    """What the browser does with a push message (RFC 8291)."""
+    import json as json_
+
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+    from app.webpush import b64url_decode
+    salt, idlen = body[:16], body[20]
+    as_public, ciphertext = body[21:21 + idlen], body[21 + idlen:]
+    shared = private.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), as_public))
+    ua_public = b64url_decode(keys["p256dh"])
+    ikm = HKDF(hashes.SHA256(), 32, salt=b64url_decode(keys["auth"]), info=b"WebPush: info\x00" + ua_public + as_public).derive(shared)
+    cek = HKDF(hashes.SHA256(), 16, salt=salt, info=b"Content-Encoding: aes128gcm\x00").derive(ikm)
+    nonce = HKDF(hashes.SHA256(), 12, salt=salt, info=b"Content-Encoding: nonce\x00").derive(ikm)
+    plain = AESGCM(cek).decrypt(nonce, ciphertext, None)
+    assert plain.endswith(b"\x02")
+    return json_.loads(plain[:-1])
+
+
+@pytest.fixture
+def push_service(monkeypatch, outbox):
+    """Stub of the browsers' push services: decrypts what we send, like a browser would."""
+    from app import webpush
+    browsers, received = {}, []
+
+    class Response:
+        def __init__(self, status_code):
+            self.status_code, self.text = status_code, ""
+
+    def post(url, content=None, headers=None, timeout=None, **_):
+        if url not in browsers:
+            return Response(410)  # the browser unsubscribed
+        private, keys = browsers[url]
+        assert headers["Content-Encoding"] == "aes128gcm" and headers["Authorization"].startswith("vapid t=")
+        received.append((url, _browser_decrypt(private, keys, content)))
+        return Response(201)
+
+    monkeypatch.setattr(webpush.httpx, "post", post)
+
+    def browser(name):
+        private, keys = _browser_keys()
+        url = f"https://fcm.googleapis.com/fcm/send/{name}"
+        browsers[url] = (private, keys)
+        return {"endpoint": url, "keys": keys}
+
+    browser.received = received
+    browser.forget = lambda sub: browsers.pop(sub["endpoint"])
+    return browser
+
+
+def test_web_push_encryption_and_signature(client):
+    import jwt as jwt_
+
+    from app import webpush
+    from app.database import SessionLocal as Session_
+    private, keys = _browser_keys()
+    body = webpush.encrypt('{"title": "Привет"}'.encode(), keys["p256dh"], keys["auth"])
+    assert _browser_decrypt(private, keys, body) == {"title": "Привет"}
+
+    db = Session_()
+    headers = webpush._vapid_headers(db, "https://fcm.googleapis.com/fcm/send/abc")
+    public_key = webpush.vapid_public_key(db)
+    db.close()
+    token = headers["Authorization"].split("t=")[1].split(",")[0]
+    from cryptography.hazmat.primitives.asymmetric import ec
+    key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), webpush.b64url_decode(public_key))
+    claims = jwt_.decode(token, key, algorithms=["ES256"], audience="https://fcm.googleapis.com")
+    assert claims["sub"].startswith("mailto:")
+    # the same key survives restarts (stored in the database)
+    assert client.get("/notifications/web-push/key").json()["public_key"] == public_key
+
+
+def test_web_push_to_masters_and_clients(client, push_service):
+    master_h, _ = register_master(client, "Веб Мастер", city="Балыкчы")
+    master_browser = push_service("master-phone")
+    client_browser = push_service("client-phone")
+    assert client.post("/notifications/web-push/subscribe", json=master_browser).status_code == 401
+    assert client.post("/notifications/web-push/subscribe", headers=master_h, json=master_browser).status_code == 204
+    r = client.post("/notifications/web-push/subscribe", headers=CLIENT_KEY, json={**client_browser, "lang": "en"})
+    assert r.status_code == 204
+    # SSRF: only real push services
+    evil = {"endpoint": "https://169.254.169.254/latest/meta-data", "keys": client_browser["keys"]}
+    assert client.post("/notifications/web-push/subscribe", headers=CLIENT_KEY, json=evil).status_code == 422
+    evil["endpoint"] = "https://fcm.googleapis.com.evil.example/x"
+    assert client.post("/notifications/web-push/subscribe", headers=CLIENT_KEY, json=evil).status_code == 422
+
+    # a new request reaches the master's browser
+    push_service.received.clear()
+    rate_limit._attempts.clear()
+    r = client.post("/requests", headers=CLIENT_KEY, json={
+        "name": "Клиент", "phone": new_phone(), "category_id": category_id(client), "city": "Балыкчы", "description": "Кран"})
+    req = r.json()["request"]
+    assert [(u.rsplit("/", 1)[1], m["title"]) for u, m in push_service.received] == [("master-phone", f"Новый заказ #{req['id']} — Сантехника")]
+
+    # the master's offer reaches the client's browser, in the client's language
+    push_service.received.clear()
+    client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 750})
+    assert push_service.received == [(client_browser["endpoint"], {"title": "New offer", "body": "Веб Мастер — 750 som", "link": "/my-requests.html"})]
+
+    # chat reply from the master
+    chat = client.post("/chats", headers=CLIENT_KEY, json={"master_id": master_id_of(client, master_h), "name": "К", "text": "?"}).json()
+    push_service.received.clear()
+    client.post(f"/chats/{chat['id']}/messages", headers=master_h, json={"text": "Буду в 6"})
+    assert push_service.received[-1][1]["link"] == f"/chat.html?id={chat['id']}" and push_service.received[-1][1]["body"] == "Буду в 6"
+
+    # a browser that unsubscribed is forgotten
+    from app.models import WebPushSubscription
+    push_service.forget(client_browser)
+    client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 700})
+    db = SessionLocal()
+    assert db.query(WebPushSubscription).filter(WebPushSubscription.endpoint == client_browser["endpoint"]).count() == 0
+    db.close()
+
+
 def test_blocked_master(client):
     headers, _ = register_master(client, "Заблокированный")
     mid = master_id_of(client, headers)

@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import get_db
 from app.dispatch import mark_answered
 from app.models import Master, Order, OrderOffer, OrderStatus, OfferStatus, RequestDelivery, User, UserRole
-from app.notify import notify
+from app.notify import STATUS_WORDS, notify, notify_client
 from app.schemas import (
     ContactOut,
     MasterBriefOut,
@@ -230,6 +230,7 @@ def offer_order(
 
     order.status = OrderStatus.offers_received
     mark_answered(db, order.id, master.id, "offered")
+    notify_client(db, order.client_key_hash, "offer", id=order.id, name=current_user.name, price=float(data.price))
     if order.client_id is not None:
         notify(db, order.client_id, "Новое предложение по заказу",
                f"{current_user.name} предлагает {data.price:g} сом за заказ #{order.id}")
@@ -264,6 +265,8 @@ def update_status(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Статус можно менять только вперёд")
 
     order.status = new_status
+    if new_status.value in STATUS_WORDS:
+        notify_client(db, order.client_key_hash, "status", id=order.id, status=new_status.value)
     if order.client_id is not None and new_status in STATUS_TITLES:
         notify(db, order.client_id, STATUS_TITLES[new_status], f"Заказ #{order.id}")
     db.commit()
