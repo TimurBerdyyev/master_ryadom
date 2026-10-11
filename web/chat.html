@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title data-i18n="chat.docTitle">Сообщения — Мастер рядом</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="chat-page">
+    <div class="chat-head" id="chatHead">
+      <a class="chat-back" href="chats.html" data-i18n-aria="wiz.back"><svg class="i" aria-hidden="true"><use href="#i-arrow-left"></use></svg></a>
+      <div class="chat-who" id="who"></div>
+      <span class="spacer"></span>
+      <div class="row" id="headActions" style="gap:6px"></div>
+    </div>
+
+    <div id="wpBanner"></div>
+    <div class="chat-messages" id="messages" aria-live="polite"></div>
+
+    <div class="notice warn" id="blockedNote" hidden></div>
+    <form class="chat-compose" id="compose">
+      <label class="chat-name" id="nameRow" hidden>
+        <span data-i18n="neworder.name">Как к вам обращаться</span>
+        <input id="clientName" type="text" maxlength="100" autocomplete="name" data-i18n-ph="neworder.namePh" />
+      </label>
+      <div class="chat-compose-row">
+        <label class="chat-attach" data-i18n-title="chat.attach">
+          <svg class="i" aria-hidden="true"><use href="#i-camera"></use></svg>
+          <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+        </label>
+        <textarea id="text" rows="1" maxlength="2000" data-i18n-ph="chat.placeholder" placeholder="Сообщение"></textarea>
+        <button class="chat-send" type="submit" data-i18n-aria="chat.send"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg></button>
+      </div>
+    </form>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    let chatId = /^\d+$/.test(params.get("id") || "") ? Number(params.get("id")) : null;
+    const masterId = /^\d+$/.test(params.get("master") || "") ? Number(params.get("master")) : null;
+    let isMaster = false;
+    let lastId = 0;
+    let chat = null;
+    let master = null;  // for a new chat started from a master's profile
+
+    function stored(key) {
+      try { return localStorage.getItem(key) || ""; } catch (e) { return ""; }
+    }
+
+    function clock(value) {
+      const d = new Date(value.endsWith("Z") || value.includes("+") ? value : value + "Z");
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+
+    function renderHead() {
+      const name = isMaster ? chat.client_name : (chat ? chat.master.name : master.user.name);
+      const photo = isMaster ? null : (chat ? chat.master.photo : master.user.photo);
+      const id = chat ? chat.master.id : master.id;
+      const verified = chat ? chat.master.verified : master.verified;
+      const phone = chat ? chat.master.phone : master.user.phone;
+      document.getElementById("who").innerHTML = `
+        ${avatarHtml(name, "avatar", photo)}
+        <div>
+          <b>${esc(name)} ${!isMaster && verified ? `<span class="tasker-check">${icon("badge-check")}</span>` : ""}</b>
+          ${isMaster ? `<small>${t("detail.client")}</small>` : `<a class="link small" href="master.html?id=${id}">${t("tr.viewProfile")}</a>`}
+        </div>`;
+      document.getElementById("headActions").innerHTML = isMaster
+        ? `<button class="btn small secondary" type="button" id="blockBtn">${icon("ban")}${chat.blocked ? t("chat.unblock") : t("chat.block")}</button>`
+        : (phone ? `<a class="btn small secondary" href="${esc(telLink(phone))}" aria-label="${t("common.call")}">${icon("phone")}<span class="hide-sm">${t("common.call")}</span></a>` : "");
+      const block = document.getElementById("blockBtn");
+      if (block) block.addEventListener("click", async () => {
+        chat = await api.blockChat(chat.id, !chat.blocked);
+        renderHead();
+        renderBlocked();
+      });
+    }
+
+    function renderBlocked() {
+      const note = document.getElementById("blockedNote");
+      note.hidden = !(chat && chat.blocked);
+      note.innerHTML = chat && chat.blocked ? `${icon("ban")}<span>${t(isMaster ? "chat.blockedMaster" : "chat.blockedClient")}</span>` : "";
+      document.getElementById("compose").hidden = Boolean(chat && chat.blocked && !isMaster);
+    }
+
+    function bubble(m) {
+      const mine = m.sender === (isMaster ? "master" : "client");
+      const body = m.photo
+        ? `<a href="${esc(uploadUrl(m.photo))}" target="_blank" rel="noopener"><img class="chat-photo" src="${esc(uploadUrl(m.photo))}" alt="${t("chat.photo")}" loading="lazy" /></a>`
+        : `<span class="chat-text">${esc(m.text)}</span>`;
+      return `<div class="msg ${mine ? "mine" : "theirs"}">${body}<time>${clock(m.created_at)}</time></div>`;
+    }
+
+    async function poll(scroll = false) {
+      if (!chat) return;
+      try {
+        const items = await api.chatMessages(chat.id, lastId);
+        if (!items.length) return;
+        const box = document.getElementById("messages");
+        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+        box.insertAdjacentHTML("beforeend", items.map(bubble).join(""));
+        lastId = items[items.length - 1].id;
+        if (scroll || atBottom) box.scrollTop = box.scrollHeight;
+        refreshChatBadge();
+      } catch (e) {
+        /* try again on the next tick */
+      }
+    }
+
+    async function send(text) {
+      if (chat) {
+        await api.sendChatMessage(chat.id, text);
+        await poll(true);
+        return;
+      }
+      // First message to this master: the chat is created now.
+      const name = document.getElementById("clientName").value.trim();
+      if (!name) {
+        document.getElementById("clientName").focus();
+        throw new Error(t("chat.needName"));
+      }
+      localStorage.setItem("clientName", name);
+      chat = await api.startChat(master.id, name, text);
+      history.replaceState(null, "", `chat.html?id=${chat.id}`);
+      document.getElementById("nameRow").hidden = true;
+      renderHead();
+      await poll(true);
+      webPushBanner(document.getElementById("wpBanner"), "wp.chatText");
+    }
+
+    document.getElementById("compose").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const box = document.getElementById("text");
+      const text = box.value.trim();
+      if (!text) return;
+      box.disabled = true;
+      try {
+        await send(text);
+        box.value = "";
+        box.style.height = "";
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        box.disabled = false;
+        box.focus();
+      }
+    });
+
+    // Enter sends, Shift+Enter makes a new line; the box grows with the text.
+    const textBox = document.getElementById("text");
+    textBox.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById("compose").requestSubmit();
+      }
+    });
+    textBox.addEventListener("input", () => {
+      textBox.style.height = "auto";
+      textBox.style.height = Math.min(textBox.scrollHeight, 140) + "px";
+    });
+
+    document.getElementById("photoInput").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      if (!chat) return toast(t("chat.photoFirst"));
+      try {
+        await api.sendChatPhoto(chat.id, file);
+        await poll(true);
+      } catch (err) {
+        toast(err.message);
+      }
+    });
+
+    async function load() {
+      try {
+        if (getToken()) isMaster = (await api.me()).role === "master";
+        if (!chatId && masterId && !isMaster) {
+          // Already chatting with this master? Continue that chat.
+          let existing = null;
+          if (stored("clientKey")) existing = (await api.chats()).find(c => c.master.id === masterId);
+          if (existing) {
+            chatId = existing.id;
+            history.replaceState(null, "", `chat.html?id=${chatId}`);
+          } else {
+            master = await api.getMaster(masterId);
+            renderHead();
+            document.getElementById("nameRow").hidden = false;
+            document.getElementById("clientName").value = stored("clientName");
+            document.getElementById("messages").innerHTML = `<div class="chat-hello">${t("chat.hello", { name: esc(master.user.name) })}</div>`;
+            return;
+          }
+        }
+        if (!chatId) throw new Error(t("chat.notFound"));
+        chat = await api.chat(chatId);
+        renderHead();
+        renderBlocked();
+        await poll(true);
+        if (!isMaster) webPushBanner(document.getElementById("wpBanner"), "wp.chatText");
+      } catch (e) {
+        document.querySelector("main").innerHTML = emptyState("message-circle", esc(e.message), "",
+          `<a class="btn" href="chats.html">${t("nav.messages")}</a>`);
+      }
+    }
+
+    load();
+    setInterval(() => { if (!document.hidden) poll(); }, 4000);
+    renderNav();
+  </script>
+</body>
+</html>

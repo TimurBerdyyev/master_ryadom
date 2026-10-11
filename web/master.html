@@ -36,7 +36,7 @@
       const orderHref = `order.html${categoryId ? `?category_id=${categoryId}` : ""}`;
       const phoneBlock = master.user.phone
         ? `
-          <a class="btn block large" href="${esc(telLink(master.user.phone))}">${icon("phone")}${t("common.call")} · ${esc(master.user.phone)}</a>
+          <a class="btn secondary block" href="${esc(telLink(master.user.phone))}">${icon("phone")}${t("common.call")} · ${esc(master.user.phone)}</a>
           <a class="btn whatsapp block" href="${esc(waLink(master.user.phone))}" target="_blank" rel="noopener noreferrer">${icon("message-circle")}${t("master.whatsapp")}</a>`
         : "";
       return `
@@ -47,8 +47,9 @@
             <div><b>${master.experience_years || "—"}</b><span>${t("master.statYears")}</span></div>
           </div>
           <div class="contact-actions">
+            <a class="btn block large" href="chat.html?master=${master.id}">${icon("message-circle")}${t("tr.message")}</a>
             ${phoneBlock}
-            <a class="btn accent block" href="${orderHref}">${icon("timer")}${t("nav.createOrder")}</a>
+            <a class="btn ghost block" href="${orderHref}">${icon("timer")}${t("nav.createOrder")}</a>
           </div>
           ${master.verified ? `<p class="aside-note guarantee-note">${icon("shield-check")}<span>${t("guarantee.tip")}</span></p>` : ""}
           <p class="aside-note">${icon("clock")}<span>${t("master.note")}</span></p>

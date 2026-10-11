@@ -44,6 +44,15 @@ const CATEGORY_STYLE = {
   "Другое": ["layout-grid", "#64748b"],
 };
 
+// Most requested first (the API returns categories alphabetically); unknown ones keep their place after these.
+const CATEGORY_ORDER = ["Сантехника", "Электрика", "Ремонт", "Уборка", "Грузчики", "Перевозки", "Ремонт бытовой техники",
+  "Строительство", "Компьютеры", "Ремонт телефонов", "Автомастера", "Красота", "Парикмахеры", "Другое"];
+
+function sortCategories(list) {
+  const rank = name => { const i = CATEGORY_ORDER.indexOf(name); return i === -1 ? CATEGORY_ORDER.length - 1 : i; };
+  return [...list].sort((a, b) => rank(a.name) - rank(b.name));
+}
+
 function categoryStyle(name) {
   const [iconName, tint] = CATEGORY_STYLE[name] || ["wrench", "#2d5bff"];
   return { iconName, tint, style: `--tint:${tint};--tint-bg:${tint}17` };
@@ -98,6 +107,20 @@ function initials(name) {
 function avatarHtml(name, cls = "avatar", photo = null) {
   if (photo) return `<img class="${cls} photo" src="${esc(uploadUrl(photo))}" alt="${esc(name)}" loading="lazy">`;
   return `<div class="${cls}" style="background:${avatarColor(name)}">${initials(name)}</div>`;
+}
+
+// Compact master card (home page "top masters"): photo, name, rating, jobs, price.
+function taskerMiniHtml(m) {
+  const prices = m.services.map(s => s.price_from);
+  return `
+    <a class="tasker-mini" href="master.html?id=${m.id}">
+      ${avatarHtml(m.user.name, "avatar", m.user.photo)}
+      <div class="tasker-mini-body">
+        <div class="tasker-name">${esc(m.user.name)} ${m.verified ? `<span class="tasker-check" title="${t("guarantee.badge")}">${icon("badge-check")}</span>` : ""}</div>
+        <div class="tasker-rating">${icon("star", "sm")}<b>${Number(m.rating).toFixed(1)}</b><span>· ${plural(m.completed_orders, "p.orders")}</span></div>
+        ${prices.length ? `<div class="tasker-price">${priceFromHtml(Math.min(...prices))}</div>` : ""}
+      </div>
+    </a>`;
 }
 
 function starsHtml(rating) {
@@ -278,6 +301,27 @@ function formatCountdown(seconds) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+// Clients have no account: this random key, kept only in this browser, is how the server recognises
+// their chats and where to send their notifications (it stores only a hash of it).
+function getClientKey() {
+  try {
+    let key = localStorage.getItem("clientKey");
+    if (!key || key.length < 32) {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      key = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      localStorage.setItem("clientKey", key);
+    }
+    return key;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Endpoints where a client (no account) is identified by the key above.
+function needsClientKey(path) {
+  return /^\/(chats|requests|notifications\/web-push)(\/|\?|$)/.test(path);
+}
+
 function getToken() {
   return localStorage.getItem("token");
 }
@@ -304,6 +348,7 @@ async function apiRequest(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (needsClientKey(path) && getClientKey()) headers["X-Client-Key"] = getClientKey();
 
   let res;
   try {
@@ -333,6 +378,7 @@ async function apiUpload(path, files, field = "files") {
   const headers = {};
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (needsClientKey(path) && getClientKey()) headers["X-Client-Key"] = getClientKey();
 
   let res;
   try {
@@ -369,6 +415,22 @@ const api = {
   reviewRequest: (token, data) => apiRequest(`/requests/${encodeURIComponent(token)}/review`, { method: "POST", body: JSON.stringify(data) }),
   uploadRequestPhotos: (token, files) => apiUpload(`/requests/${encodeURIComponent(token)}/photos`, files),
   requestComplaint: (token, text) => apiRequest(`/requests/${encodeURIComponent(token)}/complaint`, { method: "POST", body: JSON.stringify({ text }) }),
+  // Chat (clients by key, masters by login)
+  startChat: (masterId, name, text) => apiRequest("/chats", { method: "POST", body: JSON.stringify({ master_id: masterId, name, text }) }),
+  chats: () => apiRequest("/chats"),
+  chat: (id) => apiRequest(`/chats/${id}`),
+  chatMessages: (id, afterId = 0) => apiRequest(`/chats/${id}/messages?after_id=${afterId}`),
+  sendChatMessage: (id, text) => apiRequest(`/chats/${id}/messages`, { method: "POST", body: JSON.stringify({ text }) }),
+  sendChatPhoto: (id, file) => apiUpload(`/chats/${id}/photos`, [file], "file"),
+  blockChat: (id, blocked) => apiRequest(`/chats/${id}/block?blocked=${blocked}`, { method: "POST" }),
+  chatsUnread: () => apiRequest("/chats/unread"),
+  // Map and live location
+  nearbyMasters: (params) => apiRequest(`/masters/nearby?${new URLSearchParams(params)}`),
+  shareLocation: (lat, lon, accuracy) => apiRequest("/masters/me/location", { method: "PUT", body: JSON.stringify({ lat, lon, accuracy }) }),
+  stopLocation: () => apiRequest("/masters/me/location", { method: "DELETE" }),
+  // Browser notifications (Web Push)
+  webPushKey: () => apiRequest("/notifications/web-push/key"),
+  webPushSubscribe: (sub) => apiRequest("/notifications/web-push/subscribe", { method: "POST", body: JSON.stringify({ ...sub, lang: LANG }) }),
   // Master side
   myOrders: () => apiRequest("/orders"),
   getOrder: (id) => apiRequest(`/orders/${id}`),

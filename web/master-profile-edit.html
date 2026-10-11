@@ -98,6 +98,18 @@
 
     <div class="notice" id="pushStatus" hidden style="margin-top:16px"></div>
 
+    <!-- Live location on the clients' map -->
+    <div class="card-box" id="locationCard" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between;gap:16px;flex-wrap:nowrap">
+        <div>
+          <h2 class="form-section-title" style="margin:0"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="loc.title">Показывать меня на карте</span></h2>
+          <p class="muted" style="margin:6px 0 0" data-i18n="loc.text">Клиенты рядом увидят вас на карте и смогут сразу позвонить или написать. Положение обновляется, пока у вас открыт сайт или приложение.</p>
+        </div>
+        <label class="switch"><input type="checkbox" id="locationToggle" /><span></span></label>
+      </div>
+      <p class="hint" id="locationStatus" style="margin:10px 0 0"></p>
+    </div>
+
     <form class="card" id="notifyForm" style="max-width:none;margin-top:16px">
       <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="edit.notifyTitle">Уведомления</span></h2>
       <p class="muted" style="margin:-8px 0 0" data-i18n="edit.notifySub">Куда присылать уведомления о новых заказах и выборе вашего предложения.</p>
@@ -197,9 +209,21 @@
         return;
       }
       if (!PUSH) {
-        box.className = "notice";
-        box.innerHTML = `${icon("smartphone")}<span>${t("edit.pushGetApp")} <a class="link" href="app.html">${t("nav.app")} →</a></span>`;
+        // In the browser / site installed as an app: Web Push.
+        const state = webPushState();
         box.hidden = false;
+        if (state === "granted") {
+          box.className = "notice success";
+          box.innerHTML = `${icon("bell-ring")}<span><b>${t("edit.pushTitle")}.</b> ${t("wp.masterOn")}</span>`;
+          return;
+        }
+        box.className = "notice warn";
+        box.innerHTML = `${icon("bell")}<span style="flex:1">${t("wp.masterOff")} ${state === "ios-install" ? t("wp.iosInstall") : ""}</span>
+          ${state === "default" ? `<button class="btn small" type="button" id="wpOn">${t("wp.enable")}</button>` : ""}`;
+        const on = document.getElementById("wpOn");
+        if (on) on.addEventListener("click", async () => {
+          try { await enableWebPush(); renderPushStatus(); } catch (err) { toast(err.message); }
+        });
         return;
       }
       let permission = "unknown";
@@ -245,6 +269,39 @@
       }
     }
     renderPushStatus();
+
+    async function renderLocation(master) {
+      const toggle = document.getElementById("locationToggle");
+      toggle.checked = master.location_shared;
+      document.getElementById("locationStatus").textContent = master.location_shared ? t("loc.on") : t("loc.off");
+    }
+
+    document.getElementById("locationToggle").addEventListener("change", async (e) => {
+      const status = document.getElementById("locationStatus");
+      if (!e.target.checked) {
+        await api.stopLocation().catch(() => {});
+        status.textContent = t("loc.off");
+        return;
+      }
+      if (!navigator.geolocation) {
+        e.target.checked = false;
+        return toast(t("map.noGeo"));
+      }
+      status.textContent = t("common.loading");
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          await api.shareLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+          localStorage.setItem("locationSentAt", String(Date.now()));
+          status.textContent = t("loc.on");
+        } catch (err) {
+          e.target.checked = false;
+          status.textContent = t("common.error") + err.message;
+        }
+      }, () => {
+        e.target.checked = false;
+        status.textContent = t("loc.denied");
+      }, { enableHighAccuracy: true, timeout: 15000 });
+    });
 
     function renderAvatar(master) {
       const photo = master.user.photo;
@@ -311,6 +368,7 @@
         renderServices(master.services);
         renderAvatar(master);
         renderTrust(master);
+        renderLocation(master);
         const link = document.getElementById("publicLink");
         link.href = `master.html?id=${master.id}`;
         link.hidden = false;

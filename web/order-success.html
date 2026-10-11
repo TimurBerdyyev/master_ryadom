@@ -25,6 +25,7 @@
       <h1 data-i18n="success.title">Заявка отправлена</h1>
       <p class="muted" style="font-size:16px;max-width:460px;margin:0 auto" id="successText"></p>
       <p class="error" id="photoError"></p>
+      <div id="wpBanner" style="max-width:520px;margin:16px auto 0;text-align:left"></div>
       <div class="link-card" id="linkCard" hidden>
         <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-link"></use></svg><span data-i18n="success.linkTitle">Ваша личная ссылка на заявку</span></h2>
         <p class="muted" data-i18n="success.linkText"></p>
@@ -62,6 +63,7 @@
     if (params.get("photo_error")) {
       document.getElementById("photoError").textContent = t("success.photoError");
     }
+    webPushBanner(document.getElementById("wpBanner"), "wp.requestText");
     renderNav();
   </script>
 </body>

@@ -12,8 +12,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -22,130 +20,100 @@
     <nav id="nav"></nav>
   </header>
 
-  <main>
-    <section class="hero">
-      <div class="reveal">
-        <span class="hero-pill"><span class="dot"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg></span><span data-i18n="home.pill">Гарантия сервиса: каждый мастер проверен</span></span>
-        <h1 data-i18n-html="home.h1">Предложения мастеров<br /><span class="hl">за 20 минут</span></h1>
-        <p class="lead" data-i18n="home.lead">…или мы сами найдём вам мастера. Без регистрации: оставьте заявку или позвоните мастеру напрямую.</p>
-
-        <div class="hero-actions">
-          <a class="btn accent large" href="order.html"><svg class="i" aria-hidden="true"><use href="#i-timer"></use></svg><span data-i18n="home.ctaRequest">Оставить заявку</span></a>
-          <span class="hero-note"><svg class="i" aria-hidden="true"><use href="#i-circle-check"></use></svg><span data-i18n="home.ctaFree">Бесплатно и без регистрации</span></span>
-        </div>
-        <p class="hero-or" data-i18n="home.orSearch">Или найдите мастера и позвоните сами</p>
-
-        <form class="hero-search" role="search" onsubmit="event.preventDefault(); goSearch();">
-          <svg class="i lg" aria-hidden="true"><use href="#i-search"></use></svg>
-          <input id="searchInput" type="search" maxlength="100" data-i18n-aria="home.searchAria" aria-label="Что нужно сделать"
-                 data-i18n-ph="home.searchPh" placeholder="Например: заменить смеситель" />
-          <button class="btn accent large" type="submit" data-i18n="nav.find">Найти мастера</button>
-        </form>
-
-        <div class="hero-chips">
-          <span data-i18n="home.popular">Часто ищут:</span>
-          <a href="masters.html?q=%D1%81%D0%BC%D0%B5%D1%81%D0%B8%D1%82%D0%B5%D0%BB%D1%8C" data-i18n="home.chip1">смеситель</a>
-          <a href="masters.html?q=%D1%80%D0%BE%D0%B7%D0%B5%D1%82%D0%BA%D0%B0" data-i18n="home.chip2">розетка</a>
-          <a href="masters.html?q=%D1%83%D0%B1%D0%BE%D1%80%D0%BA%D0%B0" data-i18n="home.chip3">уборка</a>
-          <a href="masters.html?q=%D0%BA%D0%BE%D0%BD%D0%B4%D0%B8%D1%86%D0%B8%D0%BE%D0%BD%D0%B5%D1%80" data-i18n="home.chip4">кондиционер</a>
-        </div>
-      </div>
-
-      <!-- Illustration of the product: an order and two incoming offers -->
-      <div class="hero-visual" aria-hidden="true">
-        <div class="mock mock-order">
-          <div class="mock-head">
-            <span class="cat-dot" style="--tint:#0ea5e9;--tint-bg:#0ea5e917"><svg class="i"><use href="#i-shower-head"></use></svg></span>
-            <span class="mock-title" data-i18n="home.mockTitle">Течёт смеситель на кухне</span>
-          </div>
-          <p data-i18n="home.mockText">Нужно заменить смеситель, новый уже куплен. Сегодня после 18:00.</p>
-        </div>
-        <div class="mock mock-offer one">
-          <div class="avatar" style="background:#2563eb">АТ</div>
-          <div class="who">Айбек Т.<small><svg class="i"><use href="#i-star"></use></svg><span data-i18n="home.mockStats1">4.9 · 87 заказов</span></small></div>
-          <div class="price" data-i18n="home.mockPrice1">900 сом</div>
-        </div>
-        <div class="mock mock-offer two">
-          <div class="avatar" style="background:#0d9488">НА</div>
-          <div class="who">Нурлан А.<small><svg class="i"><use href="#i-star"></use></svg><span data-i18n="home.mockStats2">4.7 · 31 заказ</span></small></div>
-          <div class="price" data-i18n="home.mockPrice2">1 100 сом</div>
-        </div>
-        <div class="mock mock-toast">
-          <span class="tick"><svg class="i"><use href="#i-timer"></use></svg></span>
-          <span><span data-i18n="home.mockToast">2 новых предложения</span><small data-i18n="home.mockTimer">Ответ за 4 мин</small></span>
-        </div>
-      </div>
+  <main class="tr-home">
+    <!-- Search first: what do you need help with? -->
+    <section class="tr-hero">
+      <h1 data-i18n="tr.heroTitle">Мастер на любое дело — рядом с вами</h1>
+      <p class="tr-hero-sub" data-i18n="tr.heroSub">Проверенные мастера ответят за 20 минут — или мы сами найдём вам мастера</p>
+      <form class="tr-search" role="search" id="heroSearch">
+        <svg class="i lg" aria-hidden="true"><use href="#i-search"></use></svg>
+        <input id="searchInput" type="search" maxlength="100" autocomplete="off" data-i18n-ph="tr.searchPh" data-i18n-aria="home.searchAria" placeholder="Что нужно сделать?" />
+        <button class="btn large" type="submit" data-i18n="tr.searchBtn">Найти мастера</button>
+      </form>
     </section>
 
-    <div class="trust reveal">
-      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-shield-check"></use></svg></span><div><span data-i18n="home.trust1">Гарантия сервиса</span><small data-i18n="home.trust1s">Проверяем мастеров и заключаем договор</small></div></div>
-      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-timer"></use></svg></span><div><span data-i18n="home.trust2">Ответ за 20 минут</span><small data-i18n="home.trust2s">Или мы сами найдём мастера</small></div></div>
-      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-star"></use></svg></span><div><span data-i18n="home.trust3">Честные отзывы</span><small data-i18n="home.trust3s">Только после выполненного заказа</small></div></div>
-      <div class="trust-item"><span class="ico"><svg class="i lg" aria-hidden="true"><use href="#i-phone"></use></svg></span><div><span data-i18n="home.trust4">Без регистрации</span><small data-i18n="home.trust4s">Звонок или WhatsApp напрямую</small></div></div>
-    </div>
+    <!-- Category tabs with icons; the chosen category shows its popular jobs -->
+    <section class="tr-cats" aria-labelledby="catsTitle">
+      <h2 class="visually-hidden" id="catsTitle" data-i18n="home.catsTitle">Категории услуг</h2>
+      <div class="cat-tabs" id="catTabs" role="tablist"></div>
+      <div class="proj-pills" id="projPills"></div>
+      <div class="cat-feature" id="catFeature"></div>
+    </section>
 
-    <section class="section">
-      <div class="section-head">
+    <!-- Trust row -->
+    <section class="tr-trust">
+      <div><span class="tr-trust-ico"><svg class="i lg" aria-hidden="true"><use href="#i-timer"></use></svg></span><b data-i18n="home.trust2">Ответ за 20 минут</b><span data-i18n="home.trust2s">Или мы сами найдём мастера</span></div>
+      <div><span class="tr-trust-ico"><svg class="i lg" aria-hidden="true"><use href="#i-shield-check"></use></svg></span><b data-i18n="home.trust1">Гарантия сервиса</b><span data-i18n="home.trust1s">Проверяем мастеров и заключаем договор</span></div>
+      <div><span class="tr-trust-ico"><svg class="i lg" aria-hidden="true"><use href="#i-message-circle"></use></svg></span><b data-i18n="tr.trustChat">Чат с мастером</b><span data-i18n="tr.trustChatS">Обсудите цену и время до заявки</span></div>
+      <div><span class="tr-trust-ico"><svg class="i lg" aria-hidden="true"><use href="#i-map-pin"></use></svg></span><b data-i18n="tr.trustMap">Мастера на карте</b><span data-i18n="tr.trustMapS">Видно, кто рядом прямо сейчас</span></div>
+    </section>
+
+    <!-- Popular projects -->
+    <section class="tr-section">
+      <div class="tr-section-head">
+        <h2 data-i18n="tr.popularTitle">Популярные услуги</h2>
+        <a class="link" href="masters.html"><span data-i18n="home.seeAll">Смотреть всех</span> →</a>
+      </div>
+      <div class="tr-projects" id="popularProjects"></div>
+    </section>
+
+    <!-- Top masters -->
+    <section class="tr-section" id="topSection" hidden>
+      <div class="tr-section-head">
+        <h2 data-i18n="home.topTitle">Лучшие мастера</h2>
+        <a class="link" href="masters.html"><span data-i18n="home.seeAll">Смотреть всех</span> →</a>
+      </div>
+      <div class="tr-taskers" id="topMasters"></div>
+    </section>
+
+    <!-- Map teaser -->
+    <section class="tr-section">
+      <a class="tr-map-teaser" href="masters.html?view=map">
         <div>
-          <h2 data-i18n="home.catsTitle">Категории услуг</h2>
-          <p data-i18n="home.catsSub">Выберите, что нужно сделать — покажем мастеров рядом</p>
+          <h2 data-i18n="tr.mapTitle">Кто рядом прямо сейчас</h2>
+          <p data-i18n="tr.mapText">Откройте карту: мастера выбранной категории поблизости, расстояние и звонок в одно касание.</p>
+          <span class="btn"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="tr.mapBtn">Открыть карту</span></span>
         </div>
-        <a class="btn secondary" href="masters.html"><span data-i18n="home.allMasters">Все мастера</span> <svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
-      </div>
-      <div id="categories" class="category-grid"></div>
+        <div class="tr-map-art" aria-hidden="true">
+          <span class="pin p1"><svg class="i"><use href="#i-wrench"></use></svg></span>
+          <span class="pin p2"><svg class="i"><use href="#i-zap"></use></svg></span>
+          <span class="pin p3"><svg class="i"><use href="#i-spray-can"></use></svg></span>
+          <span class="me"></span>
+        </div>
+      </a>
     </section>
 
-    <section class="section">
-      <div class="section-head">
+    <!-- How it works -->
+    <section class="tr-section">
+      <h2 class="tr-center" data-i18n="home.howTitle">Как это работает</h2>
+      <div class="tr-steps">
+        <div class="tr-step"><span class="tr-step-n">1</span><h3 data-i18n="tr.step1">Опишите задачу</h3><p data-i18n="home.step1s">Имя, телефон и что случилось — регистрация не нужна.</p></div>
+        <div class="tr-step"><span class="tr-step-n">2</span><h3 data-i18n="tr.step2">Выберите мастера</h3><p data-i18n="tr.step2s">Сравните цены, рейтинг и отзывы. Напишите мастеру в чат или позвоните.</p></div>
+        <div class="tr-step"><span class="tr-step-n">3</span><h3 data-i18n="tr.step3">Готово</h3><p data-i18n="tr.step3s">Мастер приезжает и делает работу. Оцените его — это помогает другим.</p></div>
+      </div>
+    </section>
+
+    <!-- Guarantee -->
+    <section class="tr-section">
+      <div class="tr-guarantee">
+        <span class="guarantee-seal"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg></span>
         <div>
-          <h2 data-i18n="home.howTitle">Как это работает</h2>
-          <p data-i18n="home.howSub">От заявки до готовой работы — четыре простых шага</p>
-        </div>
-      </div>
-      <div class="steps">
-        <div class="step"><h3 data-i18n="home.step1">Опишите задачу</h3><p data-i18n="home.step1s">Имя, телефон и что случилось — регистрация не нужна.</p></div>
-        <div class="step"><h3 data-i18n="home.step2">Получите предложения</h3><p data-i18n="home.step2s">Мастера отвечают в течение 20 минут — так прописано в договоре с ними.</p></div>
-        <div class="step"><h3 data-i18n="home.step3">Выберите мастера</h3><p data-i18n="home.step3s">Сравните цену, рейтинг и отзывы — и позвоните выбранному мастеру.</p></div>
-        <div class="step"><h3 data-i18n="home.step4">Оцените работу</h3><p data-i18n="home.step4s">Ваш отзыв помогает другим клиентам и честным мастерам.</p></div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="guarantee">
-        <div class="guarantee-head">
-          <span class="guarantee-seal"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg></span>
-          <div>
-            <h2 data-i18n="home.gTitle">Гарантия «Мастер рядом»</h2>
-            <p data-i18n="home.gSub">Мы отвечаем за мастеров, которых показываем</p>
-          </div>
-        </div>
-        <div class="guarantee-grid">
-          <div class="g-item"><span class="ico"><svg class="i" aria-hidden="true"><use href="#i-badge-check"></use></svg></span><h3 data-i18n="home.g1">Проверены сервисом</h3><p data-i18n="home.g1s">Знакомимся с каждым мастером, проверяем документы и опыт. Без проверки мастер не появится в поиске.</p></div>
-          <div class="g-item"><span class="ico"><svg class="i" aria-hidden="true"><use href="#i-handshake"></use></svg></span><h3 data-i18n="home.g2">Договор с каждым мастером</h3><p data-i18n="home.g2s">Мастер обязуется ответить на заявку за 20 минут. Не ответил — штраф и снижение рейтинга.</p></div>
-          <div class="g-item"><span class="ico"><svg class="i" aria-hidden="true"><use href="#i-phone-call"></use></svg></span><h3 data-i18n="home.g3">Не ответили — найдём сами</h3><p data-i18n="home.g3s">Если за 20 минут нет предложений, менеджер сервиса сам подберёт мастера и позвонит вам.</p></div>
-          <div class="g-item"><span class="ico"><svg class="i" aria-hidden="true"><use href="#i-flag"></use></svg></span><h3 data-i18n="home.g4">Жалобы — под контролем</h3><p data-i18n="home.g4s">Пожалуйтесь по ссылке на заявку — мы разберёмся и примем меры к мастеру.</p></div>
+          <h2 data-i18n="home.gTitle">Гарантия «Мастер рядом»</h2>
+          <p data-i18n="home.g2s">Мастер обязуется ответить на заявку за 20 минут. Не ответил — штраф и снижение рейтинга.</p>
         </div>
       </div>
     </section>
 
-    <section class="section" id="topSection" hidden>
-      <div class="section-head">
+    <!-- For masters -->
+    <section class="tr-section">
+      <div class="tr-become">
         <div>
-          <h2 data-i18n="home.topTitle">Лучшие мастера</h2>
-          <p data-i18n="home.topSub">С самым высоким рейтингом среди клиентов</p>
+          <h2 data-i18n="home.ctaTitle">Вы мастер? Получайте заявки рядом с домом</h2>
+          <p data-i18n="home.ctaText">Зарегистрируйтесь, примите договор и пройдите проверку — клиенты вашего города увидят вас со знаком «Гарантия сервиса».</p>
         </div>
-        <a class="btn secondary" href="masters.html"><span data-i18n="home.seeAll">Смотреть всех</span> <svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
+        <a class="btn large white" href="register.html"><span data-i18n="nav.becomeMaster">Стать мастером</span></a>
       </div>
-      <div class="top-masters" id="topMasters"></div>
     </section>
-
-    <div class="cta-band">
-      <div>
-        <h2 data-i18n="home.ctaTitle">Вы мастер? Получайте заявки рядом с домом</h2>
-        <p data-i18n="home.ctaText">Зарегистрируйтесь, примите договор и пройдите проверку — клиенты вашего города увидят вас со знаком «Гарантия сервиса».</p>
-      </div>
-      <a class="btn secondary large" href="register.html"><span data-i18n="nav.becomeMaster">Стать мастером</span> <svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></a>
-    </div>
   </main>
 
   <footer class="site-footer">
@@ -160,6 +128,7 @@
           <li><a href="masters.html" data-i18n="nav.find">Найти мастера</a></li>
           <li><a href="order.html" data-i18n="nav.createOrder">Оставить заявку</a></li>
           <li><a href="my-requests.html" data-i18n="nav.myRequests">Мои заявки</a></li>
+          <li><a href="chats.html" data-i18n="nav.messages">Сообщения</a></li>
           <li><a href="app.html" data-i18n="nav.app">Приложение</a></li>
         </ul>
       </div>
@@ -180,56 +149,93 @@
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
+    let categories = [];
+    let activeCategory = null;
+
+    function renderTabs() {
+      document.getElementById("catTabs").innerHTML = categories.map(c => {
+        const st = categoryStyle(c.name);
+        return `
+          <button type="button" class="cat-tab${c.id === activeCategory ? " active" : ""}" role="tab" aria-selected="${c.id === activeCategory}" data-cat="${c.id}" style="${st.style}">
+            <span class="cat-tab-ico">${icon(st.iconName)}</span><span>${esc(catName(c.name))}</span>
+          </button>`;
+      }).join("");
+    }
+
+    function renderCategory() {
+      const cat = categories.find(c => c.id === activeCategory);
+      if (!cat) return;
+      const projects = projectsFor(cat.name);
+      document.getElementById("projPills").innerHTML = projects.map(p =>
+        `<a class="proj-pill" href="order.html?category_id=${cat.id}&task=${encodeURIComponent(p)}">${esc(p)}</a>`).join("");
+      const st = categoryStyle(cat.name);
+      document.getElementById("catFeature").innerHTML = `
+        <div class="cat-feature-text">
+          <h3>${esc(catName(cat.name))}</h3>
+          <p>${t("tr.featureText")}</p>
+          <ul>
+            <li>${icon("check")}${t("tr.featureP1")}</li>
+            <li>${icon("check")}${t("tr.featureP2")}</li>
+            <li>${icon("check")}${t("tr.featureP3")}</li>
+          </ul>
+          <div class="row">
+            <a class="btn" href="order.html?category_id=${cat.id}">${t("tr.featureBtn")}</a>
+            <a class="btn secondary" href="masters.html?category_id=${cat.id}">${t("tr.featureMasters")}</a>
+          </div>
+        </div>
+        <div class="cat-feature-art" style="${st.style}" aria-hidden="true">${icon(st.iconName)}</div>`;
+    }
+
+    function renderPopular() {
+      const pick = categories.slice(0, 8);
+      document.getElementById("popularProjects").innerHTML = pick.map(c => {
+        const st = categoryStyle(c.name);
+        const project = projectsFor(c.name)[0] || catName(c.name);
+        return `
+          <a class="tr-project" href="order.html?category_id=${c.id}&task=${encodeURIComponent(project)}">
+            <span class="tr-project-art" style="${st.style}">${icon(st.iconName)}</span>
+            <span class="tr-project-title">${esc(project)}</span>
+            <span class="tr-project-cat">${esc(catName(c.name))}</span>
+          </a>`;
+      }).join("");
+    }
+
     async function loadCategories() {
-      const grid = document.getElementById("categories");
-      grid.innerHTML = skeletons(8, 118);
       try {
-        const categories = await api.categories();
-        grid.classList.add("reveal");
-        grid.innerHTML = categories.map(c => `
-          <a class="category-card" href="masters.html?category_id=${c.id}">
-            ${categoryBadge(c.name, "cat-icon")}
-            <span>${esc(catName(c.name))}</span>
-            <span class="go">${icon("arrow-right", "sm")}</span>
-          </a>
-        `).join("");
+        categories = sortCategories(await api.categories());
+        activeCategory = categories.length ? categories[0].id : null;
+        renderTabs();
+        renderCategory();
+        renderPopular();
       } catch (e) {
-        grid.innerHTML = `<p class="error">${esc(t("neworder.catError") + e.message)}</p>`;
+        document.getElementById("catTabs").innerHTML = `<p class="error">${esc(t("neworder.catError") + e.message)}</p>`;
       }
     }
 
+    document.getElementById("catTabs").addEventListener("click", (e) => {
+      const tab = e.target.closest("[data-cat]");
+      if (!tab) return;
+      activeCategory = Number(tab.dataset.cat);
+      renderTabs();
+      renderCategory();
+    });
+
     async function loadTopMasters() {
       try {
-        const masters = (await api.searchMasters({ sort: "rating", limit: 3 })).filter(m => m.rating > 0);
+        const masters = (await api.searchMasters({ sort: "rating", limit: 4 })).filter(m => m.rating > 0);
         if (!masters.length) return;
-        document.getElementById("topMasters").innerHTML = masters.map(m => {
-          const prices = m.services.map(s => s.price_from);
-          return `
-            <a class="top-master" href="master.html?id=${m.id}">
-              <div class="head">
-                ${avatarHtml(m.user.name, "avatar", m.user.photo)}
-                <div>
-                  <div class="name">${esc(m.user.name)}</div>
-                  <div class="meta">${ratingHtml(m.rating)}<span>${plural(m.completed_orders, "p.orders")}</span></div>
-                </div>
-              </div>
-              ${m.description ? `<p class="desc">${esc(m.description)}</p>` : ""}
-              <div class="foot">
-                <span>${m.verified ? verifiedBadge() : (m.city ? esc(cityName(m.city)) : "")}</span>
-                ${prices.length ? `<span class="price-from">${priceFromHtml(Math.min(...prices))}</span>` : ""}
-              </div>
-            </a>`;
-        }).join("");
+        document.getElementById("topMasters").innerHTML = masters.map(m => taskerMiniHtml(m)).join("");
         document.getElementById("topSection").hidden = false;
       } catch (e) {
         /* the section simply stays hidden */
       }
     }
 
-    function goSearch() {
+    document.getElementById("heroSearch").addEventListener("submit", (e) => {
+      e.preventDefault();
       const q = document.getElementById("searchInput").value.trim();
       location.href = q ? `masters.html?q=${encodeURIComponent(q)}` : "masters.html";
-    }
+    });
 
     loadCategories();
     loadTopMasters();

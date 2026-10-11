@@ -116,7 +116,7 @@ app = FastAPI(
 PAGE_CSP = (
     "default-src 'self'; script-src 'self' 'unsafe-inline'; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
-    "img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
+    "img-src 'self' data: blob: https://tile.openstreetmap.org; connect-src 'self'; manifest-src 'self'; worker-src 'self'; "
     "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 )
 # Biggest legitimate body: 5 photos of MAX_UPLOAD_SIZE_MB each plus form overhead.

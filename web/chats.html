@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title data-i18n="chat.docTitle">Сообщения — Мастер рядом</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="narrow">
+    <div class="page-head">
+      <div>
+        <h1 data-i18n="nav.messages">Сообщения</h1>
+        <p class="muted" id="chatsSub" data-i18n="chat.listSub">Переписка с мастерами</p>
+      </div>
+    </div>
+    <div id="wpBanner" style="margin-bottom:12px"></div>
+    <div id="list" class="chat-list"></div>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    let isMaster = false;
+
+    function timeLabel(value) {
+      const d = new Date(value.endsWith("Z") || value.includes("+") ? value : value + "Z");
+      const today = new Date();
+      return d.toDateString() === today.toDateString()
+        ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+        : formatDate(value);
+    }
+
+    function row(c) {
+      const name = isMaster ? c.client_name : c.master.name;
+      const photo = isMaster ? null : c.master.photo;
+      const preview = c.last_is_photo ? `${icon("image-plus", "sm")} ${t("chat.photo")}` : esc(c.last_message || "");
+      const mine = c.last_sender === (isMaster ? "master" : "client");
+      return `
+        <a class="chat-row${c.unread ? " unread" : ""}" href="chat.html?id=${c.id}">
+          ${avatarHtml(name, "avatar", photo)}
+          <span class="chat-row-body">
+            <span class="chat-row-top"><b>${esc(name)}</b><small>${timeLabel(c.last_message_at)}</small></span>
+            <span class="chat-row-bottom"><span class="chat-preview">${mine ? t("chat.you") + " " : ""}${preview}</span>${c.unread ? `<span class="chat-unread">${c.unread}</span>` : ""}</span>
+          </span>
+        </a>`;
+    }
+
+    async function load() {
+      const list = document.getElementById("list");
+      let hasKey = false;
+      try { hasKey = Boolean(localStorage.getItem("clientKey")); } catch (e) { /* ignore */ }
+      if (!getToken() && !hasKey) {
+        list.innerHTML = emptyState("message-circle", t("chat.emptyTitle"), t("chat.emptyText"),
+          `<a class="btn" href="masters.html">${t("nav.find")}</a>`);
+        return;
+      }
+      try {
+        if (getToken()) isMaster = (await api.me()).role === "master";
+        const chats = await api.chats();
+        if (isMaster) document.getElementById("chatsSub").textContent = t("chat.listSubMaster");
+        list.innerHTML = chats.length ? chats.map(row).join("")
+          : emptyState("message-circle", t("chat.emptyTitle"), isMaster ? t("chat.emptyMaster") : t("chat.emptyText"),
+              isMaster ? "" : `<a class="btn" href="masters.html">${t("nav.find")}</a>`);
+        if (!isMaster && chats.length) webPushBanner(document.getElementById("wpBanner"), "wp.chatText");
+      } catch (e) {
+        list.innerHTML = emptyState("triangle-alert", t("common.error") + esc(e.message), "");
+      }
+    }
+
+    load();
+    setInterval(() => { if (!document.hidden) load(); }, 15000);
+    renderNav();
+  </script>
+</body>
+</html>

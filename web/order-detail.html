@@ -134,7 +134,9 @@
                 </div>
                 <div class="meta">${ratingHtml(o.master.rating)}<span>${icon("briefcase")}${plural(o.master.completed_orders, "p.orders")}</span></div>
                 ${o.comment ? `<div class="comment">${esc(o.comment)}</div>` : ""}
-                ${canAccept && o.master.phone ? `<div class="row" style="margin-top:10px">${callButtons(o.master.phone)}</div>` : ""}
+                ${canAccept ? `<div class="row" style="margin-top:10px;gap:6px">
+                  <a class="btn small" href="chat.html?master=${o.master.id}">${icon("message-circle")}${t("tr.message")}</a>
+                  ${o.master.phone ? callButtons(o.master.phone) : ""}</div>` : ""}
               </div>
               <div class="offer-side">
                 <div class="price">${formatPrice(o.price)}</div>

@@ -29,6 +29,7 @@
       <a class="btn accent" href="order.html"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="nav.createOrder">Оставить заявку</span></a>
     </div>
 
+    <div id="wpBanner" style="margin-bottom:12px"></div>
     <div id="list" class="stack"></div>
   </main>
 
@@ -100,6 +101,7 @@
         list.innerHTML = emptyState("triangle-alert", t("orders.loadError"), esc(results[0].message));
         return;
       }
+      webPushBanner(document.getElementById("wpBanner"), "wp.requestText");
       list.classList.add("reveal");
       list.innerHTML = saved.map((s, i) => (results[i] instanceof Error ? "" : cardHtml(s, results[i]))).join("");
     }

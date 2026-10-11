@@ -12,64 +12,6 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
   <link rel="stylesheet" href="css/style.css" />
-  <style>
-    .cat-picker {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 8px;
-    }
-
-    .cat-picker input {
-      position: absolute;
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .cat-picker label {
-      flex-direction: row !important;
-      align-items: center;
-      gap: 10px !important;
-      padding: 10px 12px;
-      border: 1.5px solid var(--border);
-      border-radius: 12px;
-      font-weight: 500 !important;
-      font-size: 14px !important;
-      line-height: 1.25;
-      cursor: pointer;
-      transition: border-color .2s, background .2s, box-shadow .2s;
-    }
-
-    .cat-picker label:hover {
-      border-color: var(--border-strong);
-    }
-
-    .cat-picker input:checked + label {
-      border-color: var(--primary);
-      background: var(--primary-50);
-      box-shadow: 0 0 0 1px var(--primary);
-    }
-
-    .cat-picker input:focus-visible + label {
-      box-shadow: var(--ring);
-    }
-
-    .cat-picker .cat-dot {
-      width: 32px;
-      height: 32px;
-      border-radius: 10px;
-    }
-
-    .cat-picker .cat-dot .i {
-      width: 17px;
-      height: 17px;
-    }
-
-    .fieldset-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: -8px;
-    }
-  </style>
 </head>
 <body>
   <header class="topbar">
@@ -77,81 +19,140 @@
     <nav id="nav"></nav>
   </header>
 
-  <main class="narrow">
-    <div class="page-head">
-      <div>
-        <h1 data-i18n="neworder.title">Оставить заявку</h1>
-        <p class="muted" data-i18n="neworder.sub">Без регистрации. Мастера вашего города ответят за 20 минут — или мы сами найдём вам мастера и перезвоним.</p>
-      </div>
-    </div>
+  <!-- Progress: 1 describe → 2 masters & prices → 3 confirm -->
+  <div class="wizard-progress" aria-hidden="true">
+    <div class="wizard-bar"><span id="wizardBar"></span></div>
+    <ol class="wizard-steps">
+      <li data-step="1"><span>1</span><b data-i18n="wiz.step1">Опишите задачу</b></li>
+      <li data-step="2"><span>2</span><b data-i18n="wiz.step2">Мастера и цены</b></li>
+      <li data-step="3"><span>3</span><b data-i18n="wiz.step3">Подтверждение</b></li>
+    </ol>
+  </div>
 
-    <form class="card reveal" id="orderForm" style="max-width:none">
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-user"></use></svg><span data-i18n="neworder.contacts">Ваши контакты</span></h2>
-      <div class="form-grid">
-        <label>
-          <span data-i18n="neworder.name">Как к вам обращаться</span>
-          <input id="clientName" type="text" required maxlength="100" autocomplete="name" data-i18n-ph="neworder.namePh" />
-        </label>
-        <label>
-          <span data-i18n="common.phone">Телефон</span>
-          <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-phone"></use></svg><input id="clientPhone" type="tel" required maxlength="20" autocomplete="tel" placeholder="+996 700 123 456" /></span>
-        </label>
-      </div>
-      <span class="hint" style="margin-top:-8px" data-i18n="neworder.phoneHint">Номер увидят только выбранный вами мастер и менеджер сервиса</span>
-      <!-- Honeypot: invisible to people, bots fill it in -->
-      <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden">
-        <label>Website <input id="website" type="text" tabindex="-1" autocomplete="off" /></label>
-      </div>
+  <main class="wizard">
+    <!-- Step 1: the task -->
+    <form class="wizard-step" id="step1" novalidate>
+      <h1 data-i18n="wiz.title1">Расскажите о задаче</h1>
+      <p class="muted" data-i18n="wiz.sub1">Мы покажем мастеров рядом и их цены. Регистрация не нужна.</p>
 
-      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="neworder.what">Что нужно сделать</span></h2>
-      <div class="fieldset-title" id="catLabel" data-i18n="neworder.category">Категория</div>
-      <div class="cat-picker" id="categoryPicker" role="radiogroup" aria-labelledby="catLabel"></div>
+      <section class="wiz-card">
+        <h2 data-i18n="wiz.categoryQ">Что нужно сделать?</h2>
+        <div class="cat-picker" id="categoryPicker" role="radiogroup" data-i18n-aria="neworder.category"></div>
+        <div class="proj-pills small" id="taskPills"></div>
+      </section>
 
-      <label>
-        <span data-i18n="neworder.describe">Опишите задачу</span>
-        <textarea id="description" rows="4" required maxlength="2000" data-i18n-ph="neworder.describePh"></textarea>
-        <span class="hint" data-i18n="neworder.describeHint">Чем подробнее — тем точнее мастера назовут цену</span>
-      </label>
-
-      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="neworder.where">Где и когда</span></h2>
-      <label>
-        <span data-i18n="common.city">Город</span>
-        <select id="city" required></select>
-        <span class="hint" data-i18n="neworder.cityHint">Заказ увидят мастера из этого города</span>
-      </label>
-
-      <label>
-        <span data-i18n="common.address">Адрес</span>
-        <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-house"></use></svg><input id="address" type="text" maxlength="500" data-i18n-ph="neworder.addressPh" /></span>
+      <section class="wiz-card">
+        <h2 data-i18n="wiz.whereQ">Где?</h2>
+        <div class="form-grid">
+          <label>
+            <span data-i18n="common.city">Город</span>
+            <select id="city" required></select>
+          </label>
+          <label>
+            <span data-i18n="common.address">Адрес</span>
+            <input id="address" type="text" maxlength="500" data-i18n-ph="neworder.addressPh" />
+          </label>
+        </div>
         <span class="hint" data-i18n="neworder.addressHint">Мастер увидит адрес только после того, как вы его выберете</span>
-      </label>
+      </section>
 
-      <div class="form-grid">
+      <section class="wiz-card">
+        <h2 data-i18n="wiz.sizeQ">Объём работы</h2>
+        <div class="size-picker" role="radiogroup">
+          <input type="radio" name="size" id="sizeS" value="small" />
+          <label for="sizeS"><b data-i18n="wiz.sizeS">Небольшая</b><small data-i18n="wiz.sizeSs">до 1 часа</small></label>
+          <input type="radio" name="size" id="sizeM" value="medium" checked />
+          <label for="sizeM"><b data-i18n="wiz.sizeM">Средняя</b><small data-i18n="wiz.sizeMs">2–3 часа</small></label>
+          <input type="radio" name="size" id="sizeL" value="large" />
+          <label for="sizeL"><b data-i18n="wiz.sizeL">Большая</b><small data-i18n="wiz.sizeLs">4 часа и больше</small></label>
+        </div>
+      </section>
+
+      <section class="wiz-card">
+        <h2 data-i18n="wiz.detailsQ">Подробности</h2>
         <label>
-          <span data-i18n="neworder.date">Дата</span>
-          <input id="date" type="date" />
+          <textarea id="description" rows="4" maxlength="1900" required data-i18n-ph="neworder.describePh"></textarea>
+          <span class="hint" data-i18n="neworder.describeHint">Чем подробнее — тем точнее мастера назовут цену</span>
         </label>
         <label>
-          <span data-i18n="neworder.time">Время</span>
-          <input id="time" type="time" />
+          <span data-i18n="neworder.photos">Фото (до 5 штук)</span>
+          <input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
         </label>
+      </section>
+
+      <div class="error" id="error1" role="alert"></div>
+      <div class="wiz-actions">
+        <button class="btn large" type="submit"><span data-i18n="wiz.continue">Продолжить</span><svg class="i" aria-hidden="true"><use href="#i-arrow-right"></use></svg></button>
       </div>
+    </form>
 
-      <h2 class="form-section-title" style="margin-top:8px"><svg class="i" aria-hidden="true"><use href="#i-wallet"></use></svg><span data-i18n="neworder.budgetTitle">Бюджет и фото</span></h2>
-      <label>
-        <span data-i18n="neworder.budget">Ваш бюджет, сом</span>
-        <input id="price" type="number" min="0" max="10000000" data-i18n-ph="neworder.budgetPh" />
-      </label>
+    <!-- Step 2: masters and prices -->
+    <section class="wizard-step" id="step2" hidden>
+      <button class="back-link" type="button" data-go="1"><svg class="i sm" aria-hidden="true"><use href="#i-arrow-left"></use></svg><span data-i18n="wiz.back">Назад</span></button>
+      <h1 data-i18n="wiz.title2">Выберите мастера</h1>
+      <div class="send-all">
+        <span class="send-all-ico"><svg class="i lg" aria-hidden="true"><use href="#i-timer"></use></svg></span>
+        <div>
+          <b data-i18n="wiz.allTitle">Не хотите выбирать?</b>
+          <p data-i18n="wiz.allText">Отправим заявку всем подходящим мастерам — предложения с ценами придут за 20 минут.</p>
+        </div>
+        <button class="btn" type="button" id="sendAllBtn" data-i18n="wiz.allBtn">Отправить всем</button>
+      </div>
+      <div class="browse">
+        <aside class="browse-filters">
+          <label>
+            <span data-i18n="search.sortAria">Сортировка</span>
+            <select id="sort">
+              <option value="rating" data-i18n="wiz.sortRecommended">Рекомендуемые</option>
+              <option value="price" data-i18n="wiz.sortPrice">Сначала дешевле</option>
+              <option value="orders" data-i18n="search.sortOrders">По опыту</option>
+            </select>
+          </label>
+          <p class="hint" data-i18n="wiz.filtersHint">Все мастера проверены сервисом и обязаны ответить за 20 минут.</p>
+        </aside>
+        <div class="tasker-list" id="taskerList"></div>
+      </div>
+    </section>
 
-      <label>
-        <span data-i18n="neworder.photos">Фото (до 5 штук)</span>
-        <input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
-        <span class="hint" data-i18n="neworder.photosHint">JPEG, PNG или WebP — помогают мастеру оценить работу</span>
-      </label>
-
+    <!-- Step 3: contacts and confirmation -->
+    <form class="wizard-step" id="step3" hidden novalidate>
+      <button class="back-link" type="button" data-go="2"><svg class="i sm" aria-hidden="true"><use href="#i-arrow-left"></use></svg><span data-i18n="wiz.back">Назад</span></button>
+      <h1 data-i18n="wiz.title3">Подтвердите заявку</h1>
+      <div class="confirm-layout">
+        <div>
+          <section class="wiz-card">
+            <h2 data-i18n="wiz.whenQ">Когда удобно?</h2>
+            <div class="form-grid">
+              <label><span data-i18n="neworder.date">Дата</span><input id="date" type="date" /></label>
+              <label><span data-i18n="neworder.time">Время</span><input id="time" type="time" /></label>
+            </div>
+            <label>
+              <span data-i18n="neworder.budget">Ваш бюджет, сом</span>
+              <input id="price" type="number" min="0" max="10000000" data-i18n-ph="neworder.budgetPh" />
+            </label>
+          </section>
+          <section class="wiz-card">
+            <h2 data-i18n="neworder.contacts">Ваши контакты</h2>
+            <div class="form-grid">
+              <label><span data-i18n="neworder.name">Как к вам обращаться</span>
+                <input id="clientName" type="text" required maxlength="100" autocomplete="name" data-i18n-ph="neworder.namePh" /></label>
+              <label><span data-i18n="common.phone">Телефон</span>
+                <input id="clientPhone" type="tel" required maxlength="20" autocomplete="tel" placeholder="+996 700 123 456" /></label>
+            </div>
+            <span class="hint" data-i18n="neworder.phoneHint">Номер увидят только выбранный вами мастер и менеджер сервиса</span>
+            <!-- Honeypot: invisible to people, bots fill it in -->
+            <div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden">
+              <label>Website <input id="website" type="text" tabindex="-1" autocomplete="off" /></label>
+            </div>
+          </section>
+        </div>
+        <aside class="summary-card" id="summary"></aside>
+      </div>
       <p class="hint" data-i18n="neworder.consent">Отправляя заявку, вы соглашаетесь, что мастер или менеджер сервиса может вам позвонить.</p>
-      <div id="formError" class="error" role="alert"></div>
-      <button class="btn accent large" type="submit" id="submitBtn"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span data-i18n="neworder.submit">Отправить заявку</span></button>
+      <div class="error" id="error3" role="alert"></div>
+      <div class="wiz-actions">
+        <button class="btn large" type="submit" id="submitBtn"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span data-i18n="wiz.confirm">Подтвердить и отправить</span></button>
+      </div>
     </form>
   </main>
 
@@ -160,108 +161,216 @@
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
   <script>
-    const preselectCategory = new URLSearchParams(location.search).get("category_id");
-    document.getElementById("date").min = new Date().toISOString().slice(0, 10);
+    const params = new URLSearchParams(location.search);
+    let categories = [];
+    let masters = [];
+    let chosenMaster = null;  // null = send to everyone
 
     function stored(key) {
-      try {
-        return localStorage.getItem(key) || "";
-      } catch (e) {
-        return "";
-      }
+      try { return localStorage.getItem(key) || ""; } catch (e) { return ""; }
     }
 
-    function lastCity() {
-      return stored("lastCity");
-    }
-
-    // Returning clients don't have to type their name and phone again.
+    document.getElementById("date").min = new Date().toISOString().slice(0, 10);
     document.getElementById("clientName").value = stored("clientName");
     document.getElementById("clientPhone").value = stored("clientPhone");
+    if (params.get("task")) document.getElementById("description").value = params.get("task") + ". ";
 
-    async function loadCities() {
-      document.getElementById("city").innerHTML = await cityOptionsHtml(lastCity());
+    function show(n) {
+      for (const i of [1, 2, 3]) document.getElementById(`step${i}`).hidden = i !== n;
+      document.querySelectorAll(".wizard-steps li").forEach(li => {
+        const s = Number(li.dataset.step);
+        li.classList.toggle("done", s < n);
+        li.classList.toggle("current", s === n);
+      });
+      document.getElementById("wizardBar").style.width = `${(n / 3) * 100}%`;
+      window.scrollTo({ top: 0 });
+      if (n === 3) renderSummary();
     }
 
-    async function loadCategories() {
-      const picker = document.getElementById("categoryPicker");
-      try {
-        const categories = await api.categories();
-        picker.innerHTML = categories.map((c, i) => `
-          <input type="radio" name="category" id="cat${c.id}" value="${c.id}" ${String(c.id) === preselectCategory || (!preselectCategory && i === 0) ? "checked" : ""} required />
-          <label for="cat${c.id}">${categoryBadge(c.name)}<span>${esc(catName(c.name))}</span></label>
-        `).join("");
-      } catch (e) {
-        document.getElementById("formError").textContent = t("neworder.catError") + e.message;
-      }
+    document.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => show(Number(b.dataset.go))));
+
+    function selectedCategory() {
+      const checked = document.querySelector('input[name="category"]:checked');
+      return checked ? categories.find(c => c.id === Number(checked.value)) : null;
     }
 
-    document.getElementById("photos").addEventListener("change", (e) => {
-      if (e.target.files.length > 5) {
-        document.getElementById("formError").textContent = t("neworder.maxPhotos");
-        e.target.value = "";
-      }
+    function renderTaskPills() {
+      const cat = selectedCategory();
+      document.getElementById("taskPills").innerHTML = (cat ? projectsFor(cat.name) : []).map(p =>
+        `<button type="button" class="proj-pill" data-task="${esc(p)}">${esc(p)}</button>`).join("");
+    }
+
+    // A popular job fills in the start of the description.
+    document.getElementById("taskPills").addEventListener("click", (e) => {
+      const pill = e.target.closest("[data-task]");
+      if (!pill) return;
+      const box = document.getElementById("description");
+      const known = projectsFor(selectedCategory().name).find(p => box.value.startsWith(p + ". "));
+      box.value = pill.dataset.task + ". " + (known ? box.value.slice(known.length + 2) : box.value);
+      box.focus();
     });
 
-    document.getElementById("orderForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const errorBox = document.getElementById("formError");
-      const button = document.getElementById("submitBtn");
-      errorBox.textContent = "";
-
-      const checked = document.querySelector('input[name="category"]:checked');
-      if (!checked) {
-        errorBox.textContent = t("neworder.chooseCat");
-        return;
+    async function loadCategories() {
+      try {
+        categories = sortCategories(await api.categories());
+        const pre = params.get("category_id");
+        document.getElementById("categoryPicker").innerHTML = categories.map((c, i) => `
+          <input type="radio" name="category" id="cat${c.id}" value="${c.id}" ${String(c.id) === pre || (!pre && i === 0) ? "checked" : ""} />
+          <label for="cat${c.id}">${categoryBadge(c.name)}<span>${esc(catName(c.name))}</span></label>`).join("");
+        renderTaskPills();
+      } catch (e) {
+        document.getElementById("error1").textContent = t("neworder.catError") + e.message;
       }
+    }
+    document.getElementById("categoryPicker").addEventListener("change", renderTaskPills);
 
+    const SIZE_TEXT = { small: "wiz.sizeSfull", medium: "wiz.sizeMfull", large: "wiz.sizeLfull" };
+
+    function taskDescription() {
+      const size = document.querySelector('input[name="size"]:checked').value;
+      return `${document.getElementById("description").value.trim()}\n${t(SIZE_TEXT[size])}`;
+    }
+
+    // ---------- step 1 → 2 ----------
+    document.getElementById("step1").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const error = document.getElementById("error1");
+      error.textContent = "";
+      if (!selectedCategory()) return (error.textContent = t("neworder.chooseCat"));
+      if (!document.getElementById("city").value) return (error.textContent = t("city.choose"));
+      if (!document.getElementById("description").value.trim()) return (error.textContent = t("wiz.needDetails"));
+      if (document.getElementById("photos").files.length > 5) return (error.textContent = t("neworder.maxPhotos"));
+      try { localStorage.setItem("lastCity", document.getElementById("city").value); } catch (err) { /* ignore */ }
+      show(2);
+      loadMasters();
+    });
+
+    function taskerCardHtml(m) {
+      const cat = selectedCategory();
+      const services = m.services.filter(s => !cat || s.category_id === cat.id);
+      const price = services.length ? Math.min(...services.map(s => s.price_from)) : null;
+      return `
+        <article class="tasker-card">
+          <div class="tasker-card-side">
+            ${avatarHtml(m.user.name, "avatar avatar-lg", m.user.photo)}
+            <a class="link small" href="master.html?id=${m.id}" target="_blank" rel="noopener">${t("tr.viewProfile")}</a>
+          </div>
+          <div class="tasker-card-main">
+            <div class="tasker-card-head">
+              <div>
+                <div class="tasker-name">${esc(m.user.name)} ${m.verified ? `<span class="tasker-check" title="${t("guarantee.badge")}">${icon("badge-check")}</span>` : ""}</div>
+                <div class="tasker-rating">${icon("star", "sm")}<b>${Number(m.rating).toFixed(1)}</b><span>· ${plural(m.completed_orders, "p.orders")}</span></div>
+                ${m.experience_years ? `<div class="tasker-meta">${t("search.exp", { years: plural(m.experience_years, "p.years") })}</div>` : ""}
+              </div>
+              ${price !== null ? `<div class="tasker-card-price">${priceFromHtml(price)}</div>` : ""}
+            </div>
+            ${m.description ? `<div class="tasker-help"><b>${t("tr.howHelp")}</b> ${esc(m.description)}</div>` : ""}
+            <div class="tasker-card-actions">
+              <button class="btn" type="button" data-choose="${m.id}">${t("tr.selectContinue")}</button>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function renderMasters() {
+      const sort = document.getElementById("sort").value;
+      const cat = selectedCategory();
+      const priceOf = m => Math.min(...m.services.filter(s => !cat || s.category_id === cat.id).map(s => s.price_from), Infinity);
+      const list = [...masters];
+      if (sort === "price") list.sort((a, b) => priceOf(a) - priceOf(b));
+      if (sort === "orders") list.sort((a, b) => b.completed_orders - a.completed_orders);
+      document.getElementById("taskerList").innerHTML = list.length
+        ? list.map(taskerCardHtml).join("")
+        : emptyState("users", t("wiz.noMasters"), t("wiz.noMastersText"));
+    }
+
+    async function loadMasters() {
+      const box = document.getElementById("taskerList");
+      box.innerHTML = skeletons(3, 170);
+      try {
+        masters = await api.searchMasters({ category_id: selectedCategory().id, city: document.getElementById("city").value, sort: "rating", limit: 50 });
+        renderMasters();
+      } catch (e) {
+        box.innerHTML = emptyState("triangle-alert", t("search.loadError"), esc(e.message));
+      }
+    }
+    document.getElementById("sort").addEventListener("change", renderMasters);
+
+    document.getElementById("taskerList").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-choose]");
+      if (!b) return;
+      chosenMaster = masters.find(m => m.id === Number(b.dataset.choose)) || null;
+      show(3);
+    });
+    document.getElementById("sendAllBtn").addEventListener("click", () => { chosenMaster = null; show(3); });
+
+    // ---------- step 3 ----------
+    function renderSummary() {
+      const cat = selectedCategory();
+      const size = document.querySelector('input[name="size"]:checked').value;
+      const address = document.getElementById("address").value.trim();
+      document.getElementById("summary").innerHTML = `
+        <h3>${t("wiz.summary")}</h3>
+        <div class="summary-row">${categoryBadge(cat.name)}<b>${esc(catName(cat.name))}</b></div>
+        <div class="summary-row">${icon("map-pin")}<span>${esc(cityName(document.getElementById("city").value))}${address ? ", " + esc(address) : ""}</span></div>
+        <div class="summary-row">${icon("clock")}<span>${t(SIZE_TEXT[size])}</span></div>
+        <div class="summary-master">
+          ${chosenMaster
+            ? `${avatarHtml(chosenMaster.user.name, "avatar", chosenMaster.user.photo)}<div><small>${t("wiz.yourMaster")}</small><b>${esc(chosenMaster.user.name)}</b></div>`
+            : `<span class="send-all-ico">${icon("users")}</span><div><small>${t("wiz.yourMaster")}</small><b>${t("wiz.allMasters")}</b></div>`}
+        </div>
+        <p class="summary-desc">${esc(document.getElementById("description").value.trim())}</p>`;
+    }
+
+    document.getElementById("step3").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const error = document.getElementById("error3");
+      const button = document.getElementById("submitBtn");
+      error.textContent = "";
+      const name = document.getElementById("clientName").value.trim();
+      const phone = document.getElementById("clientPhone").value.trim();
+      if (!name || !phone) return (error.textContent = t("srv.required"));
       const date = document.getElementById("date").value;
       const time = document.getElementById("time").value;
       const price = document.getElementById("price").value;
-      const photoFiles = Array.from(document.getElementById("photos").files || []);
-
       const payload = {
-        name: document.getElementById("clientName").value.trim(),
-        phone: document.getElementById("clientPhone").value.trim(),
+        name, phone,
         website: document.getElementById("website").value,
-        category_id: Number(checked.value),
+        category_id: selectedCategory().id,
         city: document.getElementById("city").value,
-        description: document.getElementById("description").value.trim(),
+        description: taskDescription(),
         address: document.getElementById("address").value.trim() || null,
         date: date ? new Date(`${date}T${time || "00:00"}:00`).toISOString() : null,
         time: time || null,
         price: price ? Number(price) : null,
       };
-
       button.disabled = true;
       try {
         const { token, request } = await api.createRequest(payload);
         try {
-          localStorage.setItem("lastCity", payload.city);
-          localStorage.setItem("clientName", payload.name);
-          localStorage.setItem("clientPhone", payload.phone);
+          localStorage.setItem("clientName", name);
+          localStorage.setItem("clientPhone", phone);
           rememberRequest(token, request.id);
-        } catch (e) {
-          /* storage unavailable — the success page still shows the link */
+        } catch (err) { /* ignore */ }
+        // The chosen master also gets a direct chat message, so they can answer first.
+        if (chosenMaster) {
+          await api.startChat(chosenMaster.id, name, t("wiz.chatIntro", { id: request.id, text: payload.description })).catch(() => {});
         }
         let photoWarning = "";
-        if (photoFiles.length) {
-          try {
-            await api.uploadRequestPhotos(token, photoFiles);
-          } catch (photoErr) {
-            photoWarning = "&photo_error=1";
-          }
+        const files = Array.from(document.getElementById("photos").files || []);
+        if (files.length) {
+          try { await api.uploadRequestPhotos(token, files); } catch (err) { photoWarning = "&photo_error=1"; }
         }
-        // The token goes in the #fragment: it never reaches server logs or Referer headers.
         location.href = `order-success.html?id=${request.id}${photoWarning}#token=${encodeURIComponent(token)}`;
-      } catch (e) {
-        errorBox.textContent = t("neworder.sendError") + e.message;
+      } catch (err) {
+        error.textContent = t("neworder.sendError") + err.message;
         button.disabled = false;
       }
     });
 
+    cityOptionsHtml(stored("lastCity")).then(html => { document.getElementById("city").innerHTML = html; }).catch(() => {});
     loadCategories();
-    loadCities().catch(() => {});
+    show(1);
     renderNav();
   </script>
 </body>

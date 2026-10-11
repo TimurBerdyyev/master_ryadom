@@ -71,13 +71,13 @@ function renderTabbar(role) {
   if (!IS_APP) return;
   const items = role === "master"
     ? [["feed.html", "inbox", t("tab.feed")], ["orders.html", "clipboard-list", t("tab.jobs")],
-       ["notifications.html", "bell", t("tab.notifications")], ["master-profile-edit.html", "user", t("tab.profile")]]
+       ["chats.html", "message-circle", t("tab.messages"), false, "chatBadge"], ["master-profile-edit.html", "user", t("tab.profile")]]
     : role === "admin"
     ? [["index.html", "house", t("tab.home")], ["masters.html", "search", t("tab.masters")],
        ["admin/index.html", "shield-check", t("nav.admin")]]
     : [["index.html", "house", t("tab.home")], ["masters.html", "search", t("tab.masters")],
-       ["order.html", "plus", t("tab.request"), true], ["my-requests.html", "clipboard-list", t("tab.myRequests")],
-       ["login.html", "briefcase", t("tab.forMasters")]];
+       ["order.html", "plus", t("tab.request"), true], ["chats.html", "message-circle", t("tab.messages"), false, "chatBadge"],
+       ["my-requests.html", "clipboard-list", t("tab.myRequests")]];
   const current = location.pathname.replace(/^.*?\/((admin\/)?[^/]*)$/, "$1") || "index.html";
   let bar = document.getElementById("tabbar");
   if (!bar) {
@@ -87,10 +87,11 @@ function renderTabbar(role) {
     bar.setAttribute("aria-label", t("nav.menu"));
     document.body.appendChild(bar);
   }
-  bar.innerHTML = items.map(([href, iconName, label, main]) => `
+  bar.innerHTML = items.map(([href, iconName, label, main, badge]) => `
     <a class="tab${main ? " main" : ""}${(current || "index.html") === href ? " active" : ""}" href="${ROOT}${href}">
-      <span class="tab-icon">${icon(iconName)}</span><span class="tab-label">${label}</span>
+      <span class="tab-icon">${icon(iconName)}${badge ? `<span class="tab-badge" data-chat-badge hidden></span>` : ""}</span><span class="tab-label">${label}</span>
     </a>`).join("");
+  refreshChatBadge();
 }
 
 function navLink(href, label, iconName) {
@@ -157,15 +158,18 @@ async function renderNav() {
   // Clients have no account: they search, call, leave requests and come back via "Мои заявки".
   const guestNav = `
     ${navLink("masters.html", t("nav.find"), "search")}
+    ${navLink("chats.html", t("nav.messages") + '<span class="nav-count" data-chat-badge hidden></span>', "message-circle")}
     ${navLink("my-requests.html", t("nav.myRequests"), "clipboard-list")}
     ${navLink("login.html", t("nav.forMasters"), "briefcase")}
-    ${IS_APP ? "" : navLink("app.html", t("nav.app"), "smartphone")}
+    ${IS_APP ? "" : `<span class="nav-app-link">${navLink("app.html", t("nav.app"), "smartphone")}</span>`}
     <a class="btn small accent" href="${ROOT}order.html">${icon("plus")}${t("nav.createOrder")}</a>
   `;
 
   if (!getToken()) {
     nav.innerHTML = guestNav;
     renderTabbar("guest");
+    syncWebPush();
+    refreshChatBadge();
     return;
   }
   try {
@@ -174,6 +178,7 @@ async function renderNav() {
     if (user.role === "master") {
       links.push(navLink("feed.html", t("nav.feed"), "inbox"));
       links.push(navLink("orders.html", t("nav.myJobs"), "clipboard-list"));
+      links.push(navLink("chats.html", t("nav.messages") + '<span class="nav-count" data-chat-badge hidden></span>', "message-circle"));
       links.push(navLink("master-profile-edit.html", t("common.profile"), "settings-2"));
       links.push(`<span id="planLink"></span>`);
     } else {
@@ -192,6 +197,9 @@ async function renderNav() {
     if (user.role === "master") renderPlanLink();
     renderTabbar(user.role);
     setupPush(user);
+    syncWebPush();
+    refreshChatBadge();
+    if (user.role === "master") shareLiveLocation();
   } catch (e) {
     clearToken();
     nav.innerHTML = guestNav;
@@ -234,4 +242,105 @@ async function logout() {
   }
   clearToken();
   location.href = `${ROOT}index.html`;
+}
+
+
+// ---------- chat unread badge ----------
+async function refreshChatBadge() {
+  const badges = document.querySelectorAll("[data-chat-badge]");
+  if (!badges.length) return;
+  let unread = 0;
+  try {
+    // Clients only ask once they have chatted (they then have a key); masters always.
+    let hasKey = false;
+    try { hasKey = Boolean(localStorage.getItem("clientKey")); } catch (e) { /* ignore */ }
+    if (getToken() || hasKey) unread = (await api.chatsUnread()).unread;
+  } catch (e) {
+    /* no badge */
+  }
+  badges.forEach(b => { b.textContent = unread > 99 ? "99+" : String(unread); b.hidden = unread === 0; });
+}
+
+// ---------- browser notifications (Web Push) ----------
+const WEB_PUSH = !PUSH && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+function urlBase64ToUint8Array(base64) {
+  const padded = (base64 + "=".repeat((4 - base64.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+}
+
+// Asks for permission (call from a button: browsers, especially iPhone, require a tap) and subscribes.
+async function enableWebPush() {
+  if (!WEB_PUSH) throw new Error(t("wp.unsupported"));
+  if (Notification.permission !== "granted" && (await Notification.requestPermission()) !== "granted") {
+    throw new Error(t("wp.denied"));
+  }
+  await subscribeWebPush();
+  return true;
+}
+
+async function subscribeWebPush() {
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    const { public_key } = await api.webPushKey();
+    subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(public_key) });
+  }
+  getClientKey();  // make sure the browser has its key: clients are found by it
+  await api.webPushSubscribe(subscription.toJSON());
+}
+
+// Already allowed earlier: quietly keep the subscription tied to this login / browser key.
+function syncWebPush() {
+  if (WEB_PUSH && Notification.permission === "granted") subscribeWebPush().catch(() => {});
+}
+
+function webPushState() {
+  if (PUSH) return "app";
+  if (!WEB_PUSH) {
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    return ios && !IS_APP ? "ios-install" : "unsupported";
+  }
+  return Notification.permission;  // "granted" | "denied" | "default"
+}
+
+// A small "turn on notifications" banner for pages where an answer is awaited (chat, my requests).
+function webPushBanner(container, textKey) {
+  const state = webPushState();
+  if (!container || state === "granted" || state === "app" || state === "unsupported") return;
+  container.innerHTML = state === "ios-install"
+    ? `<div class="notice">${icon("bell")}<span>${t("wp.iosInstall")} <a class="link" href="${ROOT}app.html">${t("nav.app")} →</a></span></div>`
+    : state === "denied"
+    ? `<div class="notice warn">${icon("bell")}<span>${t("wp.deniedHelp")}</span></div>`
+    : `<div class="notice wp-banner">${icon("bell-ring")}<span style="flex:1">${t(textKey)}</span><button class="btn small" type="button">${t("wp.enable")}</button></div>`;
+  const button = container.querySelector("button");
+  if (button) button.addEventListener("click", async () => {
+    try {
+      await enableWebPush();
+      container.innerHTML = `<div class="notice success">${icon("circle-check")}<span>${t("wp.enabled")}</span></div>`;
+    } catch (e) {
+      toast(e.message);
+    }
+  });
+}
+
+// ---------- masters: live location on the clients' map ----------
+// While a master has "Показывать меня на карте" on, every open page reports the position (at most every 2 minutes).
+async function shareLiveLocation(force = false) {
+  if (!navigator.geolocation) return;
+  let last = 0;
+  try { last = Number(localStorage.getItem("locationSentAt") || 0); } catch (e) { /* ignore */ }
+  if (!force && Date.now() - last < 120000) return;
+  try {
+    const me = await api.myMasterProfile();
+    if (!me.location_shared && !force) return;
+  } catch (e) {
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      await api.shareLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      localStorage.setItem("locationSentAt", String(Date.now()));
+    } catch (e) { /* ignore */ }
+  }, () => {}, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }

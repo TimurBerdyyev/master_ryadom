@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -19,75 +20,104 @@
     <nav id="nav"></nav>
   </header>
 
-  <main>
-    <div class="page-head">
+  <main class="tr-home">
+    <form class="tr-search compact" role="search" id="searchForm">
+      <svg class="i lg" aria-hidden="true"><use href="#i-search"></use></svg>
+      <input id="searchInput" type="search" maxlength="100" data-i18n-ph="search.ph" data-i18n-aria="search.aria" />
+      <button class="btn" type="submit" data-i18n="search.submit">Найти</button>
+    </form>
+
+    <div class="cat-chips" id="categoryChips" role="tablist" data-i18n-aria="search.catsAria"></div>
+
+    <div class="browse-head">
       <div>
         <h1 id="title" data-i18n="search.title">Все мастера</h1>
         <p class="muted" id="subtitle">&nbsp;</p>
       </div>
-      <a class="btn accent" id="orderBtn" href="order.html"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="nav.createOrder">Создать заказ</span></a>
+      <div class="view-switch" role="tablist">
+        <button type="button" role="tab" data-view="list" class="active"><svg class="i" aria-hidden="true"><use href="#i-list-filter"></use></svg><span data-i18n="map.list">Список</span></button>
+        <button type="button" role="tab" data-view="map"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="map.map">Карта</span></button>
+      </div>
     </div>
 
-    <div class="chips" id="categoryChips" role="tablist" data-i18n-aria="search.catsAria"></div>
+    <div class="browse" id="listView">
+      <aside class="browse-filters">
+        <label><span data-i18n="common.city">Город</span><select id="cityFilter"></select></label>
+        <label><span data-i18n="search.sortAria">Сортировка</span>
+          <select id="sortFilter">
+            <option value="rating" data-i18n="wiz.sortRecommended">Рекомендуемые</option>
+            <option value="orders" data-i18n="search.sortOrders">По опыту</option>
+          </select>
+        </label>
+        <label><span data-i18n="search.ratingAria">Рейтинг</span>
+          <select id="ratingFilter">
+            <option value="" data-i18n="search.anyRating">Любой рейтинг</option>
+            <option value="4">★ 4.0+</option>
+            <option value="4.5">★ 4.5+</option>
+          </select>
+        </label>
+        <a class="btn block" id="orderBtn" href="order.html"><span data-i18n="nav.createOrder">Оставить заявку</span></a>
+        <p class="hint" data-i18n="wiz.filtersHint">Все мастера проверены сервисом и обязаны ответить за 20 минут.</p>
+      </aside>
+      <div class="tasker-list" id="masterList"></div>
+    </div>
 
-    <form class="filters" onsubmit="event.preventDefault(); applyFilters();">
-      <div class="input-icon">
-        <svg class="i" aria-hidden="true"><use href="#i-search"></use></svg>
-        <input id="searchInput" type="search" maxlength="100" data-i18n-ph="search.ph" data-i18n-aria="search.aria" />
+    <!-- Live map: masters sharing their location now -->
+    <div id="mapView" hidden>
+      <div class="map-bar">
+        <span class="map-live"><span class="dot"></span><span data-i18n="map.live">Сейчас на связи</span></span>
+        <span class="muted" id="mapCount"></span>
+        <span class="spacer"></span>
+        <button class="btn small secondary" type="button" id="locateBtn"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="map.nearMe">Рядом со мной</span></button>
       </div>
-      <select id="cityFilter" data-i18n-aria="common.city"></select>
-      <select id="ratingFilter" data-i18n-aria="search.ratingAria">
-        <option value="" data-i18n="search.anyRating">Любой рейтинг</option>
-        <option value="4">★ 4.0+</option>
-        <option value="4.5">★ 4.5+</option>
-      </select>
-      <select id="verifiedFilter" data-i18n-aria="search.verifiedAria">
-        <option value="" data-i18n="search.allMasters">Все мастера</option>
-        <option value="true" data-i18n="search.verifiedOnly">Проверенные</option>
-      </select>
-      <select id="sortFilter" data-i18n-aria="search.sortAria">
-        <option value="rating" data-i18n="search.sortRating">По рейтингу</option>
-        <option value="orders" data-i18n="search.sortOrders">По опыту</option>
-      </select>
-      <button class="btn" type="submit" data-i18n="search.submit">Найти</button>
-    </form>
-
-    <div id="masterList" class="master-list"></div>
+      <div class="map-wrap">
+        <div id="map" role="region" data-i18n-aria="map.map"></div>
+        <div class="map-list" id="mapList"></div>
+      </div>
+      <p class="hint" data-i18n="map.hint">На карте — мастера, которые сейчас включили «Показывать меня на карте». Положение обновляется, пока у них открыто приложение.</p>
+    </div>
   </main>
 
   <script src="js/icons.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/api.js"></script>
   <script src="js/nav.js"></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     let categoryId = params.get("category_id") || "";
     let categories = [];
+    let view = params.get("view") === "map" ? "map" : "list";
+    // Where we look for masters on the map: the visitor (if they allow it) or Bishkek.
+    const DEFAULT_CENTER = [42.8746, 74.5698];
+    let center = null;
+    let map = null;
+    let markers = null;
 
     document.getElementById("searchInput").value = params.get("q") || "";
     const cityReady = cityOptionsHtml(params.get("city") || "", "city.all")
       .then(html => { document.getElementById("cityFilter").innerHTML = html; })
       .catch(() => {});
-    document.getElementById("cityFilter").addEventListener("change", applyFilters);
+    ["cityFilter", "sortFilter", "ratingFilter"].forEach(id => document.getElementById(id).addEventListener("change", applyFilters));
 
-    function categoryName(id) {
+    function categoryNameOf(id) {
       return categories.find(c => String(c.id) === String(id))?.name;
     }
 
     function renderChips() {
-      const chip = (id, label, iconHtml, style = "") => `
-        <button type="button" role="tab" class="chip ${String(id) === String(categoryId) ? "active" : ""}"
-                style="${style}" onclick="pickCategory('${id}')">${iconHtml}${label}</button>`;
+      const chip = (id, label, iconHtml) => `
+        <button type="button" role="tab" class="cat-chip${String(id) === String(categoryId) ? " active" : ""}" data-cat="${id}">${iconHtml}<span>${label}</span></button>`;
       document.getElementById("categoryChips").innerHTML = [chip("", esc(t("search.allCats")), icon("layout-grid"))]
-        .concat(categories.map(c => chip(c.id, esc(catName(c.name)), categoryIcon(c.name), categoryStyle(c.name).style)))
-        .join("");
+        .concat(categories.map(c => chip(c.id, esc(catName(c.name)), categoryIcon(c.name)))).join("");
     }
 
-    function pickCategory(id) {
-      categoryId = id;
+    document.getElementById("categoryChips").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-cat]");
+      if (!b) return;
+      categoryId = b.dataset.cat;
       renderChips();
       applyFilters();
-    }
+    });
 
     function applyFilters() {
       const q = document.getElementById("searchInput").value.trim();
@@ -96,79 +126,156 @@
       if (categoryId) next.set("category_id", categoryId);
       if (q) next.set("q", q);
       if (city) next.set("city", city);
+      if (view === "map") next.set("view", "map");
       history.replaceState(null, "", `?${next}`);
-      loadMasters();
+      const name = categoryNameOf(categoryId);
+      document.getElementById("title").textContent = q ? t("search.query", { q }) : (categoryId && name ? catName(name) : t("search.title"));
+      document.getElementById("orderBtn").href = categoryId ? `order.html?category_id=${encodeURIComponent(categoryId)}` : "order.html";
+      view === "map" ? loadMap() : loadMasters();
     }
 
+    document.getElementById("searchForm").addEventListener("submit", (e) => { e.preventDefault(); applyFilters(); });
+
     function masterCard(m) {
-      const prices = m.services.map(s => s.price_from);
-      const minPrice = prices.length ? Math.min(...prices) : null;
-      const tags = [...new Set(m.services.map(s => s.title))].slice(0, 4);
-      // The whole card opens the profile (stretched link); the call buttons sit above it.
+      const services = m.services.filter(s => !categoryId || String(s.category_id) === String(categoryId));
+      const price = (services.length ? services : m.services).map(s => s.price_from);
       return `
-        <div class="master-card">
-          ${avatarHtml(m.user.name, "avatar", m.user.photo)}
-          <div>
-            <div class="name"><a class="stretched" href="master.html?id=${m.id}">${esc(m.user.name)}</a> ${m.verified ? verifiedBadge() : ""}</div>
-            <div class="meta">
-              ${ratingHtml(m.rating)}
-              <span>${icon("briefcase")}${plural(m.completed_orders, "p.orders")}</span>
-              ${m.experience_years ? `<span>${icon("timer")}${t("search.exp", { years: plural(m.experience_years, "p.years") })}</span>` : ""}
-              ${m.city ? `<span>${icon("map-pin")}${esc(cityName(m.city))}</span>` : ""}
+        <article class="tasker-card">
+          <div class="tasker-card-side">
+            ${avatarHtml(m.user.name, "avatar avatar-lg", m.user.photo)}
+            <a class="link small" href="master.html?id=${m.id}">${t("tr.viewProfile")}</a>
+          </div>
+          <div class="tasker-card-main">
+            <div class="tasker-card-head">
+              <div>
+                <a class="tasker-name" href="master.html?id=${m.id}">${esc(m.user.name)} ${m.verified ? `<span class="tasker-check" title="${t("guarantee.badge")}">${icon("badge-check")}</span>` : ""}</a>
+                <div class="tasker-rating">${icon("star", "sm")}<b>${Number(m.rating).toFixed(1)}</b><span>· ${plural(m.completed_orders, "p.orders")}</span></div>
+                <div class="tasker-meta">${m.city ? esc(cityName(m.city)) : ""}${m.experience_years ? " · " + t("search.exp", { years: plural(m.experience_years, "p.years") }) : ""}</div>
+              </div>
+              ${price.length ? `<div class="tasker-card-price">${priceFromHtml(Math.min(...price))}</div>` : ""}
             </div>
-            ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ""}
-            ${tags.length ? `<div class="tags">${tags.map(tag => `<span class="tag">${esc(tag)}</span>`).join("")}</div>` : ""}
+            ${m.description ? `<div class="tasker-help"><b>${t("tr.howHelp")}</b> ${esc(m.description)}</div>` : ""}
+            <div class="tasker-card-actions">
+              ${m.user.phone ? `<a class="btn secondary" href="${esc(telLink(m.user.phone))}">${icon("phone")}${t("common.call")}</a>` : ""}
+              <a class="btn" href="chat.html?master=${m.id}">${icon("message-circle")}${t("tr.message")}</a>
+            </div>
           </div>
-          <div class="side">
-            ${minPrice !== null ? `<div class="price-from">${priceFromHtml(minPrice)}</div>` : "<span></span>"}
-            ${m.user.phone ? `
-              <div class="card-calls">
-                <a class="btn small secondary" href="${esc(telLink(m.user.phone))}">${icon("phone")}${t("common.call")}</a>
-                <a class="btn small whatsapp icon-only" href="${esc(waLink(m.user.phone))}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">${icon("message-circle")}</a>
-              </div>` : `<span class="btn small secondary">${t("common.profile")} ${icon("arrow-right")}</span>`}
-          </div>
-        </div>`;
+        </article>`;
     }
 
     async function loadMasters() {
       const list = document.getElementById("masterList");
-      list.classList.remove("reveal");
-      list.innerHTML = skeletons(4, 132);
-
-      const q = document.getElementById("searchInput").value.trim();
-      const name = categoryName(categoryId);
-      document.getElementById("title").textContent = q ? t("search.query", { q }) : (categoryId && name ? catName(name) : t("search.title"));
-      document.getElementById("orderBtn").href = categoryId ? `order.html?category_id=${encodeURIComponent(categoryId)}` : "order.html";
-
+      list.innerHTML = skeletons(3, 170);
       const query = { sort: document.getElementById("sortFilter").value };
       if (categoryId) query.category_id = categoryId;
+      const q = document.getElementById("searchInput").value.trim();
       if (q) query.q = q;
-      const verified = document.getElementById("verifiedFilter").value;
-      if (verified) query.verified = verified;
       const minRating = document.getElementById("ratingFilter").value;
       if (minRating) query.min_rating = minRating;
       const city = document.getElementById("cityFilter").value.trim();
       if (city) query.city = city;
-
       try {
         const masters = await api.searchMasters(query);
         document.getElementById("subtitle").textContent = t("search.found", { count: plural(masters.length, "p.masters") });
-        if (masters.length === 0) {
-          const href = `order.html${categoryId ? `?category_id=${encodeURIComponent(categoryId)}` : ""}`;
-          list.innerHTML = emptyState("search-x", t("search.emptyTitle"), t("search.emptyText"),
-            `<a class="btn accent" href="${href}">${icon("plus")}${t("nav.createOrder")}</a>`);
-          return;
-        }
-        list.classList.add("reveal");
-        list.innerHTML = masters.map(masterCard).join("");
+        list.innerHTML = masters.length ? masters.map(masterCard).join("")
+          : emptyState("search-x", t("search.emptyTitle"), t("search.emptyText"),
+              `<a class="btn" href="${esc(document.getElementById("orderBtn").getAttribute("href"))}">${t("nav.createOrder")}</a>`);
       } catch (e) {
         list.innerHTML = emptyState("triangle-alert", t("search.loadError"), esc(e.message));
       }
     }
 
+    // ---------- map ----------
+    function ensureMap() {
+      if (map) return;
+      map = L.map("map", { zoomControl: true, attributionControl: true }).setView(center || DEFAULT_CENTER, 13);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+      map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
+      markers = L.layerGroup().addTo(map);
+    }
+
+    function pinIcon(m) {
+      const inner = m.photo
+        ? `<img src="${esc(uploadUrl(m.photo))}" alt="">`
+        : `<span style="background:${avatarColor(m.name)}">${initials(m.name)}</span>`;
+      return L.divIcon({ className: "master-pin", html: `<div class="master-pin-face">${inner}</div>`, iconSize: [48, 56], iconAnchor: [24, 56], popupAnchor: [0, -50] });
+    }
+
+    function popupHtml(m) {
+      return `
+        <div class="map-popup">
+          <b>${esc(m.name)}</b>
+          <div class="tasker-rating">${icon("star", "sm")}<b>${Number(m.rating).toFixed(1)}</b><span>· ${plural(m.completed_orders, "p.orders")}</span></div>
+          <div class="muted">${t("map.distance", { km: m.distance_km })} · ${m.minutes_ago < 2 ? t("map.justNow") : t("map.minutesAgo", { n: m.minutes_ago })}</div>
+          ${m.price_from !== null ? `<div class="tasker-price">${priceFromHtml(m.price_from)}</div>` : ""}
+          <div class="row" style="gap:6px;margin-top:8px">
+            ${m.phone ? `<a class="btn small" href="${esc(telLink(m.phone))}">${icon("phone")}${t("common.call")}</a>` : ""}
+            <a class="btn small secondary" href="chat.html?master=${m.id}">${icon("message-circle")}${t("tr.message")}</a>
+          </div>
+          <a class="link small" href="master.html?id=${m.id}">${t("tr.viewProfile")} →</a>
+        </div>`;
+    }
+
+    async function loadMap() {
+      ensureMap();
+      setTimeout(() => map.invalidateSize(), 50);
+      const c = center || DEFAULT_CENTER;
+      const query = { lat: c[0], lon: c[1], radius_km: 30 };
+      if (categoryId) query.category_id = categoryId;
+      const listBox = document.getElementById("mapList");
+      try {
+        const found = await api.nearbyMasters(query);
+        markers.clearLayers();
+        found.forEach(m => L.marker([m.lat, m.lon], { icon: pinIcon(m), title: m.name }).bindPopup(popupHtml(m)).addTo(markers));
+        if (center) L.circleMarker(center, { radius: 8, color: "#fff", weight: 3, fillColor: "#2f6fed", fillOpacity: 1 }).addTo(markers);
+        document.getElementById("mapCount").textContent = plural(found.length, "p.masters");
+        if (found.length && !center) map.fitBounds(L.latLngBounds(found.map(m => [m.lat, m.lon])).pad(0.3), { maxZoom: 14 });
+        listBox.innerHTML = found.length ? found.map((m, i) => `
+          <button type="button" class="map-item" data-i="${i}">
+            ${avatarHtml(m.name, "avatar", m.photo)}
+            <span><b>${esc(m.name)}</b><small>${icon("star", "sm")} ${Number(m.rating).toFixed(1)} · ${t("map.distance", { km: m.distance_km })}</small></span>
+            ${m.price_from !== null ? `<span class="tasker-price">${priceFromHtml(m.price_from)}</span>` : ""}
+          </button>`).join("")
+          : emptyState("map-pin", t("map.emptyTitle"), t("map.emptyText"), `<a class="btn" href="order.html${categoryId ? `?category_id=${encodeURIComponent(categoryId)}` : ""}">${t("nav.createOrder")}</a>`);
+        listBox.onclick = (e) => {
+          const item = e.target.closest("[data-i]");
+          if (!item) return;
+          const m = found[Number(item.dataset.i)];
+          map.setView([m.lat, m.lon], 16);
+          markers.eachLayer(layer => { if (layer.options && layer.options.title === m.name) layer.openPopup(); });
+        };
+      } catch (e) {
+        listBox.innerHTML = emptyState("triangle-alert", t("search.loadError"), esc(e.message));
+      }
+    }
+
+    document.getElementById("locateBtn").addEventListener("click", () => {
+      if (!navigator.geolocation) return toast(t("map.noGeo"));
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          center = [pos.coords.latitude, pos.coords.longitude];
+          map.setView(center, 14);
+          loadMap();
+        },
+        () => toast(t("map.noGeo")),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+      );
+    });
+
+    function setView(next) {
+      view = next;
+      document.querySelectorAll(".view-switch [data-view]").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+      document.getElementById("listView").hidden = view !== "list";
+      document.getElementById("mapView").hidden = view !== "map";
+      applyFilters();
+    }
+    document.querySelectorAll(".view-switch [data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+
     Promise.all([api.categories(), cityReady])
-      .then(([c]) => { categories = c; renderChips(); loadMasters(); })
-      .catch(() => loadMasters());
+      .then(([c]) => { categories = sortCategories(c); renderChips(); setView(view); })
+      .catch(() => setView(view));
     renderNav();
   </script>
 </body>

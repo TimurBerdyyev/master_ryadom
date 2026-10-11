@@ -29,17 +29,32 @@
 - Стили — один файл `web/css/style.css` на CSS-переменных (`--primary`, `--accent`, `--ink`, `--muted`, `--r-*`, `--shadow-*`).
 
 ## Дизайн-система
-- Шрифты: **Unbounded** — только заголовки, логотип, крупные цифры (`--font-display`); **Onest** — весь остальной текст.
-  Оба с кириллицей, подключены в начале `style.css`.
+- Стиль маркетплейса в духе TaskRabbit (компоновка и сценарии; имя, логотип, тексты и картинки — свои): белый фон,
+  почти чёрный текст, **один зелёный** `--primary` (#12875a) для всех действий, круглые фото мастеров, карточки с рамкой.
+- Шрифт: **Onest** везде (заголовки 700–800). Unbounded больше не используется.
+- Главная (`index.html`): вопрос + поиск, вкладки категорий с иконками → «популярные услуги» (`projectsFor()`,
+  ключи `proj.<Категория>` в `i18n.js`), карточка категории, популярные услуги, лучшие мастера, карта, «Как это работает».
+- Заявка (`order.html`) — 3 шага с полосой прогресса: «Опишите задачу → Мастера и цены → Подтверждение».
+  «Выбрать и продолжить» отправляет заявку всем (обещание 20 минут) и дополнительно пишет выбранному мастеру в чат.
+- Мастера (`masters.html`): категории-чипсы, фильтры слева, карточки (`tasker-card`), «Список | Карта» (Leaflet из
+  `web/vendor/leaflet`, тайлы OpenStreetMap — разрешены в CSP только для картинок).
+- Чат: `chats.html` (список) и `chat.html` (переписка, опрос новых сообщений раз в 4 с). Клиент — по ключу браузера
+  `getClientKey()`, который `api.js` сам добавляет в запросы к `/chats`, `/requests`, `/notifications/web-push`.
 - Иконки: **Lucide** (ISC) спрайтом в `web/js/icons.js`. В JS — `icon("name")`, в HTML —
   `<svg class="i"><use href="#i-name"></use></svg>`. Новую иконку добавлять `<symbol>` в спрайт
   (исходники: `npm pack lucide-static`). **Эмодзи вместо иконок не использовать.**
-- `icons.js` подключается на каждой странице перед `api.js`.
-- Цвета: синий `--primary` — основные действия, оранжевый `--accent` — главный CTA («Создать заказ», «Предложить»),
-  зелёный — подтверждение/WhatsApp. У каждой категории своя иконка и цвет — `CATEGORY_STYLE` в `api.js`,
-  рисовать через `categoryBadge()`.
-- Готовые хелперы: `avatarHtml`, `ratingHtml`, `starsHtml`, `verifiedBadge`, `statusPillHtml`, `emptyState`, `skeletons`, `toast`.
+- Категории: иконка и цвет — `CATEGORY_STYLE`, порядок — `CATEGORY_ORDER`/`sortCategories()` в `api.js`.
+- Готовые хелперы: `avatarHtml`, `taskerMiniHtml`, `ratingHtml`, `starsHtml`, `verifiedBadge`, `statusPillHtml`,
+  `emptyState`, `skeletons`, `toast`, `webPushBanner`, `enableWebPush`.
 - Проверять вёрстку на 390px и 1280px; анимации уважают `prefers-reduced-motion`.
+
+## Уведомления в браузере (Web Push) и карта
+- `app/webpush.py`: шифрование RFC 8291 + подпись VAPID (ключ генерируется сам и лежит в `app_settings`). Подписка —
+  `/notifications/web-push/subscribe` (мастер — по входу, клиент — по ключу браузера); принимаются только адреса
+  настоящих push-сервисов (`WEB_PUSH_HOSTS`, защита от SSRF). Клиентам: новое предложение, статус, ответ в чате.
+- Живая геопозиция: `PUT/DELETE /masters/me/location`, карта — `GET /masters/nearby` (только свежие точки,
+  `LIVE_LOCATION_MINUTES`). Пока у мастера включено «Показывать меня на карте», `shareLiveLocation()` в `nav.js`
+  отправляет положение не чаще раза в 2 минуты.
 
 ## Телефон, SMS, уведомления
 - Email обязателен для мастеров (клиенты не регистрируются) и уникален; подтверждается кодом из письма: `/auth/send-code` (purpose=register|reset|change_email)
