@@ -59,13 +59,17 @@
   вебхук `/telegram/webhook` с секретом в заголовке; локально — `python -m app.telegram_poll`.
 
 ## Мобильное приложение
-- `mobile/` — Android-приложение на Capacitor 7: оболочка вокруг живого сайта (`server.url`), подробно — `mobile/README.md`.
-  APK собирает GitHub Actions (`.github/workflows/android.yml`) и выкладывает в Releases; ссылка — на `web/app.html`.
+- Отдельный репозиторий **master_ryadom_app** (Capacitor-оболочка вокруг этого сайта, `server.url`). Его README —
+  сборка APK на GitHub, ключ подписи, Firebase. Ссылка на APK — в `web/app.html`.
 - Сайт в режиме приложения (User-Agent `MasterRyadomApp` или установлен на экран «Домой») ставит класс `in-app`
   на `<html>` и рисует нижнюю панель вкладок (`IS_APP`, `renderTabbar` в `nav.js`). PWA: `web/manifest.webmanifest`,
   `web/sw.js` (сеть в приоритете, кеш только как запасной вариант; `/api/` не кешируется). Новые страницы — с тегами
   manifest/apple-touch-icon в `<head>`, как у остальных.
-- Ключ подписи APK — вне репозитория, в секретах GitHub. Потеряете — обновления не встанут поверх старой версии.
+- Push в приложение: `setupPush` в `nav.js` (разрешение, канал «orders», регистрация телефона в `/notifications/devices`,
+  переход по нажатию), сервер — `app/push.py` (Firebase HTTP v1, `FIREBASE_SERVICE_ACCOUNT`). `notify()` шлёт push
+  всем телефонам мастера независимо от выбранного канала email/Telegram. Без Firebase push просто не отправляется.
+- `cryptography` в `requirements.txt` — для подписи ключа Firebase; на macOS 12 новые версии не ставятся, локально
+  допустима старая (сервер и CI ставят указанную).
 
 ## Города
 - Список городов — `backend/app/cities.py` (`CITIES`, канонические русские названия; переводы — `city.*` в `i18n.js`).

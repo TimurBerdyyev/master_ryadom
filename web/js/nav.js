@@ -12,6 +12,46 @@ if ("serviceWorker" in navigator && !/MasterRyadomApp/.test(navigator.userAgent)
   window.addEventListener("load", () => navigator.serviceWorker.register(`${ROOT}sw.js`).catch(() => {}));
 }
 
+// ---------- push notifications in the Android app ----------
+// The app (Capacitor) injects window.Capacitor into the site; the push plugin is native.
+const PUSH = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()
+  ? (window.Capacitor.Plugins || {}).PushNotifications : null;
+
+if (PUSH) {
+  // Tapping a notification opens its page (also when the tap started the app).
+  PUSH.addListener("pushNotificationActionPerformed", (action) => {
+    const link = ((action.notification || {}).data || {}).link || "";
+    location.href = ROOT + safeNext(link.replace(/^\/+/, ""), "index.html");
+  });
+  // A notification while the app is open: show it on the page instead of the system banner.
+  PUSH.addListener("pushNotificationReceived", (notification) => {
+    toast(notification.title || t("nav.notifications"));
+    refreshUnread();
+  });
+  PUSH.addListener("registration", ({ value }) => {
+    try { localStorage.setItem("pushToken", value); } catch (e) { /* ignore */ }
+    if (getToken()) api.registerDevice(value).catch(() => {});
+  });
+}
+
+// Masters: ask once for permission and register this phone for new-order notifications.
+async function setupPush(user) {
+  if (!PUSH || user.role !== "master") return;
+  try {
+    await PUSH.createChannel({
+      id: "orders", name: t("push.channel"), description: t("push.channelText"),
+      importance: 5, visibility: 1, sound: "default", vibration: true, lights: true,
+    });
+    let permission = await PUSH.checkPermissions();
+    if (permission.receive === "prompt" || permission.receive === "prompt-with-rationale") {
+      permission = await PUSH.requestPermissions();
+    }
+    if (permission.receive === "granted") await PUSH.register();
+  } catch (e) {
+    /* no Firebase configured in this build, or the user said no */
+  }
+}
+
 // Bottom tab bar for the app on phones: the main sections one tap away.
 function renderTabbar(role) {
   if (!IS_APP) return;
@@ -137,6 +177,7 @@ async function renderNav() {
     refreshUnread();
     if (user.role === "master") renderPlanLink();
     renderTabbar(user.role);
+    setupPush(user);
   } catch (e) {
     clearToken();
     nav.innerHTML = guestNav;
@@ -170,7 +211,13 @@ async function refreshUnread() {
   }
 }
 
-function logout() {
+async function logout() {
+  // Stop push notifications to this phone for the account that is logging out.
+  let pushToken = null;
+  try { pushToken = localStorage.getItem("pushToken"); } catch (e) { /* ignore */ }
+  if (PUSH && pushToken && getToken()) {
+    await Promise.race([api.removeDevice(pushToken).catch(() => {}), new Promise(r => setTimeout(r, 2000))]);
+  }
   clearToken();
   location.href = `${ROOT}index.html`;
 }

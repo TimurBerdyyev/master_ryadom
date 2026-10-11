@@ -429,9 +429,15 @@ class AdminStats(BaseModel):
     complaints_open: int
 
 
+class PushDeviceIn(BaseModel):
+    token: str = Field(min_length=20, max_length=512)
+    platform: Literal["android", "ios"] = "android"
+
+
 class PublicConfigOut(BaseModel):
     cities: list[str] = []
     telegram_enabled: bool = False
+    push_enabled: bool = False
     sms_enabled: bool = False
     subscriptions_enabled: bool
     subscription_trial_days: int

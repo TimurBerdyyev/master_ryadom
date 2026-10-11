@@ -819,6 +819,118 @@ def test_new_orders_by_email(client, outbox):
     assert "Leaking tap" in mails[0][2] and "700 som" in mails[0][2] and "Turn off" in mails[0][2]
 
 
+@pytest.fixture
+def fcm(monkeypatch, outbox):
+    """Firebase stub: records pushes; tokens starting with "dead" are reported as unregistered."""
+    from app import push
+    from app.config import settings
+    sent = []
+
+    class Response:
+        def __init__(self, status_code, text=""):
+            self.status_code, self.text = status_code, text
+
+    def post(url, json=None, headers=None, timeout=None):
+        message = json["message"]
+        if message["token"].startswith("dead"):
+            return Response(404, '{"error": {"status": "NOT_FOUND", "details": [{"errorCode": "UNREGISTERED"}]}}')
+        sent.append((message["token"], message["notification"]["title"], message["notification"]["body"], message["data"]["link"]))
+        return Response(200)
+
+    monkeypatch.setattr(settings, "firebase_service_account", '{"project_id": "test-project"}')
+    monkeypatch.setattr(push, "_access_token", lambda: "access-token")
+    monkeypatch.setattr(push.httpx, "post", post)
+    return sent
+
+
+def test_push_notifications_to_the_app(client, fcm):
+    assert client.get("/config").json()["push_enabled"] is True
+    # push works even if the master didn't choose email/Telegram notifications
+    master_h, _ = register_master(client, city="Чолпон-Ата", notify_enabled=False)
+    device = {"token": "phone-token-0123456789-aaaa", "platform": "android"}
+    assert client.post("/notifications/devices", json=device).status_code == 401
+    assert client.post("/notifications/devices", headers=master_h, json=device).status_code == 204
+    assert client.post("/notifications/devices", headers=master_h, json=device).status_code == 204  # no duplicate
+    assert client.post("/notifications/devices", headers=master_h, json={"token": "short"}).status_code == 422
+
+    fcm.clear()
+    token, req = create_request(client, city="Чолпон-Ата")
+    assert fcm == [(device["token"], f"Новый заказ #{req['id']} — Сантехника", f"Новый заказ #{req['id']}: Сантехника", "/feed.html")]
+
+    offer = client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 100}).json()
+    fcm.clear()
+    client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]})
+    assert fcm and fcm[0][3] == f"/order-detail.html?id={req['id']}"
+
+    # the same phone logs into another account: pushes follow the new account
+    other_h, _ = register_master(client, city="Чолпон-Ата")
+    client.post("/notifications/devices", headers=other_h, json=device)
+    fcm.clear()
+    create_request(client, city="Чолпон-Ата")
+    assert len(fcm) == 1  # one phone, one push
+
+    # logout removes the phone
+    client.post("/notifications/devices/remove", headers=other_h, json=device)
+    fcm.clear()
+    create_request(client, city="Чолпон-Ата")
+    assert fcm == []
+
+
+def test_push_access_token_is_signed_with_service_account(monkeypatch):
+    import json as json_
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    from app import push
+    from app.config import settings
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
+    monkeypatch.setattr(settings, "firebase_service_account", json_.dumps(
+        {"project_id": "p", "client_email": "bot@p.iam.gserviceaccount.com", "private_key": pem}))
+    monkeypatch.setattr(push, "_access", {"token": None, "expires": 0.0})
+    seen = {}
+
+    class Response:
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"access_token": "ya29.test", "expires_in": 3600}
+
+    def post(url, data=None, **_kwargs):
+        seen.update(url=url, data=data)
+        return Response()
+
+    monkeypatch.setattr(push.httpx, "post", post)
+    assert push._access_token() == "ya29.test"
+    assert push._access_token() == "ya29.test"  # cached
+    claims = jwt.decode(seen["data"]["assertion"], key.public_key(), algorithms=["RS256"], audience=push.TOKEN_URL)
+    assert claims["iss"] == "bot@p.iam.gserviceaccount.com" and claims["scope"] == push.SCOPE
+
+
+def test_dead_push_token_is_removed(client, fcm):
+    from app.models import PushDevice
+    master_h, _ = register_master(client, city="Кызыл-Кия")
+    client.post("/notifications/devices", headers=master_h, json={"token": "dead-token-0123456789-bbbb"})
+    create_request(client, city="Кызыл-Кия")
+    db = SessionLocal()
+    assert db.query(PushDevice).filter(PushDevice.token == "dead-token-0123456789-bbbb").count() == 0
+    db.close()
+
+
+def test_no_push_without_firebase(client, outbox, monkeypatch):
+    from app import push
+    called = []
+    monkeypatch.setattr(push.httpx, "post", lambda *a, **k: called.append(1))
+    master_h, _ = register_master(client, city="Майлуу-Суу")
+    client.post("/notifications/devices", headers=master_h, json={"token": "phone-token-0123456789-cccc"})
+    create_request(client, city="Майлуу-Суу")
+    assert called == [] and client.get("/config").json()["push_enabled"] is False
+
+
 def test_sms_channel_hidden_without_gateway(client):
     assert client.get("/config").json()["sms_enabled"] is False
     phone = new_phone()

@@ -18,6 +18,7 @@ from app.models import (
     OrderOffer,
     OrderStatus,
     Photo,
+    PushDevice,
     RequestDelivery,
     Review,
     Service,
@@ -52,7 +53,7 @@ def delete_user(db: Session, user: User) -> None:
     db.query(Complaint).filter(Complaint.author_id == user.id).update({Complaint.author_id: None}, synchronize_session=False)
     db.query(Complaint).filter(Complaint.target_user_id == user.id).update(
         {Complaint.target_user_id: None}, synchronize_session=False)
-    for model in (Notification, NotificationSettings, Address):
+    for model in (Notification, NotificationSettings, Address, PushDevice):
         db.query(model).filter(model.user_id == user.id).delete(synchronize_session=False)
     db.query(Message).filter(Message.sender_id == user.id).delete(synchronize_session=False)
     db.delete(user)

@@ -773,6 +773,14 @@ const I18N = {
   "admin.deleteConfirm": ["Удалить «{name}» навсегда? Профиль, фото, услуги и отзывы о мастере будут удалены. Заявки клиентов останутся. Отменить нельзя.", "«{name}» биротоло өчүрүлсүнбү? Профиль, сүрөттөр, кызматтар жана уста жөнүндө пикирлер өчүрүлөт. Кардарлардын арыздары калат. Кайтаруу мүмкүн эмес.", "Delete “{name}” permanently? The profile, photos, services and reviews of this pro will be removed. Clients' requests stay. This can't be undone."],
   "admin.deleted": ["Удалено", "Өчүрүлдү", "Deleted"],
   "srv.Нельзя удалить администратора": ["Нельзя удалить администратора", "Администраторду өчүрүүгө болбойт", "An admin can't be deleted"],
+
+  // ---------- push ----------
+  "push.channel": ["Новые заказы", "Жаңы буйрутмалар", "New orders"],
+  "push.channelText": ["Новые заявки, выбор клиента и пропущенные заявки", "Жаңы арыздар, кардардын тандоосу жана өткөрүлгөн арыздар", "New requests, client choices and missed requests"],
+  "edit.pushTitle": ["Уведомления в приложении", "Тиркемедеги билдирмелер", "App notifications"],
+  "edit.pushOn": ["Включены на этом телефоне — новые заказы придут сразу", "Бул телефондо күйгүзүлгөн — жаңы буйрутмалар дароо келет", "On for this phone — new orders arrive instantly"],
+  "edit.pushOff": ["Выключены. Разрешите уведомления для «Мастер рядом» в настройках телефона, иначе можно пропустить заявку и получить штраф.", "Өчүк. Телефондун жөндөөлөрүнөн «Мастер рядом» үчүн билдирмелерге уруксат бериңиз, болбосо арызды өткөрүп жиберип, айып алышыңыз мүмкүн.", "Off. Allow notifications for «Мастер рядом» in your phone settings, or you may miss a request and get a fine."],
+  "edit.pushGetApp": ["Установите приложение — новые заказы будут приходить уведомлением на телефон, даже когда оно закрыто.", "Тиркемени орнотуңуз — жаңы буйрутмалар телефонго билдирме менен келет, ал жабык болсо да.", "Install the app — new orders arrive as phone notifications, even when it's closed."],
 };
 
 // Server messages with variable parts: [regex, key, (match) => vars]

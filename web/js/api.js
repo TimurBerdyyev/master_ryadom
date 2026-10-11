@@ -394,6 +394,8 @@ const api = {
   sendCode: (email, purpose, extra = {}) => apiRequest("/auth/send-code", { method: "POST", body: JSON.stringify({ email, purpose, lang: LANG, ...extra }) }),
   changeEmail: (email, code) => apiRequest("/auth/change-email", { method: "POST", body: JSON.stringify({ email, code }) }),
   resetPassword: (data) => apiRequest("/auth/reset-password", { method: "POST", body: JSON.stringify(data) }),
+  registerDevice: (token) => apiRequest("/notifications/devices", { method: "POST", body: JSON.stringify({ token, platform: "android" }) }),
+  removeDevice: (token) => apiRequest("/notifications/devices/remove", { method: "POST", body: JSON.stringify({ token, platform: "android" }) }),
   notificationSettings: () => apiRequest("/notifications/settings"),
   saveNotificationSettings: (data) => apiRequest("/notifications/settings", { method: "PUT", body: JSON.stringify(data) }),
   telegramLink: () => apiRequest("/notifications/telegram/link", { method: "POST" }),

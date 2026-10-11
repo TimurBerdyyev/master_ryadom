@@ -6,12 +6,13 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
-from app.models import Notification, NotificationSettings, User, UserRole
+from app.models import Notification, NotificationSettings, PushDevice, User, UserRole, utcnow
 from app.sms import get_sms_provider
 from app.schemas import (
     NotificationOut,
     NotificationSettingsIn,
     NotificationSettingsOut,
+    PushDeviceIn,
     TelegramLinkOut,
     UnreadCountOut,
 )
@@ -99,6 +100,39 @@ def telegram_link(current_user: User = Depends(get_current_user), db: Session = 
     prefs.telegram_link_token = secrets.token_urlsafe(24)
     db.commit()
     return TelegramLinkOut(url=f"https://t.me/{settings.telegram_bot_username}?start={prefs.telegram_link_token}")
+
+
+
+MAX_DEVICES_PER_USER = 10
+
+
+@router.post("/devices", status_code=status.HTTP_204_NO_CONTENT)
+def register_device(data: PushDeviceIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """The app sends its Firebase token after the master allowed notifications on the phone."""
+    device = db.query(PushDevice).filter(PushDevice.token == data.token).first()
+    if device is None:
+        device = PushDevice(token=data.token, platform=data.platform, user_id=current_user.id)
+        db.add(device)
+    # The same phone switching accounts: notifications follow whoever is logged in now.
+    device.user_id = current_user.id
+    device.platform = data.platform
+    device.last_seen_at = utcnow()
+    db.flush()
+    # Keep only the newest phones of a user.
+    stale = (
+        db.query(PushDevice).filter(PushDevice.user_id == current_user.id)
+        .order_by(PushDevice.last_seen_at.desc()).offset(MAX_DEVICES_PER_USER).all()
+    )
+    for old in stale:
+        db.delete(old)
+    db.commit()
+
+
+@router.post("/devices/remove", status_code=status.HTTP_204_NO_CONTENT)
+def remove_device(data: PushDeviceIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """On logout: stop notifications to this phone."""
+    db.query(PushDevice).filter(PushDevice.token == data.token, PushDevice.user_id == current_user.id).delete()
+    db.commit()
 
 
 @telegram_router.post("/telegram/webhook")

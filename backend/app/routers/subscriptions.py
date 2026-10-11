@@ -44,6 +44,7 @@ def public_config():
     return PublicConfigOut(
         cities=CITIES,
         telegram_enabled=settings.telegram_enabled,
+        push_enabled=settings.push_enabled,
         sms_enabled=not get_sms_provider().is_dev,
         subscriptions_enabled=settings.subscriptions_enabled,
         subscription_trial_days=settings.subscription_trial_days,

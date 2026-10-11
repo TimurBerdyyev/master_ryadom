@@ -96,6 +96,8 @@
       <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
     </form>
 
+    <div class="notice" id="pushStatus" hidden style="margin-top:16px"></div>
+
     <form class="card" id="notifyForm" style="max-width:none;margin-top:16px">
       <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="edit.notifyTitle">Уведомления</span></h2>
       <p class="muted" style="margin:-8px 0 0" data-i18n="edit.notifySub">Куда присылать уведомления о новых заказах и выборе вашего предложения.</p>
@@ -180,6 +182,24 @@
     if (new URLSearchParams(location.search).get("welcome")) document.getElementById("welcome").hidden = false;
 
     let categories = [];
+
+    // Is this phone going to get new-order notifications from the app?
+    async function renderPushStatus() {
+      const box = document.getElementById("pushStatus");
+      if (PUSH) {
+        let granted = false;
+        try { granted = (await PUSH.checkPermissions()).receive === "granted"; } catch (e) { /* ignore */ }
+        box.className = granted ? "notice success" : "notice warn";
+        box.innerHTML = `${icon(granted ? "bell-ring" : "triangle-alert")}<span><b>${t("edit.pushTitle")}.</b> ${t(granted ? "edit.pushOn" : "edit.pushOff")}</span>`;
+      } else if (!IS_APP) {
+        box.className = "notice";
+        box.innerHTML = `${icon("smartphone")}<span>${t("edit.pushGetApp")} <a class="link" href="app.html">${t("nav.app")} →</a></span>`;
+      } else {
+        return;
+      }
+      box.hidden = false;
+    }
+    renderPushStatus();
 
     function renderAvatar(master) {
       const photo = master.user.photo;

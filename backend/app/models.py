@@ -365,3 +365,15 @@ class RequestDelivery(Base):
 
     order: Mapped["Order"] = relationship()
     master: Mapped["Master"] = relationship()
+
+
+class PushDevice(Base):
+    """A phone with the app where a master gets push notifications (Firebase Cloud Messaging token)."""
+    __tablename__ = "push_devices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    token: Mapped[str] = mapped_column(String(512), unique=True)
+    platform: Mapped[str] = mapped_column(String(16), default="android")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

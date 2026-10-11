@@ -47,6 +47,9 @@ services:
       - key: SMTP_PASSWORD
         sync: false
       # Admin account (no shell on the free plan): created at startup if missing. Log in at /login.html.
+      # Push notifications in the app: the whole Firebase service account JSON (master_ryadom_app/README.md).
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
       - key: ADMIN_PHONE
         sync: false
       - key: ADMIN_PASSWORD

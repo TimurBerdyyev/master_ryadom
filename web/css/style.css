@@ -3937,3 +3937,8 @@ img.avatar-lg {
     justify-items: center;
   }
 }
+
+.notice.warn {
+  background: var(--warning-50);
+  color: #7a3d00;
+}

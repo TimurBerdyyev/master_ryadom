@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.models import Notification, NotificationSettings, User, UserRole
+from app import push
 from app.email import get_email_provider
 from app.sms import get_sms_provider
 
@@ -123,12 +124,15 @@ def render(kind: str, lang: str, channel: str, params: dict) -> str:
     description = (params.get("description") or "")[:200]
     budget = BUDGET[lang].format(price=f"{params['price']:g}") if params.get("price") else ""
     url = settings.site_url.rstrip("/") + LINKS[kind].format(id=params.get("id", ""))
+    if channel == "push":
+        url = ""  # tapping the notification opens the page itself
     telegram_text, sms_text = TEMPLATES[kind][lang]
-    # Email gets the full text, like Telegram; SMS stays short.
-    template = sms_text if channel == "sms" else telegram_text
+    # Email gets the full text, like Telegram; SMS and push stay short.
+    template = sms_text if channel in ("sms", "push") else telegram_text
     text = template.format(id=params.get("id", ""), category=category, description=description, budget=budget, url=url,
                            fine=params.get("fine", ""))
-    return "\n".join(line for line in text.split("\n") if line.strip())
+    text = "\n".join(line for line in text.split("\n") if line.strip())
+    return text.strip().rstrip(".").strip() if channel == "push" else text
 
 
 def deliver(user_id: int, kind: str, params: dict) -> None:
@@ -136,7 +140,17 @@ def deliver(user_id: int, kind: str, params: dict) -> None:
     try:
         user = db.get(User, user_id)
         prefs = db.query(NotificationSettings).filter(NotificationSettings.user_id == user_id).first()
-        if user is None or user.role != UserRole.master or prefs is None or not prefs.enabled:
+        if user is None or user.role != UserRole.master:
+            return
+        # Push to the app: the master allowed notifications on the phone — that's the consent.
+        push_lang = prefs.lang if prefs and prefs.lang in SUBJECTS[kind] else "ru"
+        push.send_to_user(
+            db, user.id,
+            SUBJECTS[kind][push_lang].format(id=params.get("id", ""), category=render_category(params.get("category", ""), push_lang)),
+            render(kind, push_lang, "push", params),
+            LINKS[kind].format(id=params.get("id", "")),
+        )
+        if prefs is None or not prefs.enabled:
             return
         text = render(kind, prefs.lang, prefs.channel, params)
         if prefs.channel == "telegram":

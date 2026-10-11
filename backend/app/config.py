@@ -74,6 +74,14 @@ class Settings(BaseSettings):
         # Some hosts hand out "postgres://", which SQLAlchemy 2 no longer accepts.
         return "postgresql://" + value[len("postgres://"):] if value.startswith("postgres://") else value
 
+    # Push notifications in the app: the Firebase service account key (the whole JSON file as one value,
+    # Firebase console → Project settings → Service accounts → Generate new private key). Empty = no push.
+    firebase_service_account: str = ""
+
+    @property
+    def push_enabled(self) -> bool:
+        return bool(self.firebase_service_account)
+
     @property
     def telegram_enabled(self) -> bool:
         return bool(self.telegram_bot_token and self.telegram_bot_username)
