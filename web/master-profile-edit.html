@@ -186,8 +186,17 @@
     // Is this phone going to get new-order notifications from the app? Status, the last error and a test button.
     async function renderPushStatus() {
       const box = document.getElementById("pushStatus");
+      if (!PUSH && IS_APP) {
+        // Inside the app, but it has no push plugin: an old version (before 1.1) is installed.
+        let version = "";
+        try { version = (await window.Capacitor.Plugins.App.getInfo()).version; } catch (e) { /* ignore */ }
+        box.className = "notice warn";
+        box.innerHTML = `${icon("triangle-alert")}<span><b>${t("edit.pushTitle")}.</b> ${t("push.oldApp", { version: esc(version || "?") })}
+          <a class="link" href="app.html">${t("app.download")} →</a></span>`;
+        box.hidden = false;
+        return;
+      }
       if (!PUSH) {
-        if (IS_APP) return;
         box.className = "notice";
         box.innerHTML = `${icon("smartphone")}<span>${t("edit.pushGetApp")} <a class="link" href="app.html">${t("nav.app")} →</a></span>`;
         box.hidden = false;

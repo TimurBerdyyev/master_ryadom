@@ -796,6 +796,7 @@ const I18N = {
   "admin.pushOk": ["Сервер подключён к Firebase ({project}). Телефонов: {n}", "Сервер Firebase'ке туташкан ({project}). Телефондор: {n}", "The server is connected to Firebase ({project}). Phones: {n}"],
   "admin.pushOff": ["Не настроены: на сервере нет FIREBASE_SERVICE_ACCOUNT", "Жөндөлгөн эмес: серверде FIREBASE_SERVICE_ACCOUNT жок", "Not set up: no FIREBASE_SERVICE_ACCOUNT on the server"],
   "admin.pushErr": ["Нет связи с Firebase: ", "Firebase менен байланыш жок: ", "Can't reach Firebase: "],
+  "push.oldApp": ["У вас старая версия приложения ({version}) — в ней нет уведомлений. Скачайте новую и установите поверх, заходить заново не придётся.", "Сизде тиркеменин эски версиясы ({version}) — анда билдирмелер жок. Жаңысын жүктөп, үстүнөн орнотуңуз, кайра кирүүнүн кереги жок.", "You have an old version of the app ({version}) without notifications. Download the new one and install it over the old one — you won't need to log in again."],
 };
 
 // Server messages with variable parts: [regex, key, (match) => vars]
