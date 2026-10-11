@@ -781,6 +781,21 @@ const I18N = {
   "edit.pushOn": ["Включены на этом телефоне — новые заказы придут сразу", "Бул телефондо күйгүзүлгөн — жаңы буйрутмалар дароо келет", "On for this phone — new orders arrive instantly"],
   "edit.pushOff": ["Выключены. Разрешите уведомления для «Мастер рядом» в настройках телефона, иначе можно пропустить заявку и получить штраф.", "Өчүк. Телефондун жөндөөлөрүнөн «Мастер рядом» үчүн билдирмелерге уруксат бериңиз, болбосо арызды өткөрүп жиберип, айып алышыңыз мүмкүн.", "Off. Allow notifications for «Мастер рядом» in your phone settings, or you may miss a request and get a fine."],
   "edit.pushGetApp": ["Установите приложение — новые заказы будут приходить уведомлением на телефон, даже когда оно закрыто.", "Тиркемени орнотуңуз — жаңы буйрутмалар телефонго билдирме менен келет, ал жабык болсо да.", "Install the app — new orders arrive as phone notifications, even when it's closed."],
+
+  // ---------- push diagnostics ----------
+  "push.allow": ["Разрешить уведомления", "Билдирмелерге уруксат берүү", "Allow notifications"],
+  "push.test": ["Отправить тестовое уведомление", "Сыноо билдирмесин жөнөтүү", "Send a test notification"],
+  "push.notRegistered": ["Разрешены, но телефон ещё не подключён к уведомлениям. Нажмите «Отправить тестовое уведомление».", "Уруксат берилген, бирок телефон билдирмелерге али туташкан жок. «Сыноо билдирмесин жөнөтүү» басыңыз.", "Allowed, but this phone isn't connected yet. Tap “Send a test notification”."],
+  "push.errServer": ["Сервер не принял телефон: ", "Сервер телефонду кабыл алган жок: ", "The server didn't accept this phone: "],
+  "push.errFirebase": ["Ошибка Firebase на телефоне: ", "Телефондогу Firebase катасы: ", "Firebase error on the phone: "],
+  "push.resNoServer": ["На сервере не настроены push-уведомления (FIREBASE_SERVICE_ACCOUNT).", "Серверде push-билдирмелер жөндөлгөн эмес (FIREBASE_SERVICE_ACCOUNT).", "Push isn't set up on the server (FIREBASE_SERVICE_ACCOUNT)."],
+  "push.resNoDevice": ["Сервер не знает этот телефон. Закройте приложение полностью, откройте снова и разрешите уведомления.", "Сервер бул телефонду билбейт. Тиркемени толук жаап, кайра ачып, билдирмелерге уруксат бериңиз.", "The server doesn't know this phone. Close the app completely, open it again and allow notifications."],
+  "push.resSent": ["Отправлено на {n} тел. — уведомление должно прийти через несколько секунд. Если не пришло: Настройки телефона → Приложения → Мастер рядом → Уведомления → включить, а также отключить экономию батареи для приложения.", "{n} телефонго жөнөтүлдү — билдирме бир нече секундда келет. Келбесе: Телефондун жөндөөлөрү → Тиркемелер → Мастер рядом → Билдирмелер → күйгүзүү, жана тиркеме үчүн батареяны үнөмдөөнү өчүрүү.", "Sent to {n} phone(s) — it should arrive in a few seconds. If not: phone Settings → Apps → Мастер рядом → Notifications → on, and turn off battery saving for the app."],
+  "push.resFailed": ["Не отправлено:", "Жөнөтүлгөн жок:", "Not sent:"],
+  "admin.pushTitle": ["Push-уведомления", "Push-билдирмелер", "Push notifications"],
+  "admin.pushOk": ["Сервер подключён к Firebase ({project}). Телефонов: {n}", "Сервер Firebase'ке туташкан ({project}). Телефондор: {n}", "The server is connected to Firebase ({project}). Phones: {n}"],
+  "admin.pushOff": ["Не настроены: на сервере нет FIREBASE_SERVICE_ACCOUNT", "Жөндөлгөн эмес: серверде FIREBASE_SERVICE_ACCOUNT жок", "Not set up: no FIREBASE_SERVICE_ACCOUNT on the server"],
+  "admin.pushErr": ["Нет связи с Firebase: ", "Firebase менен байланыш жок: ", "Can't reach Firebase: "],
 };
 
 // Server messages with variable parts: [regex, key, (match) => vars]

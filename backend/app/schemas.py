@@ -434,6 +434,29 @@ class PushDeviceIn(BaseModel):
     platform: Literal["android", "ios"] = "android"
 
 
+class PushTestOut(BaseModel):
+    push_enabled: bool
+    devices: int
+    sent: int
+    errors: list[str] = []
+
+
+class AdminPushDeviceOut(BaseModel):
+    user_id: int
+    name: str
+    role: str
+    platform: str
+    last_seen_at: datetime
+
+
+class AdminPushStatusOut(BaseModel):
+    enabled: bool
+    project_id: str | None = None
+    connected: bool
+    error: str | None = None
+    devices: list[AdminPushDeviceOut] = []
+
+
 class PublicConfigOut(BaseModel):
     cities: list[str] = []
     telegram_enabled: bool = False

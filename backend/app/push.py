@@ -66,9 +66,19 @@ def _message(token: str, title: str, body: str, link: str) -> dict:
     }
 
 
-def send_to_user(db: Session, user_id: int, title: str, body: str, link: str) -> int:
-    """Send to every phone of the user; returns how many accepted. Never raises."""
-    if not settings.push_enabled:
+def send_to_user(db: Session, user_id: int, title: str, body: str, link: str, errors: list | None = None) -> int:
+    """Send to every phone of the user; returns how many accepted. Never raises.
+
+    Problems are logged and, if `errors` is given, appended to it (shown by the test button).
+    """
+    def problem(text: str) -> None:
+        logger.warning("Push: %s", text)
+        if errors is not None:
+            errors.append(text)
+
+    if not settings.push_enabled:  # push simply isn't set up: not worth a log line on every notification
+        if errors is not None:
+            errors.append("на сервере не задан FIREBASE_SERVICE_ACCOUNT")
         return 0
     devices = db.query(PushDevice).filter(PushDevice.user_id == user_id).all()
     if not devices:
@@ -76,21 +86,45 @@ def send_to_user(db: Session, user_id: int, title: str, body: str, link: str) ->
     try:
         url = f"https://fcm.googleapis.com/v1/projects/{_service_account()['project_id']}/messages:send"
         headers = {"Authorization": f"Bearer {_access_token()}"}
-    except Exception:
-        logger.exception("Push: не удалось получить доступ к Firebase — проверьте FIREBASE_SERVICE_ACCOUNT")
+    except Exception as exc:
+        logger.exception("Push: не удалось получить доступ к Firebase")
+        problem(f"нет доступа к Firebase — проверьте FIREBASE_SERVICE_ACCOUNT ({type(exc).__name__}: {str(exc)[:150]})")
         return 0
     sent = 0
     for device in devices:
         try:
             response = httpx.post(url, json=_message(device.token, title, body, link), headers=headers, timeout=15)
-        except httpx.HTTPError:
-            logger.warning("Push: Firebase недоступен")
+        except httpx.HTTPError as exc:
+            problem(f"Firebase недоступен ({type(exc).__name__})")
             continue
         if response.status_code == 200:
             sent += 1
         elif response.status_code in (400, 404) and ("UNREGISTERED" in response.text or "INVALID_ARGUMENT" in response.text):
             db.delete(device)  # the app was removed or the token is no longer valid
+            problem("Firebase не знает этот телефон (приложение переустановлено?) — откройте приложение заново")
         else:
-            logger.warning("Push: ошибка %s: %s", response.status_code, response.text[:300])
+            problem(f"ошибка Firebase {response.status_code}: {response.text[:200]}")
     db.commit()
     return sent
+
+
+def status(db: Session) -> dict:
+    """For the admin panel: is the server able to talk to Firebase, which phones are registered."""
+    from app.models import User
+    result = {"enabled": settings.push_enabled, "project_id": None, "connected": False, "error": None, "devices": []}
+    if settings.push_enabled:
+        try:
+            result["project_id"] = _service_account().get("project_id")
+            _access_token()
+            result["connected"] = True
+        except Exception as exc:
+            result["error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+    rows = (
+        db.query(PushDevice, User).join(User, User.id == PushDevice.user_id)
+        .order_by(PushDevice.last_seen_at.desc()).limit(200).all()
+    )
+    result["devices"] = [
+        {"user_id": u.id, "name": u.name, "role": u.role.value, "platform": d.platform, "last_seen_at": d.last_seen_at}
+        for d, u in rows
+    ]
+    return result

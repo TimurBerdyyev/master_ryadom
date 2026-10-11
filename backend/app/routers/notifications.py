@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app import push
 from app.config import settings
+from app.rate_limit import rate_limit
 from app.database import get_db
 from app.models import Notification, NotificationSettings, PushDevice, User, UserRole, utcnow
 from app.sms import get_sms_provider
@@ -13,6 +15,7 @@ from app.schemas import (
     NotificationSettingsIn,
     NotificationSettingsOut,
     PushDeviceIn,
+    PushTestOut,
     TelegramLinkOut,
     UnreadCountOut,
 )
@@ -104,6 +107,7 @@ def telegram_link(current_user: User = Depends(get_current_user), db: Session = 
 
 
 MAX_DEVICES_PER_USER = 10
+push_test_rate_limit = rate_limit("push-test", max_attempts=10, window_seconds=600)
 
 
 @router.post("/devices", status_code=status.HTTP_204_NO_CONTENT)
@@ -126,6 +130,16 @@ def register_device(data: PushDeviceIn, current_user: User = Depends(get_current
     for old in stale:
         db.delete(old)
     db.commit()
+
+
+@router.post("/devices/test", response_model=PushTestOut, dependencies=[Depends(push_test_rate_limit)])
+def test_push(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """"Отправить тестовое уведомление" in the master's profile: shows exactly what went wrong."""
+    devices = db.query(PushDevice).filter(PushDevice.user_id == current_user.id).count()
+    errors: list[str] = []
+    sent = push.send_to_user(db, current_user.id, "Мастер рядом", "Тестовое уведомление: всё работает", "/master-profile-edit.html",
+                             errors=errors) if devices else 0
+    return PushTestOut(push_enabled=settings.push_enabled, devices=devices, sent=sent, errors=errors)
 
 
 @router.post("/devices/remove", status_code=status.HTTP_204_NO_CONTENT)

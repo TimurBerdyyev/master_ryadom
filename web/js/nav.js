@@ -29,9 +29,23 @@ if (PUSH) {
     refreshUnread();
   });
   PUSH.addListener("registration", ({ value }) => {
-    try { localStorage.setItem("pushToken", value); } catch (e) { /* ignore */ }
-    if (getToken()) api.registerDevice(value).catch(() => {});
+    try { localStorage.setItem("pushToken", value); localStorage.removeItem("pushError"); } catch (e) { /* ignore */ }
+    if (getToken()) {
+      api.registerDevice(value)
+        .then(() => setPushError(""))
+        .catch((e) => setPushError(t("push.errServer") + e.message));
+    }
   });
+  PUSH.addListener("registrationError", (e) => setPushError(t("push.errFirebase") + ((e && e.error) || "")));
+}
+
+// The last push problem on this phone — shown in the master's profile next to the test button.
+function setPushError(text) {
+  try { text ? localStorage.setItem("pushError", text) : localStorage.removeItem("pushError"); } catch (e) { /* ignore */ }
+}
+
+function pushError() {
+  try { return localStorage.getItem("pushError") || ""; } catch (e) { return ""; }
 }
 
 // Masters: ask once for permission and register this phone for new-order notifications.
@@ -48,7 +62,7 @@ async function setupPush(user) {
     }
     if (permission.receive === "granted") await PUSH.register();
   } catch (e) {
-    /* no Firebase configured in this build, or the user said no */
+    setPushError(t("push.errFirebase") + (e && e.message ? e.message : e));
   }
 }
 

@@ -911,6 +911,31 @@ def test_push_access_token_is_signed_with_service_account(monkeypatch):
     assert claims["iss"] == "bot@p.iam.gserviceaccount.com" and claims["scope"] == push.SCOPE
 
 
+def test_push_diagnostics(client, fcm, monkeypatch):
+    from app import push
+    master_h, _ = register_master(client, city="Таш-Кумыр")
+    r = client.post("/notifications/devices/test", headers=master_h).json()
+    assert r == {"push_enabled": True, "devices": 0, "sent": 0, "errors": []}
+    client.post("/notifications/devices", headers=master_h, json={"token": "phone-token-0123456789-dddd"})
+    fcm.clear()
+    r = client.post("/notifications/devices/test", headers=master_h).json()
+    assert r["sent"] == 1 and fcm[0][1] == "Мастер рядом"
+
+    admin_h = make_admin(client)
+    status_ = client.get("/admin/push", headers=admin_h).json()
+    assert status_["enabled"] and status_["connected"] and status_["project_id"] == "test-project"
+    assert any(d["name"] == "Мастер" and d["platform"] == "android" for d in status_["devices"])
+    assert client.get("/admin/push", headers=master_h).status_code == 403
+
+    # a broken key on the server is reported, not swallowed
+    def broken():
+        raise ValueError("Could not deserialize key data")
+    monkeypatch.setattr(push, "_access_token", broken)
+    r = client.post("/notifications/devices/test", headers=master_h).json()
+    assert r["sent"] == 0 and "FIREBASE_SERVICE_ACCOUNT" in r["errors"][0] and "deserialize" in r["errors"][0]
+    assert "deserialize" in client.get("/admin/push", headers=admin_h).json()["error"]
+
+
 def test_dead_push_token_is_removed(client, fcm):
     from app.models import PushDevice
     master_h, _ = register_master(client, city="Кызыл-Кия")

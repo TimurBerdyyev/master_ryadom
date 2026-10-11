@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
+from app import push
 from app.accounts import delete_user
 from app.auth import require_admin
 from app.database import get_db
@@ -21,6 +22,7 @@ from app.dispatch import unanswered_requests
 from app.models import RequestDelivery
 from app.routers.orders import _client_contact
 from app.schemas import (
+    AdminPushStatusOut,
     AdminUnansweredOut,
     AdminViolationOut,
     AdminStats,
@@ -156,6 +158,12 @@ def list_unanswered(db: Session = Depends(get_db)):
             masters_notified=db.query(RequestDelivery).filter(RequestDelivery.order_id == order.id).count(),
         ))
     return result
+
+
+@router.get("/push", response_model=AdminPushStatusOut)
+def push_status(db: Session = Depends(get_db)):
+    """Push notifications: does the server reach Firebase, which phones are registered."""
+    return push.status(db)
 
 
 @router.get("/violations", response_model=list[AdminViolationOut])

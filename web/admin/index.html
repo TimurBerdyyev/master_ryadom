@@ -33,6 +33,10 @@
     </div>
 
     <div id="stats" class="stat-grid"></div>
+    <div class="card-box" id="pushBox" style="margin-top:16px">
+      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="admin.pushTitle">Push-уведомления</span></h2>
+      <div id="pushInfo" class="muted" style="margin-top:8px" data-i18n="common.loading">Загрузка…</div>
+    </div>
   </main>
 
   <script src="../js/icons.js"></script>
@@ -69,7 +73,21 @@
       }
     }
 
-    requireAdmin().then(loadStats);
+    async function loadPush() {
+      const box = document.getElementById("pushInfo");
+      try {
+        const p = await api.adminPushStatus();
+        const head = !p.enabled ? `<p class="notice warn">${icon("triangle-alert")}<span>${t("admin.pushOff")}</span></p>`
+          : p.connected ? `<p class="notice success">${icon("circle-check")}<span>${t("admin.pushOk", { project: esc(p.project_id), n: p.devices.length })}</span></p>`
+          : `<p class="notice warn">${icon("triangle-alert")}<span>${esc(t("admin.pushErr") + (p.error || ""))}</span></p>`;
+        const rows = p.devices.map(d => `<tr><td>${esc(d.name)}</td><td>${esc(d.role)}</td><td>${esc(d.platform)}</td><td>${formatDate(d.last_seen_at, true)}</td></tr>`).join("");
+        box.innerHTML = head + (rows ? `<div class="table-wrap" style="margin-top:12px"><table class="admin-table"><tbody>${rows}</tbody></table></div>` : "");
+      } catch (e) {
+        box.innerHTML = `<p class="error">${esc(t("common.error") + e.message)}</p>`;
+      }
+    }
+
+    requireAdmin().then(() => { loadStats(); loadPush(); });
     renderNav();
   </script>
 </body>

@@ -183,21 +183,57 @@
 
     let categories = [];
 
-    // Is this phone going to get new-order notifications from the app?
+    // Is this phone going to get new-order notifications from the app? Status, the last error and a test button.
     async function renderPushStatus() {
       const box = document.getElementById("pushStatus");
-      if (PUSH) {
-        let granted = false;
-        try { granted = (await PUSH.checkPermissions()).receive === "granted"; } catch (e) { /* ignore */ }
-        box.className = granted ? "notice success" : "notice warn";
-        box.innerHTML = `${icon(granted ? "bell-ring" : "triangle-alert")}<span><b>${t("edit.pushTitle")}.</b> ${t(granted ? "edit.pushOn" : "edit.pushOff")}</span>`;
-      } else if (!IS_APP) {
+      if (!PUSH) {
+        if (IS_APP) return;
         box.className = "notice";
         box.innerHTML = `${icon("smartphone")}<span>${t("edit.pushGetApp")} <a class="link" href="app.html">${t("nav.app")} →</a></span>`;
-      } else {
+        box.hidden = false;
         return;
       }
+      let permission = "unknown";
+      try { permission = (await PUSH.checkPermissions()).receive; } catch (e) { /* ignore */ }
+      const granted = permission === "granted";
+      let registered = false;
+      try { registered = Boolean(localStorage.getItem("pushToken")); } catch (e) { /* ignore */ }
+      const error = pushError();
+      const ok = granted && registered && !error;
+      box.className = ok ? "notice success" : "notice warn";
+      box.innerHTML = `
+        ${icon(ok ? "bell-ring" : "triangle-alert")}
+        <div style="flex:1">
+          <b>${t("edit.pushTitle")}.</b> ${t(granted ? (registered ? "edit.pushOn" : "push.notRegistered") : "edit.pushOff")}
+          ${error ? `<div style="margin-top:6px">${esc(error)}</div>` : ""}
+          <div class="row" style="margin-top:10px;gap:8px">
+            ${granted ? "" : `<button class="btn small" type="button" id="pushAsk">${icon("bell")}${t("push.allow")}</button>`}
+            <button class="btn small secondary" type="button" id="pushTest">${icon("send")}${t("push.test")}</button>
+          </div>
+          <div id="pushTestResult" style="margin-top:8px"></div>
+        </div>`;
       box.hidden = false;
+      const ask = document.getElementById("pushAsk");
+      if (ask) ask.addEventListener("click", async () => { await setupPush({ role: "master" }); setTimeout(renderPushStatus, 1500); });
+      document.getElementById("pushTest").addEventListener("click", testPush);
+    }
+
+    async function testPush() {
+      const out = document.getElementById("pushTestResult");
+      out.textContent = t("common.loading");
+      try {
+        // Re-register first: fixes a phone the server forgot (e.g. after reinstalling the app).
+        let token = null;
+        try { token = localStorage.getItem("pushToken"); } catch (e) { /* ignore */ }
+        if (token) await api.registerDevice(token);
+        const r = await api.testPush();
+        out.textContent = !r.push_enabled ? t("push.resNoServer")
+          : !r.devices ? t("push.resNoDevice")
+          : r.sent ? t("push.resSent", { n: r.sent })
+          : t("push.resFailed") + " " + r.errors.join("; ");
+      } catch (e) {
+        out.textContent = t("common.error") + e.message;
+      }
     }
     renderPushStatus();
 
