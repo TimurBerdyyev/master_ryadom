@@ -42,7 +42,8 @@
 
     <div class="browse" id="listView">
       <aside class="browse-filters">
-        <label><span data-i18n="common.city">Город</span><select id="cityFilter"></select></label>
+        <label><span data-i18n="place.region">Область</span><select id="regionFilter"></select></label>
+        <label><span data-i18n="place.place">Город, район или село</span><select id="cityFilter"></select></label>
         <label><span data-i18n="search.sortAria">Сортировка</span>
           <select id="sortFilter">
             <option value="rating" data-i18n="wiz.sortRecommended">Рекомендуемые</option>
@@ -95,9 +96,8 @@
     let markers = null;
 
     document.getElementById("searchInput").value = params.get("q") || "";
-    const cityReady = cityOptionsHtml(params.get("city") || "", "city.all")
-      .then(html => { document.getElementById("cityFilter").innerHTML = html; })
-      .catch(() => {});
+    const cityReady = setupPlacePicker(document.getElementById("regionFilter"), document.getElementById("cityFilter"),
+      params.get("city") || "", { any: true, region: params.get("region") || "" }).catch(() => {});
     ["cityFilter", "sortFilter", "ratingFilter"].forEach(id => document.getElementById(id).addEventListener("change", applyFilters));
 
     function categoryNameOf(id) {
@@ -122,10 +122,12 @@
     function applyFilters() {
       const q = document.getElementById("searchInput").value.trim();
       const city = document.getElementById("cityFilter").value.trim();
+      const region = document.getElementById("regionFilter").value;
       const next = new URLSearchParams();
       if (categoryId) next.set("category_id", categoryId);
       if (q) next.set("q", q);
       if (city) next.set("city", city);
+      else if (region) next.set("region", region);
       if (view === "map") next.set("view", "map");
       history.replaceState(null, "", `?${next}`);
       const name = categoryNameOf(categoryId);
@@ -173,7 +175,9 @@
       const minRating = document.getElementById("ratingFilter").value;
       if (minRating) query.min_rating = minRating;
       const city = document.getElementById("cityFilter").value.trim();
+      const region = document.getElementById("regionFilter").value;
       if (city) query.city = city;
+      else if (region) query.region = region;
       try {
         const masters = await api.searchMasters(query);
         document.getElementById("subtitle").textContent = t("search.found", { count: plural(masters.length, "p.masters") });

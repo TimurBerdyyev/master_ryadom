@@ -9,7 +9,7 @@ penalty, as the master agreement says. Requests nobody answered in time show up 
 import logging
 from datetime import timedelta
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -32,7 +32,9 @@ def eligible_masters(db: Session, order: Order) -> list[Master]:
         # Only masters bound by the agreement (20-minute answers, fines) get requests.
         .filter(User.agreement_accepted_at.is_not(None))
         .filter(Master.services.any(Service.category_id == order.category_id))
-        .filter(Master.city == order.city)
+        # Same place, or the same region for masters who take requests from the whole region.
+        .filter(or_(Master.city == order.city,
+                    and_(Master.serves_region.is_(True), Master.region.is_not(None), Master.region == order.region)))
     )
     if order.client_id is not None:
         query = query.filter(User.id != order.client_id)

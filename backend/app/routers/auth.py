@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.accounts import delete_user
+from app.cities import region_of
 from app.auth import create_access_token, get_current_user, get_current_user_optional, hash_password, verify_password
 from app.config import settings
 from app.database import get_db
@@ -121,7 +122,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status.HTTP_400_BAD_REQUEST, PHONE_TAKEN)
 
-    master = Master(user_id=user.id, city=data.city)
+    master = Master(user_id=user.id, city=data.city, region=region_of(data.city), serves_region=data.serves_region)
     db.add(master)
     db.flush()
     if settings.subscriptions_enabled:

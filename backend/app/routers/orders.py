@@ -1,6 +1,6 @@
 """Orders from the master's side. Clients manage their requests through private links (routers/requests.py)."""
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
@@ -135,7 +135,8 @@ def order_feed(current_user: User = Depends(get_current_user), db: Session = Dep
             Order.category_id.in_(category_ids),
             or_(Order.client_id.is_(None), Order.client_id != current_user.id),
             # Orders created before cities existed have none — keep them visible to everyone.
-            or_(Order.city == master.city, Order.city.is_(None)),
+            or_(Order.city == master.city, Order.city.is_(None),
+                and_(Order.region == master.region, Order.region.is_not(None)) if master.serves_region else False),
         )
         .order_by(Order.created_at.desc())
         .limit(100)
@@ -209,7 +210,8 @@ def offer_order(
     if order.client_id is not None and order.client_id == current_user.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Нельзя предложить цену на свой заказ")
     # Same rules as the feed: only requests from the master's city (old orders without a city are open to all).
-    if order.city is not None and order.city != master.city:
+    same_region = master.serves_region and order.region is not None and order.region == master.region
+    if order.city is not None and order.city != master.city and not same_region:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Заказ из другого города")
     if order.category_id not in {s.category_id for s in master.services}:
         raise HTTPException(

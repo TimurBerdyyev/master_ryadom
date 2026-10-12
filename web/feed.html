@@ -220,7 +220,11 @@
             `<a class="btn accent" href="master-profile-edit.html">${icon("scroll-text")}${t("feed.toProfile")}</a>`);
           return;
         }
-        chip.innerHTML = `${icon("map-pin")}<b>${esc(cityName(profile.city))}</b> · <a class="link" href="master-profile-edit.html#profile">${t("city.change")}</a>`;
+        await getRegions().catch(() => {});
+        const where = profile.serves_region && profile.region && profile.region !== `г. ${profile.city}`
+          ? t("place.plusRegion", { place: esc(cityName(profile.city)), region: esc(cityName(profile.region)) })
+          : esc(cityName(profile.city));
+        chip.innerHTML = `${icon("map-pin")}<b>${where}</b> · <a class="link" href="master-profile-edit.html#profile">${t("city.change")}</a>`;
         chip.hidden = false;
         const [feed, cats] = await Promise.all([api.orderFeed(), api.categories()]);
         orders = feed;

@@ -11,6 +11,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session, selectinload
 
+from app.cities import region_of
 from app.config import settings
 from app.database import get_db
 from app.dispatch import close_request, recalc_rating, send_request
@@ -112,6 +113,7 @@ def create_request(data: RequestCreate, db: Session = Depends(get_db), x_client_
         client_key_hash=_hash(x_client_key) if x_client_key and 32 <= len(x_client_key) <= 128 else None,
         category_id=data.category_id,
         city=data.city,
+        region=region_of(data.city),
         description=data.description,
         address=data.address,
         price=data.price,

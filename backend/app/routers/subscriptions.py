@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import require_admin
-from app.cities import CITIES
+from app.cities import CITIES, regions_for_config
 from app.config import settings
 from app.database import get_db
 from app.models import Master, MasterSubscription, SubscriptionPayment, SubscriptionPaymentStatus, utcnow
@@ -43,6 +43,7 @@ def public_config():
     """Feature flags the web client needs before login (e.g. to mention the free trial)."""
     return PublicConfigOut(
         cities=CITIES,
+        regions=regions_for_config(),
         telegram_enabled=settings.telegram_enabled,
         push_enabled=settings.push_enabled,
         sms_enabled=not get_sms_provider().is_dev,

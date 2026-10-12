@@ -1261,18 +1261,83 @@ def test_master_must_choose_city(client):
     assert client.get("/masters/me", headers=headers).json()["city"] == "Ош"
 
 
-def test_feed_and_notifications_follow_city(client, outbox):
+def test_requests_follow_place_and_region(client, outbox):
+    """Same place always; the whole region only for masters who accept it (Иссык-Кульская область)."""
+    region_h, region_phone = register_master(client, notify_enabled=True, city="Каракол")  # serves the region (default)
+    local_h, local_phone = register_master(client, notify_enabled=True, city="Балыкчы")
+    client.patch("/masters/me", headers=local_h, json={"serves_region": False})
     bishkek_h, _ = register_master(client, notify_enabled=True, city="Бишкек")
-    osh_h, osh_phone = register_master(client, notify_enabled=True, city="Кара-Балта")
-    outbox.clear()
-    _, req = create_request(client, city="Кара-Балта", description="Заказ")
-    assert req["id"] in [o["id"] for o in client.get("/orders/feed", headers=osh_h).json()]
-    assert req["id"] not in [o["id"] for o in client.get("/orders/feed", headers=bishkek_h).json()]
-    assert [m[1] for m in outbox] == [email_for(osh_phone)]
+    me = client.get("/masters/me", headers=region_h).json()
+    assert me["region"] == "Иссык-Кульская область" and me["serves_region"] is True
 
-    client.patch("/masters/me", headers=osh_h, json={"city": ""})  # no city -> no requests
-    assert client.get("/orders/feed", headers=osh_h).json() == []
-    assert "Каракол" in client.get("/config").json()["cities"]
+    outbox.clear()
+    _, req = create_request(client, city="Чолпон-Ата", description="Заказ")
+    assert req["id"] in [o["id"] for o in client.get("/orders/feed", headers=region_h).json()]
+    assert req["id"] not in [o["id"] for o in client.get("/orders/feed", headers=local_h).json()]
+    assert req["id"] not in [o["id"] for o in client.get("/orders/feed", headers=bishkek_h).json()]
+    assert [m[1] for m in outbox] == [email_for(region_phone)]
+    assert client.post(f"/orders/{req['id']}/offer", headers=local_h, json={"price": 1}).status_code == 403
+    assert client.post(f"/orders/{req['id']}/offer", headers=region_h, json={"price": 1}).status_code == 200
+
+    outbox.clear()
+    _, req = create_request(client, city="Балыкчы")
+    assert sorted(m[1] for m in outbox) == sorted([email_for(region_phone), email_for(local_phone)])
+
+    # moving to another place moves the master to its region
+    client.patch("/masters/me", headers=local_h, json={"city": "Ош"})
+    assert client.get("/masters/me", headers=local_h).json()["region"] == "г. Ош"
+
+    client.patch("/masters/me", headers=region_h, json={"city": ""})  # no place -> no requests
+    assert client.get("/orders/feed", headers=region_h).json() == []
+
+
+def test_regions_and_places(client):
+    cfg = client.get("/config").json()
+    regions = {r["name"]: r for r in cfg["regions"]}
+    assert len(regions) == 9 and "Чуйская область" in regions and regions["Чуйская область"]["ky"] == "Чүй облусу"
+    chuy = regions["Чуйская область"]
+    assert "Токмок" in chuy["cities"] and "Сокулук" in chuy["villages"]
+    assert any(d["name"] == "Сокулукский район" for d in chuy["districts"])
+    assert "Каракол" in cfg["cities"] and "Сокулукский район" in cfg["cities"]
+
+    # a district or a village can be chosen as the place
+    _, req = create_request(client, city="сокулукский район")
+    assert req["city"] == "Сокулукский район"
+    _, req = create_request(client, city="Сокулук")
+    from app.models import Order
+    db = SessionLocal()
+    assert db.get(Order, req["id"]).region == "Чуйская область"
+    db.close()
+
+    # search by place includes masters of the region who take its requests
+    master_h, _ = register_master(client, "Областной", city="Кант")
+    names = [m["user"]["name"] for m in client.get("/masters", params={"city": "Сокулук"}).json()]
+    assert "Областной" in names
+    client.patch("/masters/me", headers=master_h, json={"serves_region": False})
+    names = [m["user"]["name"] for m in client.get("/masters", params={"city": "Сокулук"}).json()]
+    assert "Областной" not in names
+
+
+def test_old_city_spelling_is_fixed(client, tmp_path):
+    from alembic import command
+    from sqlalchemy import create_engine, text
+
+    from app.cities import normalize_city
+    from app.migrations import _config
+    assert normalize_city("Арван") == "Араван" and normalize_city("АРАВАН") == "Араван"
+    engine = create_engine(f"sqlite:///{tmp_path}/aravan.db")
+    cfg = _config(engine)
+    command.upgrade(cfg, "0010")
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO users (id, name, phone, password_hash, role, status, created_at) "
+                          "VALUES (1, 'M', '+996700000001', 'x', 'master', 'active', '2026-01-01')"))
+        conn.execute(text("INSERT INTO masters (id, user_id, city, rating, completed_orders, verified, created_at, "
+                          "missed_requests, rating_penalty, location_shared) "
+                          "VALUES (1, 1, 'Арван', 0, 0, 0, '2026-01-01', 0, 0, 0)"))
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        assert tuple(conn.execute(text("SELECT city, region, serves_region FROM masters")).one()) == ("Араван", "Ошская область", 1)
+
 
 
 # ---------- paid plan (off by default) ----------
@@ -1411,6 +1476,9 @@ def test_city_migration_backfills_old_data(tmp_path):
         assert dict(conn.execute(text("SELECT id, city FROM orders")).all()) == {1: "Ош", 2: None}
         # existing masters get a clean reliability record
         assert tuple(conn.execute(text("SELECT missed_requests, rating_penalty FROM masters WHERE id = 1")).one()) == (0, 0)
+        # regions are filled in from the places (migration 0011)
+        assert conn.execute(text("SELECT region FROM masters WHERE id = 1")).scalar() == "г. Бишкек"
+        assert dict(conn.execute(text("SELECT id, region FROM orders")).all()) == {1: "г. Ош", 2: None}
 
 
 def test_email_migration_normalises_and_dedupes(tmp_path):

@@ -68,7 +68,8 @@ class UserRegister(BaseModel):
     notify_enabled: bool = False
     notify_channel: Literal["telegram", "sms", "email"] = "email"
     lang: Literal["ru", "ky", "en"] = "ru"
-    city: str | None = Field(None, max_length=100)  # required for masters: they get orders from this city
+    city: str | None = Field(None, max_length=100)  # required: the town/district/village the master works in
+    serves_region: bool = True  # also take requests from anywhere in that region
     email: str = Field(min_length=3, max_length=255)  # confirmed by the code sent to it
 
     _city = field_validator("city")(_valid_city)
@@ -201,6 +202,8 @@ class MasterOut(BaseModel):
     description: str | None = None
     experience_years: int | None = None
     city: str | None = None
+    region: str | None = None
+    serves_region: bool = True
     district: str | None = None
     rating: float
     completed_orders: int
@@ -224,6 +227,7 @@ class MasterProfileUpdate(BaseModel):
     description: str | None = Field(None, max_length=2000)
     experience_years: int | None = Field(None, ge=0, le=80)
     city: str | None = Field(None, max_length=255)
+    serves_region: bool | None = None
     district: str | None = Field(None, max_length=255)
     latitude: Latitude | None = None
     longitude: Longitude | None = None
@@ -545,6 +549,7 @@ class AdminPushStatusOut(BaseModel):
 
 class PublicConfigOut(BaseModel):
     cities: list[str] = []
+    regions: list[dict] = []  # region → towns, districts, villages (app/cities.py regions_for_config)
     telegram_enabled: bool = False
     push_enabled: bool = False
     sms_enabled: bool = False

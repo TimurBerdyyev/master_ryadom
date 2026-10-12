@@ -51,11 +51,23 @@
           </label>
 
           <!-- The city they get requests from -->
-          <label id="cityField">
-            <span data-i18n="reg.cityLabel">Город, где вы работаете</span>
-            <select id="city" required></select>
-            <span class="hint" data-i18n="reg.cityHint">Вы будете получать заказы из этого города</span>
-          </label>
+          <div class="form-grid" id="cityField">
+            <label>
+              <span data-i18n="place.region">Область</span>
+              <select id="region" required></select>
+            </label>
+            <label>
+              <span data-i18n="place.place">Город, район или село</span>
+              <select id="city" required></select>
+            </label>
+          </div>
+          <div id="servesRegionRow" class="stack-tight">
+            <label class="check">
+              <input type="checkbox" id="servesRegion" checked />
+              <span data-i18n="place.servesRegion">Принимаю заявки со всей области</span>
+            </label>
+            <span class="hint" data-i18n="place.servesRegionHint">Если выключить — заявки придут только из выбранного места.</span>
+          </div>
 
           <!-- Explicit opt-in to notifications outside the site -->
           <fieldset class="consent-box" id="notifyBox">
@@ -130,7 +142,9 @@
       document.getElementById("agreeRow").classList.toggle("invalid", !e.target.checked);
     });
 
-    cityOptionsHtml("").then(html => { document.getElementById("city").innerHTML = html; }).catch(() => {});
+    setupPlacePicker(document.getElementById("region"), document.getElementById("city"))
+      .then(() => syncServesRegion(document.getElementById("region"), document.getElementById("servesRegionRow")))
+      .catch(() => {});
 
     api.publicConfig().then(cfg => {
       if (cfg.subscriptions_enabled) {
@@ -158,6 +172,7 @@
         phone: document.getElementById("phone").value,
         password: document.getElementById("password").value,
         city: document.getElementById("city").value,
+        serves_region: document.getElementById("servesRegion").checked,
         accept_agreement: document.getElementById("acceptAgreement").checked,
         email: document.getElementById("email").value.trim(),
         notify_enabled: document.getElementById("notifyEnabled").checked,

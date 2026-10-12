@@ -69,28 +69,83 @@ function categoryBadge(name, cls = "cat-dot") {
   return `<span class="${cls}" style="${c.style}">${icon(c.iconName)}</span>`;
 }
 
-// Cities are stored as canonical Russian names; show them in the interface language.
+// ---------- places: region (oblast) → town, district or village ----------
+// Stored as canonical Russian names (backend/app/cities.py); shown in the interface language.
+const PLACE_NAMES = {};   // name -> [ky, en] for regions and districts (from /config)
+const REGION_OF = {};     // place -> region
+
+const TRANSLIT = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "zh", з: "z", и: "i", й: "y", к: "k",
+  л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts", ч: "ch", ш: "sh",
+  щ: "shch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya", ң: "ng", ө: "o", ү: "u" };
+
+function transliterate(text) {
+  return String(text).replace(/[а-яёңөү]/gi, ch => {
+    const latin = TRANSLIT[ch.toLowerCase()] ?? ch;
+    return ch === ch.toLowerCase() ? latin : latin.charAt(0).toUpperCase() + latin.slice(1);
+  });
+}
+
 function cityName(name) {
-  return name && I18N[`city.${name}`] ? t(`city.${name}`) : (name || "");
+  if (!name) return "";
+  if (I18N[`city.${name}`]) return t(`city.${name}`);
+  if (PLACE_NAMES[name]) return LANG === "ky" ? PLACE_NAMES[name][0] : LANG === "en" ? PLACE_NAMES[name][1] : name;
+  return LANG === "en" ? transliterate(name) : name;
 }
 
-let _citiesPromise = null;
+let _regionsPromise = null;
 
-function getCities() {
-  _citiesPromise = _citiesPromise || api.publicConfig().then(cfg => cfg.cities || []);
-  return _citiesPromise;
+// Regions with their places; also fills the translations above. Cached for the page.
+function getRegions() {
+  _regionsPromise = _regionsPromise || api.publicConfig().then(cfg => {
+    for (const r of cfg.regions || []) {
+      PLACE_NAMES[r.name] = [r.ky, r.en];
+      for (const d of r.districts) PLACE_NAMES[d.name] = [d.ky, d.en];
+      for (const p of [...r.cities, ...r.districts.map(d => d.name), ...r.villages]) REGION_OF[p] = r.name;
+    }
+    return cfg.regions || [];
+  });
+  return _regionsPromise;
 }
 
-// <option>s for a city <select>; the first option is a placeholder with an empty value.
-async function cityOptionsHtml(selected, placeholderKey = "city.choose") {
-  const cities = await getCities();
-  // Keep a legacy free-text value visible instead of silently dropping it.
-  const list = selected && !cities.includes(selected) ? [selected, ...cities] : cities;
-  return `<option value="">${t(placeholderKey)}</option>` + list
-    .map(c => `<option value="${esc(c)}" ${c === selected ? "selected" : ""}>${esc(cityName(c))}</option>`)
-    .join("");
+// "Принимаю заявки со всей области" means nothing for Бишкек and Ош (a region of one city): hide it there.
+function syncServesRegion(regionSelect, element) {
+  const update = () => { element.hidden = !regionSelect.value || regionSelect.value.startsWith("г. "); };
+  regionSelect.addEventListener("change", update);
+  update();
 }
 
+function regionOf(place) {
+  return REGION_OF[place] || "";
+}
+
+// Fills a pair of selects: region, then the towns / districts / villages of that region (grouped).
+// options.any = true adds "all regions" / "whole region" choices (search filters).
+async function setupPlacePicker(regionSelect, placeSelect, selected = "", options = {}) {
+  const regions = await getRegions();
+  const initialRegion = options.region || regionOf(selected);
+  regionSelect.innerHTML = `<option value="">${t(options.any ? "place.allRegions" : "place.chooseRegion")}</option>` +
+    regions.map(r => `<option value="${esc(r.name)}" ${r.name === initialRegion ? "selected" : ""}>${esc(cityName(r.name))}</option>`).join("");
+
+  const fillPlaces = (keep) => {
+    const region = regions.find(r => r.name === regionSelect.value);
+    placeSelect.disabled = !region;
+    if (!region) {
+      placeSelect.innerHTML = `<option value="">${t(options.any ? "place.anyPlace" : "place.chooseRegionFirst")}</option>`;
+      return;
+    }
+    const opt = p => `<option value="${esc(p)}" ${p === keep ? "selected" : ""}>${esc(cityName(p))}</option>`;
+    const group = (key, list) => list.length ? `<optgroup label="${t(key)}">${list.map(opt).join("")}</optgroup>` : "";
+    const only = region.cities.length === 1 && !region.districts.length && !region.villages.length;
+    placeSelect.innerHTML = (only ? "" : `<option value="">${t(options.any ? "place.wholeRegion" : "place.choosePlace")}</option>`) +
+      (only ? opt(region.cities[0]) : group("place.cities", region.cities) +
+        group("place.districts", region.districts.map(d => d.name)) + group("place.villages", region.villages));
+  };
+  fillPlaces(selected);
+  regionSelect.onchange = () => {
+    fillPlaces("");
+    placeSelect.dispatchEvent(new Event("change"));
+  };
+}
 const AVATAR_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0d9488", "#16a34a", "#0891b2", "#4f46e5"];
 
 function avatarColor(name) {

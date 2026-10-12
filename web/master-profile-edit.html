@@ -100,17 +100,24 @@
                 <span data-i18n="edit.description">Описание</span>
                 <textarea id="description" rows="3" maxlength="2000" data-i18n-ph="edit.descriptionPh"></textarea>
               </label>
+              <label>
+                <span data-i18n="edit.experience">Опыт работы (лет)</span>
+                <input id="experience_years" type="number" min="0" max="80" />
+              </label>
               <div class="form-grid">
                 <label>
-                  <span data-i18n="edit.experience">Опыт работы (лет)</span>
-                  <input id="experience_years" type="number" min="0" max="80" />
+                  <span data-i18n="place.region">Область</span>
+                  <select id="region" required></select>
                 </label>
                 <label>
-                  <span data-i18n="common.city">Город</span>
+                  <span data-i18n="place.place">Город, район или село</span>
                   <select id="city" required></select>
-                  <span class="hint" data-i18n="reg.cityHint">Вы будете получать заказы из этого города</span>
                 </label>
               </div>
+              <label class="check" id="servesRegionRow">
+                <input type="checkbox" id="servesRegion" />
+                <span data-i18n="place.servesRegion">Принимаю заявки со всей области</span>
+              </label>
               <label>
                 <span data-i18n="edit.district">Район</span>
                 <input id="district" type="text" maxlength="255" data-i18n-ph="edit.districtPh" />
@@ -491,7 +498,9 @@
         const master = await api.myMasterProfile();
         document.getElementById("description").value = master.description || "";
         document.getElementById("experience_years").value = master.experience_years || "";
-        document.getElementById("city").innerHTML = await cityOptionsHtml(master.city || "");
+        await setupPlacePicker(document.getElementById("region"), document.getElementById("city"), master.city || "");
+        document.getElementById("servesRegion").checked = master.serves_region;
+        syncServesRegion(document.getElementById("region"), document.getElementById("servesRegionRow"));
         document.getElementById("district").value = master.district || "";
         renderServices(master.services);
         renderAvatar(master);
@@ -589,6 +598,7 @@
           description: document.getElementById("description").value || null,
           experience_years: document.getElementById("experience_years").value ? Number(document.getElementById("experience_years").value) : null,
           city: document.getElementById("city").value || null,
+          serves_region: document.getElementById("servesRegion").checked,
           district: document.getElementById("district").value || null,
         });
         toast(t("edit.saved"));

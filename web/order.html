@@ -45,10 +45,14 @@
         <h2 data-i18n="wiz.whereQ">Где?</h2>
         <div class="form-grid">
           <label>
-            <span data-i18n="common.city">Город</span>
-            <select id="city" required></select>
+            <span data-i18n="place.region">Область</span>
+            <select id="region" required></select>
           </label>
           <label>
+            <span data-i18n="place.place">Город, район или село</span>
+            <select id="city" required></select>
+          </label>
+          <label class="span-2">
             <span data-i18n="common.address">Адрес</span>
             <input id="address" type="text" maxlength="500" data-i18n-ph="neworder.addressPh" />
           </label>
@@ -237,7 +241,7 @@
       const error = document.getElementById("error1");
       error.textContent = "";
       if (!selectedCategory()) return (error.textContent = t("neworder.chooseCat"));
-      if (!document.getElementById("city").value) return (error.textContent = t("city.choose"));
+      if (!document.getElementById("city").value) return (error.textContent = t("place.choosePlace"));
       if (!document.getElementById("description").value.trim()) return (error.textContent = t("wiz.needDetails"));
       if (document.getElementById("photos").files.length > 5) return (error.textContent = t("neworder.maxPhotos"));
       try { localStorage.setItem("lastCity", document.getElementById("city").value); } catch (err) { /* ignore */ }
@@ -368,7 +372,7 @@
       }
     });
 
-    cityOptionsHtml(stored("lastCity")).then(html => { document.getElementById("city").innerHTML = html; }).catch(() => {});
+    setupPlacePicker(document.getElementById("region"), document.getElementById("city"), stored("lastCity")).catch(() => {});
     loadCategories();
     show(1);
     renderNav();

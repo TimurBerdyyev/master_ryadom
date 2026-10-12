@@ -1,10 +1,11 @@
 from math import asin, cos, radians, sin, sqrt
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user, get_current_user_optional
+from app.cities import normalize_city, region_of
 from app.config import settings
 from app.database import get_db
 from app.models import Category, Master, Photo, Service, User, UserRole, UserStatus, utcnow
@@ -49,6 +50,7 @@ def search_masters(
     q: str | None = Query(None, max_length=100),
     category_id: int | None = None,
     city: str | None = Query(None, max_length=255),
+    region: str | None = Query(None, max_length=64),
     verified: bool | None = None,
     min_rating: float | None = Query(None, ge=0, le=5),
     lat: float | None = Query(None, ge=-90, le=90),
@@ -81,8 +83,14 @@ def search_masters(
             Master.services.any(Service.title.ilike(pattern, escape="\\")),
             Master.services.any(Service.category.has(Category.name.ilike(pattern, escape="\\"))),
         ))
-    if city and city.strip():
+    place = normalize_city(city) if city else None
+    if place:
+        # Masters of that place, plus masters of its region who take requests from the whole region.
+        query = query.filter(or_(Master.city == place, and_(Master.serves_region.is_(True), Master.region == region_of(place))))
+    elif city and city.strip():
         query = query.filter(Master.city.ilike(city.strip()))
+    if region and region.strip():
+        query = query.filter(Master.region == region.strip())
     if verified is not None:
         query = query.filter(Master.verified == verified)
     if min_rating is not None:
@@ -215,7 +223,10 @@ def update_my_master_profile(
     db: Session = Depends(get_db),
 ):
     for field, value in data.model_dump(exclude_unset=True).items():
+        if field == "serves_region" and value is None:
+            continue
         setattr(master, field, value)
+    master.region = region_of(master.city)  # always derived from the place, never sent by the client
     db.commit()
     db.refresh(master)
     return _me_out(master)

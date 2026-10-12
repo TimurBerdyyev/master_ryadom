@@ -96,7 +96,10 @@ class Master(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     experience_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    city: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(255), nullable=True)  # town, district or village (app/cities.py)
+    region: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # derived from city
+    # Also take requests from anywhere in the region, not only from the master's own place.
+    serves_region: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     district: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rating: Mapped[float] = mapped_column(Float, default=0.0)
     completed_orders: Mapped[int] = mapped_column(Integer, default=0)
@@ -160,6 +163,7 @@ class Order(Base):
     description: Mapped[str] = mapped_column(Text)
     # Masters only see orders from their own city (null only for orders created before cities existed).
     city: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    region: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # derived from city
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
