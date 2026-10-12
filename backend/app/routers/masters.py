@@ -117,8 +117,8 @@ def nearby_masters(
 ):
     """Masters near the client (the map): each at the last place they opened the app or site.
 
-    The position is not tracked in the background — it is updated every time the master opens the app,
-    and the map shows how long ago that was.
+    The position is not tracked in the background — it is updated every time the master opens the app.
+    When that was is deliberately not shown to clients.
     """
     query = (
         db.query(Master)
@@ -132,7 +132,6 @@ def nearby_masters(
         query = query.filter(Master.verified.is_(True))
     if category_id is not None:
         query = query.filter(Master.services.any(Service.category_id == category_id))
-    now = utcnow()
     result = []
     for m in query.limit(500).all():
         distance = haversine_km(lat, lon, m.latitude, m.longitude)
@@ -143,7 +142,6 @@ def nearby_masters(
             id=m.id, name=m.user.name, photo=m.user.photo, phone=m.user.phone, rating=m.rating,
             completed_orders=m.completed_orders, verified=m.verified,
             lat=round(m.latitude, 4), lon=round(m.longitude, 4), distance_km=round(distance, 1),
-            minutes_ago=max(0, int((now - m.location_updated_at).total_seconds() // 60)),
             price_from=min(prices) if prices else None,
         ))
     return sorted(result, key=lambda r: r.distance_km)[:100]

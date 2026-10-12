@@ -889,7 +889,7 @@ const I18N = {
   "map.map": ["Карта", "Карта", "Map"],
   "map.live": ["Сейчас на связи", "Азыр байланышта", "Online now"],
   "map.nearMe": ["Рядом со мной", "Мага жакын", "Near me"],
-  "map.hint": ["На карте — где мастер был, когда последний раз открывал приложение. Положение обновляется каждый раз, когда он заходит.", "Картада — уста тиркемени акыркы жолу ачканда кайда болгону. Ал кирген сайын жайгашуу жаңыланат.", "The map shows where each pro was when they last opened the app. It updates every time they come back."],
+  "map.hint": ["На карте — мастера, которые показывают своё местоположение. Нажмите на мастера, чтобы позвонить или написать ему.", "Картада — өз жайгашкан жерин көрсөткөн усталар. Чалуу же жазуу үчүн устаны басыңыз.", "The map shows pros who share their location. Tap a pro to call or message them."],
   "map.distance": ["{km} км", "{km} км", "{km} km"],
   "map.justNow": ["только что", "жаңы эле", "just now"],
   "map.minutesAgo": ["{n} мин назад", "{n} мүн мурун", "{n} min ago"],
@@ -958,6 +958,20 @@ const I18N = {
   "map.nearby": ["Мастера рядом", "Жакын усталар", "Pros nearby"],
   "map.hoursAgo": ["обновлено {n} ч назад", "{n} саат мурун жаңыланган", "updated {n} h ago"],
   "map.daysAgo": ["обновлено {n} дн назад", "{n} күн мурун жаңыланган", "updated {n} d ago"],
+
+  // ---------- master home ----------
+  "mh.noOrders": ["Новых заказов пока нет", "Азырынча жаңы буйрутма жок", "No new orders yet"],
+  "mh.noOrdersText": ["Как только клиент оставит заявку в вашей категории и городе, она появится здесь и придёт уведомлением.", "Кардар сиздин категорияда жана шаарда арыз калтырганда, ал ушул жерде пайда болуп, билдирме болуп келет.", "As soon as a client leaves a request in your category and city, it appears here and you get a notification."],
+  "mh.activeJobs": ["Текущие работы", "Учурдагы иштер", "Current jobs"],
+  "mh.profileTitle": ["Профиль заполнен на {percent}%", "Профиль {percent}% толтурулган", "Profile {percent}% complete"],
+  "mh.profileText": ["Мастеров с фото, описанием и фото работ клиенты выбирают чаще.", "Кардарлар сүрөтү, сүрөттөмөсү жана иштеринин сүрөттөрү бар усталарды көбүрөөк тандашат.", "Clients choose pros with a photo, description and work photos more often."],
+  "mh.profileDone": ["Отлично: профиль заполнен полностью.", "Сонун: профиль толук толтурулган.", "Great: your profile is complete."],
+  "mh.openProfile": ["Открыть кабинет", "Кабинетти ачуу", "Open my profile"],
+  "mh.tipsTitle": ["Как получать больше заказов", "Көбүрөөк буйрутма алуу үчүн", "How to get more orders"],
+  "mh.tip1": ["Добавьте фото своих работ — «до и после» вызывают доверие.", "Иштериңиздин сүрөттөрүн кошуңуз — «чейин жана кийин» ишеним жаратат.", "Add photos of your work — before/after builds trust."],
+  "mh.tip2": ["Отвечайте на заявки быстро: первые предложения выбирают чаще.", "Арыздарга тез жооп бериңиз: биринчи сунуштарды көбүрөөк тандашат.", "Answer requests fast: the first offers get chosen more often."],
+  "mh.tip3": ["Включите «Показывать меня на карте» — клиенты рядом смогут написать вам.", "«Мени картада көрсөтүү» күйгүзүңүз — жакын кардарлар сизге жаза алышат.", "Turn on “Show me on the map” — clients nearby can message you."],
+  "mh.tip4": ["Указывайте честные цены «от» — так меньше отказов.", "Чынчыл «баштап» бааларды көрсөтүңүз — ошондо баш тартуу азыраак.", "Give honest “from” prices — fewer refusals."],
 };
 
 // Server messages with variable parts: [regex, key, (match) => vars]

@@ -64,7 +64,10 @@
           password: document.getElementById("password").value,
         });
         setToken(access_token);
-        location.href = next;
+        let role = "client";
+        try { role = (await api.me()).role; setRole(role); } catch (err) { /* go to the default page */ }
+        // Without an explicit ?next=, everyone starts on their own home: masters — new orders, admins — the panel.
+        location.href = new URLSearchParams(location.search).get("next") ? next : homeFor(role);
       } catch (e) {
         errorBox.textContent = t("login.fail") + e.message;
         button.disabled = false;

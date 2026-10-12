@@ -5986,3 +5986,164 @@ img.avatar,
 .cab-title + .section-title {
   display: none;
 }
+
+/* ---------- master home (feed without new orders) ---------- */
+.mh-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+  border-radius: var(--r-xl);
+  background: var(--primary-50);
+}
+
+.mh-hero h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.mh-hero p {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.mh-hero-ico {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--primary);
+}
+
+.mh-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.mh-stats div {
+  display: grid;
+  gap: 2px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.mh-stats b {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.mh-stats span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mh-section {
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+.mh-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.mh-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+}
+
+.mh-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.mh-row .avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 14px;
+}
+
+.mh-row-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.mh-row-body small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+.mh-empty {
+  margin: 4px 0 0;
+}
+
+.mh-tips h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.mh-tips ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mh-tips li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+.mh-tips li .i {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--primary);
+}
+
+.map-item {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.map-item > span:nth-child(2) {
+  min-width: 0;
+}
+
+.map-item b {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.map-item .tasker-price {
+  font-size: 14px;
+  white-space: nowrap;
+}

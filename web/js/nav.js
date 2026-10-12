@@ -174,6 +174,15 @@ async function renderNav() {
   }
   try {
     const user = await api.me();
+    setRole(user.role);
+    // Masters don't use the clients' home page: their start screen is the order feed.
+    if (user.role === "master") {
+      if (/(^|\/)(index\.html)?$/.test(location.pathname) && !location.pathname.includes("/admin/")) {
+        location.replace(`${ROOT}feed.html`);
+        return;
+      }
+      document.querySelectorAll("a.logo").forEach(a => { a.href = `${ROOT}feed.html`; });
+    }
     const links = [];
     if (user.role === "master") {
       links.push(navLink("feed.html", t("nav.feed"), "inbox"));

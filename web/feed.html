@@ -60,6 +60,76 @@
 
     let categories = {};
     let orders = [];
+    let masterProfile = null;
+
+    // No new requests: the master's own home screen instead of an empty page.
+    async function renderMasterHome() {
+      const list = document.getElementById("list");
+      const p = masterProfile;
+      const ACTIVE = ["master_selected", "master_confirmed", "master_en_route", "in_progress"];
+      const [jobs, chats] = await Promise.all([
+        api.myOrders().catch(() => []),
+        api.chats().catch(() => []),
+      ]);
+      const active = jobs.filter(o => ACTIVE.includes(o.status));
+      const steps = [Boolean(p.user.photo), Boolean(p.description && p.description.trim().length >= 20),
+        p.services.length > 0, p.photos.length > 0, p.verified, p.location_shared];
+      const percent = Math.round(steps.filter(Boolean).length / steps.length * 100);
+      const unread = chats.reduce((n, c) => n + c.unread, 0);
+
+      list.innerHTML = `
+        <div class="mh-hero">
+          <span class="mh-hero-ico">${icon("inbox")}</span>
+          <div>
+            <h2>${t("mh.noOrders")}</h2>
+            <p>${t("mh.noOrdersText")}</p>
+          </div>
+        </div>
+
+        <div class="mh-stats">
+          <div><b>${Number(p.rating).toFixed(1)}</b><span>${t("master.statRating")}</span></div>
+          <div><b>${p.completed_orders}</b><span>${t("master.statOrders")}</span></div>
+          <div><b>${p.missed_requests}</b><span>${t("edit.missed")}</span></div>
+        </div>
+
+        ${active.length ? `
+          <section class="mh-section">
+            <div class="mh-head"><h3>${t("mh.activeJobs")}</h3><a class="link small" href="orders.html">${t("home.seeAll")} →</a></div>
+            ${active.slice(0, 3).map(o => `
+              <a class="mh-row" href="order-detail.html?id=${o.id}">
+                ${categoryBadge(categories[o.category_id] || "")}
+                <span class="mh-row-body"><b>${esc(catName(categories[o.category_id] || "") || t("common.order"))} #${o.id}</b><small>${esc(o.description.slice(0, 80))}</small></span>
+                ${statusPillHtml(o.status)}
+              </a>`).join("")}
+          </section>` : ""}
+
+        <section class="mh-section">
+          <div class="mh-head"><h3>${t("nav.messages")}${unread ? ` <span class="chat-unread">${unread}</span>` : ""}</h3><a class="link small" href="chats.html">${t("home.seeAll")} →</a></div>
+          ${chats.length ? chats.slice(0, 3).map(c => `
+            <a class="mh-row" href="chat.html?id=${c.id}">
+              ${avatarHtml(c.client_name, "avatar", null)}
+              <span class="mh-row-body"><b>${esc(c.client_name)}</b><small>${c.last_is_photo ? t("chat.photo") : esc((c.last_message || "").slice(0, 80))}</small></span>
+              ${c.unread ? `<span class="chat-unread">${c.unread}</span>` : ""}
+            </a>`).join("") : `<p class="muted mh-empty">${t("chat.emptyMaster")}</p>`}
+        </section>
+
+        <section class="mh-section">
+          <div class="mh-head"><h3>${t("mh.profileTitle", { percent })}</h3></div>
+          <div class="cab-bar"><span style="width:${percent}%"></span></div>
+          <p class="muted" style="margin:10px 0 12px">${percent < 100 ? t("mh.profileText") : t("mh.profileDone")}</p>
+          <a class="btn secondary" href="master-profile-edit.html#overview">${icon("settings-2")}${t("mh.openProfile")}</a>
+        </section>
+
+        <section class="mh-section mh-tips">
+          <h3>${t("mh.tipsTitle")}</h3>
+          <ul>
+            <li>${icon("camera")}<span>${t("mh.tip1")}</span></li>
+            <li>${icon("timer")}<span>${t("mh.tip2")}</span></li>
+            <li>${icon("map-pin")}<span>${t("mh.tip3")}</span></li>
+            <li>${icon("hand-coins")}<span>${t("mh.tip4")}</span></li>
+          </ul>
+        </section>`;
+    }
 
     function offerForm(o) {
       const mine = o.my_offer;
@@ -92,8 +162,7 @@
       list.querySelectorAll(".offer-form input").forEach(input => { if (input.value) typed[input.id] = input.value; });
       if (!orders.length) {
         list.classList.remove("reveal");
-        list.innerHTML = emptyState("inbox", t("feed.emptyTitle"), `${t("feed.emptyCityText")} ${t("feed.emptyText")}`,
-          `<a class="btn" href="master-profile-edit.html#services">${icon("settings-2")}${t("feed.myServices")}</a>`);
+        renderMasterHome();
         return;
       }
       list.classList.add("reveal");
@@ -138,6 +207,7 @@
         }
         renderPlanBanner();
         const profile = await api.myMasterProfile();
+        masterProfile = profile;
         const chip = document.getElementById("cityChip");
         if (!profile.city) {
           chip.hidden = true;

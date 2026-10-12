@@ -332,6 +332,17 @@ function setToken(token) {
 
 function clearToken() {
   localStorage.removeItem("token");
+  localStorage.removeItem("role");
+}
+
+// The logged-in role, remembered so the home page can send a master to their orders before it renders.
+function setRole(role) {
+  try { localStorage.setItem("role", role); } catch (e) { /* ignore */ }
+}
+
+// Where a logged-in user starts: masters work from the order feed, admins from the admin panel.
+function homeFor(role) {
+  return role === "master" ? "feed.html" : role === "admin" ? "admin/index.html" : "index.html";
 }
 
 // FastAPI returns a string for our own errors but a list of {loc, msg} for validation errors.

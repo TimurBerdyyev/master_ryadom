@@ -503,7 +503,6 @@ class NearbyMasterOut(BaseModel):
     lat: float
     lon: float
     distance_km: float
-    minutes_ago: int
     price_from: float | None = None
 
 

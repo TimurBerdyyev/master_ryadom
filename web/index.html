@@ -13,6 +13,12 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
   <link rel="stylesheet" href="css/style.css" />
+  <script>
+    // A logged-in master starts on their order feed, not on the clients' home page.
+    try {
+      if (localStorage.getItem("token") && localStorage.getItem("role") === "master") location.replace("feed.html");
+    } catch (e) { /* storage unavailable */ }
+  </script>
 </head>
 <body>
   <header class="topbar">

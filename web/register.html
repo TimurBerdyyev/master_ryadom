@@ -205,6 +205,7 @@
       try {
         const { access_token } = await api.register({ ...data, code: document.getElementById("code").value.trim() });
         setToken(access_token);
+        setRole("master");
         const tg = data.notify_enabled && data.notify_channel === "telegram" ? "&tg=1" : "";
         location.href = `master-profile-edit.html?welcome=1${tg}`;
       } catch (err) {
