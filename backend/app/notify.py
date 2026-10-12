@@ -99,7 +99,7 @@ UNSUBSCRIBE = {
 # Frequent notifications that go out only as push and Telegram, never as email or SMS.
 PUSH_AND_TELEGRAM_ONLY = {"message"}
 BUDGET = {"ru": "Бюджет: {price} сом", "ky": "Бюджет: {price} сом", "en": "Budget: {price} som"}
-LINKS = {"message": "/chat.html?id={id}", "missed": "/master-profile-edit.html", "new_order": "/feed.html", "chosen": "/order-detail.html?id={id}", "cancelled": "/orders.html"}
+LINKS = {"message": "/chat.html?id={id}", "missed": "/master-profile-edit.html#overview", "new_order": "/feed.html", "chosen": "/order-detail.html?id={id}", "cancelled": "/orders.html"}
 
 
 def notify(db: Session, user_id: int, title: str, text: str | None = None, kind: str | None = None, **params) -> None:

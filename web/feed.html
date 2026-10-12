@@ -93,7 +93,7 @@
       if (!orders.length) {
         list.classList.remove("reveal");
         list.innerHTML = emptyState("inbox", t("feed.emptyTitle"), `${t("feed.emptyCityText")} ${t("feed.emptyText")}`,
-          `<a class="btn" href="master-profile-edit.html">${icon("settings-2")}${t("feed.myServices")}</a>`);
+          `<a class="btn" href="master-profile-edit.html#services">${icon("settings-2")}${t("feed.myServices")}</a>`);
         return;
       }
       list.classList.add("reveal");
@@ -142,7 +142,7 @@
         if (!profile.city) {
           chip.hidden = true;
           list.innerHTML = emptyState("map-pin", t("feed.noCityTitle"), t("feed.noCityText"),
-            `<a class="btn" href="master-profile-edit.html">${icon("map-pin")}${t("feed.chooseCity")}</a>`);
+            `<a class="btn" href="master-profile-edit.html#profile">${icon("map-pin")}${t("feed.chooseCity")}</a>`);
           return;
         }
         if (!profile.agreement_accepted) {
@@ -150,7 +150,7 @@
             `<a class="btn accent" href="master-profile-edit.html">${icon("scroll-text")}${t("feed.toProfile")}</a>`);
           return;
         }
-        chip.innerHTML = `${icon("map-pin")}<b>${esc(cityName(profile.city))}</b> · <a class="link" href="master-profile-edit.html">${t("city.change")}</a>`;
+        chip.innerHTML = `${icon("map-pin")}<b>${esc(cityName(profile.city))}</b> · <a class="link" href="master-profile-edit.html#profile">${t("city.change")}</a>`;
         chip.hidden = false;
         const [feed, cats] = await Promise.all([api.orderFeed(), api.categories()]);
         orders = feed;

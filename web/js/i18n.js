@@ -934,6 +934,27 @@ const I18N = {
   "loc.denied": ["Разрешите доступ к местоположению в настройках телефона или браузера.", "Телефондун же браузердин жөндөөлөрүнөн жайгашкан жерге уруксат бериңиз.", "Allow location access in your phone or browser settings."],
   "wp.masterOn": ["Новые заказы придут уведомлением в этот браузер.", "Жаңы буйрутмалар бул браузерге билдирме болуп келет.", "New orders will arrive as notifications in this browser."],
   "wp.masterOff": ["Включите уведомления — новые заказы придут сразу, даже когда сайт закрыт.", "Билдирмелерди күйгүзүңүз — жаңы буйрутмалар сайт жабык болсо да дароо келет.", "Turn on notifications — new orders arrive instantly, even when the site is closed."],
+
+  // ---------- master cabinet ----------
+  "cab.overview": ["Обзор", "Сереп", "Overview"],
+  "cab.profile": ["Профиль", "Профиль", "Profile"],
+  "cab.services": ["Услуги и цены", "Кызматтар жана баалар", "Services & prices"],
+  "cab.photos": ["Фото работ", "Иштердин сүрөттөрү", "Work photos"],
+  "cab.map": ["Карта", "Карта", "Map"],
+  "cab.notifications": ["Уведомления", "Билдирмелер", "Notifications"],
+  "cab.account": ["Аккаунт", "Аккаунт", "Account"],
+  "cab.completeTitle": ["Заполните профиль — клиенты чаще выбирают таких мастеров", "Профилди толтуруңуз — кардарлар мындай усталарды көбүрөөк тандашат", "Complete your profile — clients choose such pros more often"],
+  "cab.ckPhoto": ["Ваше фото", "Сүрөтүңүз", "Your photo"],
+  "cab.ckAbout": ["Описание «О себе» (хотя бы пара предложений)", "«Өзүм жөнүндө» сүрөттөмөсү (жок дегенде эки сүйлөм)", "An “About me” text (a couple of sentences)"],
+  "cab.ckServices": ["Хотя бы одна услуга с ценой", "Баасы менен жок дегенде бир кызмат", "At least one service with a price"],
+  "cab.ckPhotos": ["Фото ваших работ", "Иштериңиздин сүрөттөрү", "Photos of your work"],
+  "cab.ckAgreement": ["Договор с сервисом принят", "Кызмат менен келишим кабыл алынды", "Service agreement accepted"],
+  "cab.ckVerified": ["Проверка сервисом («Гарантия сервиса»)", "Кызмат тарабынан текшерүү («Кызмат кепилдиги»)", "Vetted by the service (“Service guarantee”)"],
+  "cab.ckNotifications": ["Уведомления о новых заказах", "Жаңы буйрутмалар тууралуу билдирмелер", "Notifications about new orders"],
+  "cab.ckMap": ["Вы на карте для клиентов рядом", "Сиз жакын кардарлар үчүн картадасыз", "You're on the map for nearby clients"],
+  "cab.fill": ["Заполнить", "Толтуруу", "Complete"],
+  "cab.agreementText": ["Условия работы: ответ на заявку за 20 минут, штрафы и снижение рейтинга за пропуски.", "Иштөө шарттары: арызга 20 мүнөттө жооп, өткөрүп жибергени үчүн айып жана рейтингдин төмөндөшү.", "Terms: answer requests within 20 minutes; fines and a lower rating for misses."],
+  "cab.readAgreement": ["Открыть договор", "Келишимди ачуу", "Open the agreement"],
 };
 
 // Server messages with variable parts: [regex, key, (match) => vars]

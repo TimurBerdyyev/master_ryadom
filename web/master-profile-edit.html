@@ -19,7 +19,7 @@
     <nav id="nav"></nav>
   </header>
 
-  <main class="narrow">
+  <main class="cabinet">
     <div class="page-head">
       <div>
         <h1 data-i18n="edit.title">Мой профиль мастера</h1>
@@ -42,147 +42,191 @@
       </div>
     </div>
 
-    <div class="card-box reveal" style="margin-bottom:16px">
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-camera"></use></svg><span data-i18n="edit.avatarTitle">Ваше фото</span></h2>
-      <div class="avatar-edit" style="margin-top:14px">
-        <div id="avatarPreview"></div>
-        <div style="flex:1;min-width:200px">
-          <p class="muted" style="margin:0" data-i18n="edit.avatarHint"></p>
-          <div class="actions">
-            <label class="btn small" style="cursor:pointer">
-              <svg class="i" aria-hidden="true"><use href="#i-upload"></use></svg><span id="avatarUploadLabel" data-i18n="edit.avatarUpload">Загрузить фото</span>
-              <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" />
+    <div class="cab-layout">
+      <nav class="cab-nav" aria-label="Кабинет мастера">
+          <a class="cab-tab" href="#overview" data-tab="overview"><svg class="i" aria-hidden="true"><use href="#i-layout-grid"></use></svg><span data-i18n="cab.overview">Обзор</span></a>
+          <a class="cab-tab" href="#profile" data-tab="profile"><svg class="i" aria-hidden="true"><use href="#i-user"></use></svg><span data-i18n="cab.profile">Профиль</span></a>
+          <a class="cab-tab" href="#services" data-tab="services"><svg class="i" aria-hidden="true"><use href="#i-hand-coins"></use></svg><span data-i18n="cab.services">Услуги и цены</span></a>
+          <a class="cab-tab" href="#photos" data-tab="photos"><svg class="i" aria-hidden="true"><use href="#i-camera"></use></svg><span data-i18n="cab.photos">Фото работ</span></a>
+          <a class="cab-tab" href="#map" data-tab="map"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="cab.map">Карта</span></a>
+          <a class="cab-tab" href="#notifications" data-tab="notifications"><svg class="i" aria-hidden="true"><use href="#i-bell"></use></svg><span data-i18n="cab.notifications">Уведомления</span></a>
+          <a class="cab-tab" href="#account" data-tab="account"><svg class="i" aria-hidden="true"><use href="#i-settings-2"></use></svg><span data-i18n="cab.account">Аккаунт</span></a>
+      </nav>
+      <div class="cab-panels">
+        <section class="cab-panel" data-panel="overview" hidden>
+          <h2 class="cab-title" data-i18n="cab.overview">Обзор</h2>
+            <div class="card-box cab-progress" id="checklistCard">
+              <div class="row" style="justify-content:space-between">
+                <b data-i18n="cab.completeTitle">Заполните профиль — клиенты чаще выбирают таких мастеров</b>
+                <span class="cab-percent" id="checkPercent">0%</span>
+              </div>
+              <div class="cab-bar"><span id="checkBar"></span></div>
+              <ul class="cab-checklist" id="checklist"></ul>
+            </div>
+            <div class="card-box" id="trustCard" style="margin-bottom:16px" hidden>
+              <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg><span data-i18n="edit.trustTitle">Гарантия и надёжность</span></h2>
+              <div class="notice" id="verifyNotice" style="margin-top:12px"></div>
+              <div class="trust-stats">
+                <div><b id="missedCount">0</b><span data-i18n="edit.missed">Пропущено заявок</span></div>
+                <div><b id="penaltyValue">0</b><span data-i18n="edit.penalty">Снижение рейтинга</span></div>
+              </div>
+              <p class="hint" id="ruleText" style="margin:12px 0 0"></p>
+              <a class="link" href="master-agreement.html" style="font-size:14px"><span data-i18n="edit.agreementLink">Договор с сервисом</span> →</a>
+            </div>
+        </section>
+        <section class="cab-panel" data-panel="profile" hidden>
+          <h2 class="cab-title" data-i18n="cab.profile">Профиль</h2>
+            <div class="card-box reveal" style="margin-bottom:16px">
+              <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-camera"></use></svg><span data-i18n="edit.avatarTitle">Ваше фото</span></h2>
+              <div class="avatar-edit" style="margin-top:14px">
+                <div id="avatarPreview"></div>
+                <div style="flex:1;min-width:200px">
+                  <p class="muted" style="margin:0" data-i18n="edit.avatarHint"></p>
+                  <div class="actions">
+                    <label class="btn small" style="cursor:pointer">
+                      <svg class="i" aria-hidden="true"><use href="#i-upload"></use></svg><span id="avatarUploadLabel" data-i18n="edit.avatarUpload">Загрузить фото</span>
+                      <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" />
+                    </label>
+                    <button class="btn small ghost" type="button" id="avatarDelete" hidden><svg class="i" aria-hidden="true"><use href="#i-trash-2"></use></svg><span data-i18n="edit.avatarDelete">Удалить фото</span></button>
+                  </div>
+                  <div class="error" id="avatarError"></div>
+                </div>
+              </div>
+            </div>
+
+            <form class="card reveal" id="profileForm" style="max-width:none">
+              <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-user-round"></use></svg><span data-i18n="edit.about">О себе</span></h2>
+              <label>
+                <span data-i18n="edit.description">Описание</span>
+                <textarea id="description" rows="3" maxlength="2000" data-i18n-ph="edit.descriptionPh"></textarea>
+              </label>
+              <div class="form-grid">
+                <label>
+                  <span data-i18n="edit.experience">Опыт работы (лет)</span>
+                  <input id="experience_years" type="number" min="0" max="80" />
+                </label>
+                <label>
+                  <span data-i18n="common.city">Город</span>
+                  <select id="city" required></select>
+                  <span class="hint" data-i18n="reg.cityHint">Вы будете получать заказы из этого города</span>
+                </label>
+              </div>
+              <label>
+                <span data-i18n="edit.district">Район</span>
+                <input id="district" type="text" maxlength="255" data-i18n-ph="edit.districtPh" />
+              </label>
+              <div id="profileError" class="error"></div>
+              <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
+            </form>
+        </section>
+        <section class="cab-panel" data-panel="services" hidden>
+          <h2 class="cab-title" data-i18n="cab.services">Услуги и цены</h2>
+            <div class="section-title" data-i18n="edit.servicesTitle">Мои услуги и цены</div>
+            <div id="servicesList" class="card-box" style="padding-top:6px;padding-bottom:6px"></div>
+
+            <form class="card" id="serviceForm" style="margin-top:16px;max-width:none">
+              <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="edit.addService">Добавить услугу</span></h2>
+              <label>
+                <span data-i18n="neworder.category">Категория</span>
+                <select id="serviceCategory" required></select>
+              </label>
+              <div class="form-grid">
+                <label>
+                  <span data-i18n="edit.serviceName">Название услуги</span>
+                  <input id="serviceTitle" type="text" maxlength="255" data-i18n-ph="edit.serviceNamePh" required />
+                </label>
+                <label>
+                  <span data-i18n="edit.priceFrom">Цена от, сом</span>
+                  <input id="servicePrice" type="number" min="0" max="10000000" required />
+                </label>
+              </div>
+              <div id="serviceError" class="error"></div>
+              <button class="btn secondary" type="submit"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="edit.addService">Добавить услугу</span></button>
+            </form>
+        </section>
+        <section class="cab-panel" data-panel="photos" hidden>
+          <h2 class="cab-title" data-i18n="cab.photos">Фото работ</h2>
+            <div class="section-title" data-i18n="edit.photosTitle">Фото работ</div>
+            <div id="photosGrid" class="photo-grid"></div>
+            <label class="btn secondary" style="cursor:pointer;">
+              <svg class="i" aria-hidden="true"><use href="#i-image-plus"></use></svg><span data-i18n="edit.addPhoto">Добавить фото</span>
+              <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" />
             </label>
-            <button class="btn small ghost" type="button" id="avatarDelete" hidden><svg class="i" aria-hidden="true"><use href="#i-trash-2"></use></svg><span data-i18n="edit.avatarDelete">Удалить фото</span></button>
-          </div>
-          <div class="error" id="avatarError"></div>
-        </div>
+            <div id="photoError" class="error"></div>
+        </section>
+        <section class="cab-panel" data-panel="map" hidden>
+          <h2 class="cab-title" data-i18n="cab.map">Карта</h2>
+            <!-- Live location on the clients' map -->
+            <div class="card-box" id="locationCard" style="margin-top:16px">
+              <div class="row" style="justify-content:space-between;gap:16px;flex-wrap:nowrap">
+                <div>
+                  <h2 class="form-section-title" style="margin:0"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="loc.title">Показывать меня на карте</span></h2>
+                  <p class="muted" style="margin:6px 0 0" data-i18n="loc.text">Клиенты рядом увидят вас на карте и смогут сразу позвонить или написать. Положение обновляется, пока у вас открыт сайт или приложение.</p>
+                </div>
+                <label class="switch"><input type="checkbox" id="locationToggle" /><span></span></label>
+              </div>
+              <p class="hint" id="locationStatus" style="margin:10px 0 0"></p>
+            </div>
+        </section>
+        <section class="cab-panel" data-panel="notifications" hidden>
+          <h2 class="cab-title" data-i18n="cab.notifications">Уведомления</h2>
+            <div class="notice" id="pushStatus" hidden style="margin-top:16px"></div>
+            <form class="card" id="notifyForm" style="max-width:none;margin-top:16px">
+              <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="edit.notifyTitle">Уведомления</span></h2>
+              <p class="muted" style="margin:-8px 0 0" data-i18n="edit.notifySub">Куда присылать уведомления о новых заказах и выборе вашего предложения.</p>
+              <label class="check">
+                <input type="checkbox" id="notifyEnabled" />
+                <span data-i18n="edit.notifyOn">Присылать уведомления</span>
+              </label>
+              <div class="role-picker channel-picker" id="channelPicker" role="radiogroup" data-i18n-aria="reg.channelAria">
+                <input type="radio" name="channel" id="chTelegram" value="telegram" />
+                <label for="chTelegram"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span>Telegram</span><small id="tgSub" data-i18n="reg.tgSub">Бесплатно, мгновенно</small></label>
+                <input type="radio" name="channel" id="chEmail" value="email" />
+                <label for="chEmail"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><span>Email</span><small data-i18n="reg.emailSub">На вашу почту</small></label>
+                <input type="radio" name="channel" id="chSms" value="sms" />
+                <label for="chSms"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg><span>SMS</span><small data-i18n="reg.smsSub">На ваш номер телефона</small></label>
+              </div>
+              <div id="channelStatus"></div>
+              <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
+            </form>
+        </section>
+        <section class="cab-panel" data-panel="account" hidden>
+          <h2 class="cab-title" data-i18n="cab.account">Аккаунт</h2>
+            <div class="card-box" id="emailCard" style="margin-top:16px">
+              <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><span data-i18n="edit.accountEmail">Email аккаунта</span></h2>
+              <div class="row" style="margin-top:12px">
+                <b id="currentEmail" style="flex:1;min-width:180px;word-break:break-all">—</b>
+                <button type="button" class="btn small secondary" id="changeEmailBtn"><span data-i18n="edit.changeEmail">Изменить email</span></button>
+              </div>
+              <form id="changeEmailForm" class="stack" style="margin-top:14px" hidden>
+                <label class="field">
+                  <span data-i18n="edit.newEmail">Новый email</span>
+                  <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="newEmail" type="email" autocomplete="email" maxlength="255" placeholder="name@gmail.com" required /></span>
+                </label>
+                <div class="notice" id="emailCodeInfo" hidden></div>
+                <label class="field" id="emailCodeField" hidden>
+                  <span data-i18n="reg.code">Код из письма</span>
+                  <input id="emailCode" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" />
+                </label>
+                <div class="error" id="emailError"></div>
+                <div class="row">
+                  <button type="submit" class="btn small" id="emailSubmit"><span data-i18n="edit.sendCode">Отправить код</span></button>
+                  <button type="button" class="btn small ghost" id="emailCancel"><span data-i18n="edit.cancel">Отмена</span></button>
+                </div>
+              </form>
+            </div>
+
+            <div class="card-box" style="margin-top:16px">
+              <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-file-text"></use></svg><span data-i18n="edit.agreementLink">Договор с сервисом</span></h2>
+              <p class="muted" style="margin:6px 0 12px" data-i18n="cab.agreementText">Условия работы: ответ на заявку за 20 минут, штрафы и снижение рейтинга за пропуски.</p>
+              <div class="row">
+                <a class="btn small secondary" href="master-agreement.html"><span data-i18n="cab.readAgreement">Открыть договор</span></a>
+                <button class="btn small ghost" type="button" onclick="logout()"><svg class="i" aria-hidden="true"><use href="#i-log-out"></use></svg><span data-i18n="nav.logout">Выйти</span></button>
+              </div>
+            </div>
+        </section>
       </div>
     </div>
-
-    <div class="card-box" id="trustCard" style="margin-bottom:16px" hidden>
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-shield-check"></use></svg><span data-i18n="edit.trustTitle">Гарантия и надёжность</span></h2>
-      <div class="notice" id="verifyNotice" style="margin-top:12px"></div>
-      <div class="trust-stats">
-        <div><b id="missedCount">0</b><span data-i18n="edit.missed">Пропущено заявок</span></div>
-        <div><b id="penaltyValue">0</b><span data-i18n="edit.penalty">Снижение рейтинга</span></div>
-      </div>
-      <p class="hint" id="ruleText" style="margin:12px 0 0"></p>
-      <a class="link" href="master-agreement.html" style="font-size:14px"><span data-i18n="edit.agreementLink">Договор с сервисом</span> →</a>
-    </div>
-
-    <form class="card reveal" id="profileForm" style="max-width:none">
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-user-round"></use></svg><span data-i18n="edit.about">О себе</span></h2>
-      <label>
-        <span data-i18n="edit.description">Описание</span>
-        <textarea id="description" rows="3" maxlength="2000" data-i18n-ph="edit.descriptionPh"></textarea>
-      </label>
-      <div class="form-grid">
-        <label>
-          <span data-i18n="edit.experience">Опыт работы (лет)</span>
-          <input id="experience_years" type="number" min="0" max="80" />
-        </label>
-        <label>
-          <span data-i18n="common.city">Город</span>
-          <select id="city" required></select>
-          <span class="hint" data-i18n="reg.cityHint">Вы будете получать заказы из этого города</span>
-        </label>
-      </div>
-      <label>
-        <span data-i18n="edit.district">Район</span>
-        <input id="district" type="text" maxlength="255" data-i18n-ph="edit.districtPh" />
-      </label>
-      <div id="profileError" class="error"></div>
-      <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
-    </form>
-
-    <div class="notice" id="pushStatus" hidden style="margin-top:16px"></div>
-
-    <!-- Live location on the clients' map -->
-    <div class="card-box" id="locationCard" style="margin-top:16px">
-      <div class="row" style="justify-content:space-between;gap:16px;flex-wrap:nowrap">
-        <div>
-          <h2 class="form-section-title" style="margin:0"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="loc.title">Показывать меня на карте</span></h2>
-          <p class="muted" style="margin:6px 0 0" data-i18n="loc.text">Клиенты рядом увидят вас на карте и смогут сразу позвонить или написать. Положение обновляется, пока у вас открыт сайт или приложение.</p>
-        </div>
-        <label class="switch"><input type="checkbox" id="locationToggle" /><span></span></label>
-      </div>
-      <p class="hint" id="locationStatus" style="margin:10px 0 0"></p>
-    </div>
-
-    <form class="card" id="notifyForm" style="max-width:none;margin-top:16px">
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-bell-ring"></use></svg><span data-i18n="edit.notifyTitle">Уведомления</span></h2>
-      <p class="muted" style="margin:-8px 0 0" data-i18n="edit.notifySub">Куда присылать уведомления о новых заказах и выборе вашего предложения.</p>
-      <label class="check">
-        <input type="checkbox" id="notifyEnabled" />
-        <span data-i18n="edit.notifyOn">Присылать уведомления</span>
-      </label>
-      <div class="role-picker channel-picker" id="channelPicker" role="radiogroup" data-i18n-aria="reg.channelAria">
-        <input type="radio" name="channel" id="chTelegram" value="telegram" />
-        <label for="chTelegram"><svg class="i" aria-hidden="true"><use href="#i-send"></use></svg><span>Telegram</span><small id="tgSub" data-i18n="reg.tgSub">Бесплатно, мгновенно</small></label>
-        <input type="radio" name="channel" id="chEmail" value="email" />
-        <label for="chEmail"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><span>Email</span><small data-i18n="reg.emailSub">На вашу почту</small></label>
-        <input type="radio" name="channel" id="chSms" value="sms" />
-        <label for="chSms"><svg class="i" aria-hidden="true"><use href="#i-message-square"></use></svg><span>SMS</span><small data-i18n="reg.smsSub">На ваш номер телефона</small></label>
-      </div>
-      <div id="channelStatus"></div>
-      <button class="btn" type="submit"><svg class="i" aria-hidden="true"><use href="#i-check"></use></svg><span data-i18n="edit.save">Сохранить</span></button>
-    </form>
-
-    <div class="card-box" id="emailCard" style="margin-top:16px">
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><span data-i18n="edit.accountEmail">Email аккаунта</span></h2>
-      <div class="row" style="margin-top:12px">
-        <b id="currentEmail" style="flex:1;min-width:180px;word-break:break-all">—</b>
-        <button type="button" class="btn small secondary" id="changeEmailBtn"><span data-i18n="edit.changeEmail">Изменить email</span></button>
-      </div>
-      <form id="changeEmailForm" class="stack" style="margin-top:14px" hidden>
-        <label class="field">
-          <span data-i18n="edit.newEmail">Новый email</span>
-          <span class="input-icon"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><input id="newEmail" type="email" autocomplete="email" maxlength="255" placeholder="name@gmail.com" required /></span>
-        </label>
-        <div class="notice" id="emailCodeInfo" hidden></div>
-        <label class="field" id="emailCodeField" hidden>
-          <span data-i18n="reg.code">Код из письма</span>
-          <input id="emailCode" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" />
-        </label>
-        <div class="error" id="emailError"></div>
-        <div class="row">
-          <button type="submit" class="btn small" id="emailSubmit"><span data-i18n="edit.sendCode">Отправить код</span></button>
-          <button type="button" class="btn small ghost" id="emailCancel"><span data-i18n="edit.cancel">Отмена</span></button>
-        </div>
-      </form>
-    </div>
-
-    <div class="section-title" data-i18n="edit.servicesTitle">Мои услуги и цены</div>
-    <div id="servicesList" class="card-box" style="padding-top:6px;padding-bottom:6px"></div>
-
-    <form class="card" id="serviceForm" style="margin-top:16px;max-width:none">
-      <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="edit.addService">Добавить услугу</span></h2>
-      <label>
-        <span data-i18n="neworder.category">Категория</span>
-        <select id="serviceCategory" required></select>
-      </label>
-      <div class="form-grid">
-        <label>
-          <span data-i18n="edit.serviceName">Название услуги</span>
-          <input id="serviceTitle" type="text" maxlength="255" data-i18n-ph="edit.serviceNamePh" required />
-        </label>
-        <label>
-          <span data-i18n="edit.priceFrom">Цена от, сом</span>
-          <input id="servicePrice" type="number" min="0" max="10000000" required />
-        </label>
-      </div>
-      <div id="serviceError" class="error"></div>
-      <button class="btn secondary" type="submit"><svg class="i" aria-hidden="true"><use href="#i-plus"></use></svg><span data-i18n="edit.addService">Добавить услугу</span></button>
-    </form>
-
-    <div class="section-title" data-i18n="edit.photosTitle">Фото работ</div>
-    <div id="photosGrid" class="photo-grid"></div>
-    <label class="btn secondary" style="cursor:pointer;">
-      <svg class="i" aria-hidden="true"><use href="#i-image-plus"></use></svg><span data-i18n="edit.addPhoto">Добавить фото</span>
-      <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" multiple style="display:none" />
-    </label>
-    <div id="photoError" class="error"></div>
   </main>
 
   <script src="js/icons.js"></script>
@@ -194,6 +238,60 @@
     if (new URLSearchParams(location.search).get("welcome")) document.getElementById("welcome").hidden = false;
 
     let categories = [];
+
+    // ---------- tabs ----------
+    const TABS = ["overview", "profile", "services", "photos", "map", "notifications", "account"];
+    const startParams = new URLSearchParams(location.search);
+
+    function showTab(name) {
+      if (!TABS.includes(name)) name = "overview";
+      document.querySelectorAll(".cab-panel").forEach(p => { p.hidden = p.dataset.panel !== name; });
+      document.querySelectorAll(".cab-tab").forEach(a => {
+        const on = a.dataset.tab === name;
+        a.classList.toggle("active", on);
+        if (on) {
+          a.setAttribute("aria-current", "page");
+          a.scrollIntoView({ block: "nearest", inline: "center" });
+        } else {
+          a.removeAttribute("aria-current");
+        }
+      });
+    }
+
+    window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+    showTab(location.hash.slice(1) || (startParams.get("tg") ? "notifications" : "overview"));
+
+    // ---------- overview: what is left to fill in ----------
+    async function renderChecklist(master) {
+      let notificationsOn = false;
+      try {
+        if (PUSH) notificationsOn = (await PUSH.checkPermissions()).receive === "granted";
+        else if (webPushState() === "granted") notificationsOn = true;
+        if (!notificationsOn) notificationsOn = (await api.notificationSettings()).enabled;
+      } catch (e) { /* treat as off */ }
+      const items = [
+        [Boolean(master.user.photo), "cab.ckPhoto", "profile"],
+        [Boolean(master.description && master.description.trim().length >= 20), "cab.ckAbout", "profile"],
+        [master.services.length > 0, "cab.ckServices", "services"],
+        [master.photos.length > 0, "cab.ckPhotos", "photos"],
+        [master.agreement_accepted, "cab.ckAgreement", "account"],
+        [master.verified, "cab.ckVerified", "overview"],
+        [notificationsOn, "cab.ckNotifications", "notifications"],
+        [master.location_shared, "cab.ckMap", "map"],
+      ];
+      const done = items.filter(([ok]) => ok).length;
+      const percent = Math.round(done / items.length * 100);
+      document.getElementById("checkPercent").textContent = `${percent}%`;
+      document.getElementById("checkBar").style.width = `${percent}%`;
+      document.getElementById("checklist").innerHTML = items.map(([ok, key, tab]) => `
+        <li class="${ok ? "done" : ""}">
+          <span class="ck">${icon(ok ? "circle-check" : "circle-x")}</span>
+          <span style="flex:1">${t(key)}</span>
+          ${ok || tab === "overview" ? "" : `<a class="link small" href="#${tab}">${t("cab.fill")} →</a>`}
+        </li>`).join("");
+      // Masters who still have to complete something land on the overview; the rest see a small badge.
+      document.querySelector('.cab-tab[data-tab="overview"]').dataset.todo = items.length - done || "";
+    }
 
     // Is this phone going to get new-order notifications from the app? Status, the last error and a test button.
     async function renderPushStatus() {
@@ -369,6 +467,7 @@
         renderAvatar(master);
         renderTrust(master);
         renderLocation(master);
+        renderChecklist(master);
         const link = document.getElementById("publicLink");
         link.href = `master.html?id=${master.id}`;
         link.hidden = false;
@@ -446,7 +545,7 @@
     }
 
     async function loadCategories() {
-      categories = await api.categories();
+      categories = sortCategories(await api.categories());
       document.getElementById("serviceCategory").innerHTML =
         categories.map(c => `<option value="${c.id}">${esc(catName(c.name))}</option>`).join("");
     }
