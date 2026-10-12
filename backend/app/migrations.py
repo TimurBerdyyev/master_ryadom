@@ -21,9 +21,8 @@ BASELINE_REVISION = "0001"
 # Tables created by revision 0001. A pre-migration database may lack some of them
 # (e.g. it was created before paid plans existed), so they are filled in before stamping.
 BASELINE_TABLES = {
-    "categories", "users", "addresses", "complaints", "masters", "notifications", "master_subscriptions",
-    "orders", "services", "subscription_payments", "working_hours", "messages", "order_offers", "payments",
-    "photos", "reviews",
+    "categories", "users", "complaints", "masters", "notifications", "master_subscriptions",
+    "orders", "services", "subscription_payments", "order_offers", "photos", "reviews",
 }
 
 

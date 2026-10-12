@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title data-i18n="delp.docTitle">Удаление аккаунта — Мастер рядом</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg class="i" aria-hidden="true"><use href="#i-wrench"></use></svg></span> Мастер рядом</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="narrow">
+    <div class="notice success" id="doneNotice" hidden style="margin-bottom:16px">
+      <svg class="i" aria-hidden="true"><use href="#i-circle-check"></use></svg><span data-i18n="delp.done">Аккаунт удалён. Спасибо, что работали с нами.</span>
+    </div>
+    <article class="card-box doc reveal">
+      <h1 data-i18n="delp.title">Удаление аккаунта и данных</h1>
+      <p data-i18n="delp.intro">«Мастер рядом» — сервис, где клиенты находят мастеров. Здесь описано, как удалить свой аккаунт и данные.</p>
+
+      <h2 data-i18n="delp.mastersTitle">Мастерам: удалить аккаунт самостоятельно</h2>
+      <ol>
+        <li data-i18n="delp.m1">Войдите в приложение или на сайт под своим номером или email.</li>
+        <li data-i18n="delp.m2">Откройте «Профиль» → вкладка «Аккаунт».</li>
+        <li data-i18n="delp.m3">В блоке «Удалить аккаунт» введите пароль, отметьте подтверждение и нажмите «Удалить аккаунт навсегда».</li>
+      </ol>
+      <p><a class="btn" href="master-profile-edit.html#account" data-i18n="delp.openProfile">Открыть «Аккаунт»</a></p>
+
+      <h2 data-i18n="delp.whatTitle">Что удаляется</h2>
+      <p data-i18n="delp.what">Сразу и навсегда: профиль, имя, телефон, email, пароль, фото, описание, услуги и цены, фото работ, отзывы о вас, сохранённое местоположение, переписка с клиентами, уведомления и подключённые устройства. Заявки клиентов, где вы были мастером, остаются у клиентов, но без ваших данных. Жалобы сохраняются для разбора без указания автора.</p>
+
+      <h2 data-i18n="delp.noAccessTitle">Нет доступа к аккаунту или вы клиент</h2>
+      <p data-i18n="delp.noAccess">Напишите на masteryadomkg@gmail.com с телефона или email аккаунта (клиентам — приложите ссылку на заявку). Мы удалим данные в течение 30 дней и ответим на письмо.</p>
+    </article>
+  </main>
+
+  <script src="js/icons.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    document.getElementById("doneNotice").hidden = !new URLSearchParams(location.search).get("done");
+    renderNav();
+  </script>
+</body>
+</html>

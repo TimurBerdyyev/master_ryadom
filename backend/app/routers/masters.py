@@ -141,7 +141,8 @@ def nearby_masters(
         result.append(NearbyMasterOut(
             id=m.id, name=m.user.name, photo=m.user.photo, phone=m.user.phone, rating=m.rating,
             completed_orders=m.completed_orders, verified=m.verified,
-            lat=round(m.latitude, 4), lon=round(m.longitude, 4), distance_km=round(distance, 1),
+            # ~100 m precision: enough for "nearby", not enough to point at the master's home.
+            lat=round(m.latitude, 3), lon=round(m.longitude, 3), distance_km=round(distance, 1),
             price_from=min(prices) if prices else None,
         ))
     return sorted(result, key=lambda r: r.distance_km)[:100]

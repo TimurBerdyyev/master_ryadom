@@ -191,6 +191,7 @@
             </form>
         </section>
         <section class="cab-panel" data-panel="account" hidden>
+          <!-- delete-account block is appended below the email and agreement cards -->
           <h2 class="cab-title" data-i18n="cab.account">Аккаунт</h2>
             <div class="card-box" id="emailCard" style="margin-top:16px">
               <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-mail"></use></svg><span data-i18n="edit.accountEmail">Email аккаунта</span></h2>
@@ -224,6 +225,20 @@
                 <button class="btn small ghost" type="button" onclick="logout()"><svg class="i" aria-hidden="true"><use href="#i-log-out"></use></svg><span data-i18n="nav.logout">Выйти</span></button>
               </div>
             </div>
+          <form class="card-box danger-zone" id="deleteForm" style="margin-top:16px">
+            <h2 class="form-section-title"><svg class="i" aria-hidden="true"><use href="#i-trash-2"></use></svg><span data-i18n="del.title">Удалить аккаунт</span></h2>
+            <p class="muted" style="margin:6px 0 12px" data-i18n="del.text">Профиль, фото, услуги, отзывы о вас, переписка и уведомления будут удалены навсегда. Заявки клиентов, где вы были мастером, останутся у клиентов без ваших данных.</p>
+            <label class="field">
+              <span data-i18n="del.password">Введите пароль для подтверждения</span>
+              <input id="deletePassword" type="password" autocomplete="current-password" required maxlength="72" />
+            </label>
+            <label class="check" style="margin-top:10px">
+              <input type="checkbox" id="deleteConfirm" />
+              <span data-i18n="del.confirm">Я понимаю, что восстановить аккаунт будет нельзя</span>
+            </label>
+            <div class="error" id="deleteError"></div>
+            <button class="btn danger" type="submit" style="margin-top:12px"><svg class="i" aria-hidden="true"><use href="#i-trash-2"></use></svg><span data-i18n="del.button">Удалить аккаунт навсегда</span></button>
+          </form>
         </section>
       </div>
     </div>
@@ -260,6 +275,21 @@
 
     window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
     showTab(location.hash.slice(1) || (startParams.get("tg") ? "notifications" : "overview"));
+
+    // ---------- delete my account (Google Play requires it) ----------
+    document.getElementById("deleteForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const error = document.getElementById("deleteError");
+      error.textContent = "";
+      if (!document.getElementById("deleteConfirm").checked) return (error.textContent = t("del.needConfirm"));
+      try {
+        await api.deleteAccount(document.getElementById("deletePassword").value);
+        clearToken();
+        location.replace("delete-account.html?done=1");
+      } catch (err) {
+        error.textContent = err.message;
+      }
+    });
 
     // ---------- overview: what is left to fill in ----------
     async function renderChecklist(master) {

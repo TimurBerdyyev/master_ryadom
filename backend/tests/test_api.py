@@ -693,6 +693,7 @@ def test_live_location_on_the_map(client):
     near = next(m for m in found if m["name"] == "Рядом")
     assert near["distance_km"] < 2 and near["price_from"] == 500 and near["phone"]
     assert "minutes_ago" not in near and "location_updated_at" not in near  # clients don't see when the master was online
+    assert (near["lat"], near["lon"]) == (42.88, 74.58)  # rounded to ~100 m, not the exact spot
 
     # the last known position stays on the map, with its age (updated when the master opens the app again)
     db = SessionLocal()
@@ -837,6 +838,20 @@ def test_web_push_to_masters_and_clients(client, push_service):
     db = SessionLocal()
     assert db.query(WebPushSubscription).filter(WebPushSubscription.endpoint == client_browser["endpoint"]).count() == 0
     db.close()
+
+
+def test_master_deletes_own_account(client):
+    headers, phone = register_master(client, "Ухожу", city="Арван")
+    mid = master_id_of(client, headers)
+    assert client.post("/auth/delete-account", json={"password": "secret123"}).status_code == 401
+    r = client.post("/auth/delete-account", headers=headers, json={"password": "wrong-password"})
+    assert r.status_code == 400 and "пароль" in r.json()["detail"]
+    assert client.post("/auth/delete-account", headers=headers, json={"password": "secret123"}).status_code == 204
+    assert client.get("/auth/me", headers=headers).status_code == 401
+    assert client.get(f"/masters/{mid}").status_code == 404
+    assert client.post("/auth/login", json={"phone": phone, "password": "secret123"}).status_code == 401
+    admin_h = make_admin(client)
+    assert client.post("/auth/delete-account", headers=admin_h, json={"password": "adminpass"}).status_code == 400
 
 
 def test_blocked_master(client):

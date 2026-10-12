@@ -270,6 +270,10 @@
       document.getElementById("listView").hidden = view !== "list";
       document.getElementById("mapView").hidden = view !== "map";
       applyFilters();
+      // On a phone the map sits below the search: bring it into view when switching to it.
+      if (view === "map" && window.innerWidth < 800 && params.get("view") !== "map") {
+        setTimeout(() => document.getElementById("mapView").scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      }
     }
     document.querySelectorAll(".view-switch [data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
 

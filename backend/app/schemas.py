@@ -119,6 +119,10 @@ class SendCodeOut(BaseModel):
     debug_code: str | None = None
 
 
+class AccountDeleteIn(BaseModel):
+    password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
+
+
 class PasswordResetIn(BaseModel):
     email: str = Field(min_length=3, max_length=255)
     code: str = Field(pattern=r"^\d{6}$")
@@ -214,13 +218,6 @@ class MasterMeOut(MasterOut):
     location_shared: bool = False
 
 
-class MasterRegister(BaseModel):
-    description: str | None = Field(None, max_length=2000)
-    experience_years: int | None = Field(None, ge=0, le=80)
-    city: str | None = Field(None, max_length=255)
-    district: str | None = Field(None, max_length=255)
-    latitude: Latitude | None = None
-    longitude: Longitude | None = None
 
 
 class MasterProfileUpdate(BaseModel):
@@ -240,18 +237,6 @@ class ServiceCreate(BaseModel):
     price_from: float = Field(ge=0, le=10_000_000)
 
 
-class OrderCreate(BaseModel):
-    category_id: int
-    city: str = Field(min_length=1, max_length=100)
-    description: str = Field(min_length=1, max_length=2000)
-    address: str | None = Field(None, max_length=500)
-    latitude: Latitude | None = None
-    longitude: Longitude | None = None
-    price: float | None = Field(None, ge=0, le=10_000_000)
-    date: datetime | None = None
-    time: str | None = Field(None, max_length=16, pattern=r"^\d{1,2}:\d{2}$")
-
-    _city = field_validator("city")(_required_city)
 
 
 class ContactOut(BaseModel):
@@ -366,10 +351,6 @@ class NotificationOut(BaseModel):
     created_at: datetime
 
 
-class ComplaintCreate(BaseModel):
-    text: str = Field(min_length=1, max_length=2000)
-    target_user_id: int | None = None
-    order_id: int | None = None
 
 
 class RequestComplaintCreate(BaseModel):

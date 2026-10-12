@@ -86,7 +86,6 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     master: Mapped["Master"] = relationship(back_populates="user", uselist=False)
-    addresses: Mapped[list["Address"]] = relationship(back_populates="user")
     notifications: Mapped[list["Notification"]] = relationship(back_populates="user")
 
 
@@ -115,7 +114,6 @@ class Master(Base):
     user: Mapped["User"] = relationship(back_populates="master")
     services: Mapped[list["Service"]] = relationship(back_populates="master")
     photos: Mapped[list["Photo"]] = relationship(back_populates="master")
-    working_hours: Mapped[list["WorkingHours"]] = relationship(back_populates="master")
     reviews: Mapped[list["Review"]] = relationship(back_populates="master")
     orders: Mapped[list["Order"]] = relationship(back_populates="master")
     subscription: Mapped["MasterSubscription"] = relationship(back_populates="master", uselist=False)
@@ -209,18 +207,6 @@ class Review(Base):
     master: Mapped["Master"] = relationship(back_populates="reviews")
 
 
-class Message(Base):
-    __tablename__ = "messages"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
-    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-
 
 class Photo(Base):
     __tablename__ = "photos"
@@ -235,29 +221,6 @@ class Photo(Base):
     order: Mapped["Order"] = relationship(back_populates="photos")
 
 
-class Address(Base):
-    __tablename__ = "addresses"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    address: Mapped[str] = mapped_column(String(500))
-    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-
-    user: Mapped["User"] = relationship(back_populates="addresses")
-
-
-class WorkingHours(Base):
-    __tablename__ = "working_hours"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    master_id: Mapped[int] = mapped_column(ForeignKey("masters.id"))
-    weekday: Mapped[int] = mapped_column(Integer)  # 0 = monday .. 6 = sunday
-    start_time: Mapped[str] = mapped_column(Time)
-    end_time: Mapped[str] = mapped_column(Time)
-
-    master: Mapped["Master"] = relationship(back_populates="working_hours")
 
 
 class Notification(Base):
@@ -272,15 +235,6 @@ class Notification(Base):
 
     user: Mapped["User"] = relationship(back_populates="notifications")
 
-
-class Payment(Base):
-    __tablename__ = "payments"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
-    amount: Mapped[float] = mapped_column(Numeric(10, 2))
-    commission: Mapped[float] = mapped_column(Numeric(10, 2))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Complaint(Base):

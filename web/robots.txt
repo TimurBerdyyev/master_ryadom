@@ -1,0 +1,12 @@
+# Private pages (request links carry a secret token, chats, admin) must not be indexed.
+User-agent: *
+Disallow: /admin/
+Disallow: /api/
+Disallow: /order-detail.html
+Disallow: /order-success.html
+Disallow: /chat.html
+Disallow: /chats.html
+Disallow: /my-requests.html
+Disallow: /master-profile-edit.html
+Disallow: /feed.html
+Disallow: /orders.html

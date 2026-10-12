@@ -7,13 +7,11 @@ orders keep existing (detached from the deleted master), complaints stay for the
 from sqlalchemy.orm import Session
 
 from app.models import (
-    Address,
     ChatMessage,
     Complaint,
     Conversation,
     Master,
     MasterSubscription,
-    Message,
     Notification,
     NotificationSettings,
     Order,
@@ -27,7 +25,6 @@ from app.models import (
     SubscriptionPayment,
     User,
     WebPushSubscription,
-    WorkingHours,
 )
 from app.uploads import delete_upload
 
@@ -47,7 +44,7 @@ def delete_user(db: Session, user: User) -> None:
                 ChatMessage.conversation_id.in_(conversation_ids), ChatMessage.photo.is_not(None))]
             db.query(ChatMessage).filter(ChatMessage.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
             db.query(Conversation).filter(Conversation.id.in_(conversation_ids)).delete(synchronize_session=False)
-        for model in (Service, Photo, WorkingHours, OrderOffer, RequestDelivery, Review, MasterSubscription,
+        for model in (Service, Photo, OrderOffer, RequestDelivery, Review, MasterSubscription,
                       SubscriptionPayment):
             db.query(model).filter(model.master_id == master.id).delete(synchronize_session=False)
         # Clients' orders stay. Unfinished ones go back to "looking for a pro" (the admin sees them among
@@ -62,9 +59,8 @@ def delete_user(db: Session, user: User) -> None:
     db.query(Complaint).filter(Complaint.author_id == user.id).update({Complaint.author_id: None}, synchronize_session=False)
     db.query(Complaint).filter(Complaint.target_user_id == user.id).update(
         {Complaint.target_user_id: None}, synchronize_session=False)
-    for model in (Notification, NotificationSettings, Address, PushDevice, WebPushSubscription):
+    for model in (Notification, NotificationSettings, PushDevice, WebPushSubscription):
         db.query(model).filter(model.user_id == user.id).delete(synchronize_session=False)
-    db.query(Message).filter(Message.sender_id == user.id).delete(synchronize_session=False)
     db.delete(user)
     db.flush()
 

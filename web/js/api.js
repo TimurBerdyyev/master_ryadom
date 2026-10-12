@@ -54,7 +54,7 @@ function sortCategories(list) {
 }
 
 function categoryStyle(name) {
-  const [iconName, tint] = CATEGORY_STYLE[name] || ["wrench", "#2d5bff"];
+  const [iconName, tint] = CATEGORY_STYLE[name] || ["wrench", "#12875a"];
   return { iconName, tint, style: `--tint:${tint};--tint-bg:${tint}17` };
 }
 
@@ -413,6 +413,7 @@ const api = {
   register: (data) => apiRequest("/auth/register", { method: "POST", body: JSON.stringify(data) }),
   login: (data) => apiRequest("/auth/login", { method: "POST", body: JSON.stringify(data) }),
   me: () => apiRequest("/auth/me"),
+  deleteAccount: (password) => apiRequest("/auth/delete-account", { method: "POST", body: JSON.stringify({ password }) }),
   categories: () => apiRequest("/categories"),
   searchMasters: (params) => apiRequest(`/masters?${new URLSearchParams(params)}`),
   getMaster: (id) => apiRequest(`/masters/${id}`),
@@ -454,7 +455,6 @@ const api = {
   updateMasterProfile: (data) => apiRequest("/masters/me", { method: "PATCH", body: JSON.stringify(data) }),
   addMyService: (data) => apiRequest("/masters/me/services", { method: "POST", body: JSON.stringify(data) }),
   deleteMyService: (id) => apiRequest(`/masters/me/services/${id}`, { method: "DELETE" }),
-  fileComplaint: (data) => apiRequest("/complaints", { method: "POST", body: JSON.stringify(data) }),
   orderFeed: () => apiRequest("/orders/feed"),
   orderOffers: (id) => apiRequest(`/orders/${id}/offers`),
   makeOffer: (id, data) => apiRequest(`/orders/${id}/offer`, { method: "POST", body: JSON.stringify(data) }),

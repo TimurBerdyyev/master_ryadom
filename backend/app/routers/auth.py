@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.accounts import delete_user
 from app.auth import create_access_token, get_current_user, get_current_user_optional, hash_password, verify_password
 from app.config import settings
 from app.database import get_db
@@ -9,6 +10,7 @@ from app.email import get_email_provider
 from app.models import Master, NotificationSettings, User, UserRole, UserStatus, utcnow
 from app.rate_limit import rate_limit
 from app.schemas import (
+    AccountDeleteIn,
     ChangeEmailIn,
     MeOut,
     PasswordResetIn,
@@ -149,3 +151,14 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=MeOut)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/delete-account", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(login_rate_limit)])
+def delete_my_account(data: AccountDeleteIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """A master deletes their own account (required by Google Play): the password confirms it's really them."""
+    if current_user.role == UserRole.admin:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Нельзя удалить администратора")
+    if not verify_password(data.password, current_user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Неверный пароль")
+    delete_user(db, current_user)
+    db.commit()

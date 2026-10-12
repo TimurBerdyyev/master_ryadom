@@ -59,7 +59,7 @@ def _message(token: str, title: str, body: str, link: str) -> dict:
             "data": {"link": link},
             "android": {
                 "priority": "high",
-                "notification": {"channel_id": CHANNEL_ID, "icon": "ic_stat_notify", "color": "#2563EB",
+                "notification": {"channel_id": CHANNEL_ID, "icon": "ic_stat_notify", "color": "#12875A",
                                  "sound": "default"},
             },
         }

@@ -15,7 +15,7 @@ from app.payments import get_provider
 from app.email import get_email_provider
 from app.sms import get_sms_provider
 from app.routers import (
-    admin, auth, categories, chats, complaints, masters, notifications, orders, requests, reviews, subscriptions,
+    admin, auth, categories, chats, masters, notifications, orders, requests, reviews, subscriptions,
 )
 from app.dispatch import check_missed
 from app.create_admin import ensure_admin
@@ -161,7 +161,6 @@ app.include_router(chats.router)
 app.include_router(reviews.router)
 app.include_router(notifications.router)
 app.include_router(notifications.telegram_router)
-app.include_router(complaints.router)
 app.include_router(admin.router)
 app.include_router(subscriptions.router)
 app.include_router(subscriptions.admin_router)
