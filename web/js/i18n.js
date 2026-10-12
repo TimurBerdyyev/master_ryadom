@@ -889,7 +889,7 @@ const I18N = {
   "map.map": ["Карта", "Карта", "Map"],
   "map.live": ["Сейчас на связи", "Азыр байланышта", "Online now"],
   "map.nearMe": ["Рядом со мной", "Мага жакын", "Near me"],
-  "map.hint": ["На карте — мастера, которые сейчас включили «Показывать меня на карте». Положение обновляется, пока у них открыто приложение.", "Картада — азыр «Мени картада көрсөтүү» күйгүзгөн усталар. Жайгашуу тиркеме ачык турганда жаңыланат.", "The map shows pros who turned on “Show me on the map”. Positions update while their app is open."],
+  "map.hint": ["На карте — где мастер был, когда последний раз открывал приложение. Положение обновляется каждый раз, когда он заходит.", "Картада — уста тиркемени акыркы жолу ачканда кайда болгону. Ал кирген сайын жайгашуу жаңыланат.", "The map shows where each pro was when they last opened the app. It updates every time they come back."],
   "map.distance": ["{km} км", "{km} км", "{km} km"],
   "map.justNow": ["только что", "жаңы эле", "just now"],
   "map.minutesAgo": ["{n} мин назад", "{n} мүн мурун", "{n} min ago"],
@@ -928,7 +928,7 @@ const I18N = {
 
   // ---------- live location ----------
   "loc.title": ["Показывать меня на карте", "Мени картада көрсөтүү", "Show me on the map"],
-  "loc.text": ["Клиенты рядом увидят вас на карте и смогут сразу позвонить или написать. Положение обновляется, пока у вас открыт сайт или приложение.", "Жакын кардарлар сизди картада көрүп, дароо чалып же жаза алышат. Жайгашуу сайт же тиркеме ачык турганда жаңыланат.", "Clients nearby see you on the map and can call or message right away. Your position updates while the site or app is open."],
+  "loc.text": ["Клиенты рядом увидят вас на карте и смогут сразу позвонить или написать. Показывается место, где вы последний раз открывали приложение, — оно обновляется при каждом входе.", "Жакын кардарлар сизди картада көрүп, дароо чалып же жаза алышат. Тиркемени акыркы жолу ачкан жериңиз көрсөтүлөт — ал ар бир киргенде жаңыланат.", "Clients nearby see you on the map and can call or message right away. It shows where you last opened the app — updated every time you open it."],
   "loc.on": ["Включено: клиенты видят вас на карте.", "Күйгүзүлгөн: кардарлар сизди картада көрүшөт.", "On: clients can see you on the map."],
   "loc.off": ["Выключено: вас нет на карте.", "Өчүк: сиз картада жоксуз.", "Off: you're not on the map."],
   "loc.denied": ["Разрешите доступ к местоположению в настройках телефона или браузера.", "Телефондун же браузердин жөндөөлөрүнөн жайгашкан жерге уруксат бериңиз.", "Allow location access in your phone or browser settings."],
@@ -955,6 +955,9 @@ const I18N = {
   "cab.fill": ["Заполнить", "Толтуруу", "Complete"],
   "cab.agreementText": ["Условия работы: ответ на заявку за 20 минут, штрафы и снижение рейтинга за пропуски.", "Иштөө шарттары: арызга 20 мүнөттө жооп, өткөрүп жибергени үчүн айып жана рейтингдин төмөндөшү.", "Terms: answer requests within 20 minutes; fines and a lower rating for misses."],
   "cab.readAgreement": ["Открыть договор", "Келишимди ачуу", "Open the agreement"],
+  "map.nearby": ["Мастера рядом", "Жакын усталар", "Pros nearby"],
+  "map.hoursAgo": ["обновлено {n} ч назад", "{n} саат мурун жаңыланган", "updated {n} h ago"],
+  "map.daysAgo": ["обновлено {n} дн назад", "{n} күн мурун жаңыланган", "updated {n} d ago"],
 };
 
 // Server messages with variable parts: [regex, key, (match) => vars]

@@ -693,13 +693,17 @@ def test_live_location_on_the_map(client):
     near = next(m for m in found if m["name"] == "Рядом")
     assert near["distance_km"] < 2 and near["minutes_ago"] == 0 and near["price_from"] == 500 and near["phone"]
 
-    # stale positions disappear
+    # the last known position stays on the map, with its age (updated when the master opens the app again)
     db = SessionLocal()
     db.query(Master).filter(Master.id == master_id_of(client, near_h)).update(
-        {Master.location_updated_at: utcnow() - timedelta(hours=2)})
+        {Master.location_updated_at: utcnow() - timedelta(days=2)})
     db.commit()
     db.close()
-    assert "Рядом" not in [m["name"] for m in client.get("/masters/nearby", params={"lat": me[0], "lon": me[1]}).json()]
+    stale = next(m for m in client.get("/masters/nearby", params={"lat": me[0], "lon": me[1]}).json() if m["name"] == "Рядом")
+    assert stale["minutes_ago"] >= 2 * 24 * 60
+    client.put("/masters/me/location", headers=near_h, json={"lat": 42.8801, "lon": 74.5801})
+    fresh = next(m for m in client.get("/masters/nearby", params={"lat": me[0], "lon": me[1]}).json() if m["name"] == "Рядом")
+    assert fresh["minutes_ago"] == 0
 
     # turning sharing off removes the master and forgets the position
     client.delete("/masters/me/location", headers=electric_h)

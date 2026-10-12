@@ -1,4 +1,3 @@
-from datetime import timedelta
 from math import asin, cos, radians, sin, sqrt
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -116,14 +115,17 @@ def nearby_masters(
     radius_km: float = Query(15, gt=0, le=100),
     db: Session = Depends(get_db),
 ):
-    """Masters sharing their live location near the client (the map). Only fresh positions are shown."""
-    fresh_after = utcnow() - timedelta(minutes=settings.live_location_minutes)
+    """Masters near the client (the map): each at the last place they opened the app or site.
+
+    The position is not tracked in the background — it is updated every time the master opens the app,
+    and the map shows how long ago that was.
+    """
     query = (
         db.query(Master)
         .options(selectinload(Master.user), selectinload(Master.services))
         .join(User, Master.user_id == User.id)
         .filter(User.status == UserStatus.active, Master.location_shared.is_(True),
-                Master.location_updated_at >= fresh_after, Master.latitude.is_not(None), Master.longitude.is_not(None))
+                Master.location_updated_at.is_not(None), Master.latitude.is_not(None), Master.longitude.is_not(None))
     )
     query = filter_masters_with_access(query)
     if settings.masters_require_verification:

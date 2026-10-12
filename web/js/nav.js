@@ -199,7 +199,10 @@ async function renderNav() {
     setupPush(user);
     syncWebPush();
     refreshChatBadge();
-    if (user.role === "master") shareLiveLocation();
+    if (user.role === "master") {
+      window.__isMaster = true;
+      shareLiveLocation();
+    }
   } catch (e) {
     clearToken();
     nav.innerHTML = guestNav;
@@ -324,8 +327,10 @@ function webPushBanner(container, textKey) {
   });
 }
 
-// ---------- masters: live location on the clients' map ----------
-// While a master has "Показывать меня на карте" on, every open page reports the position (at most every 2 minutes).
+// ---------- masters: position on the clients' map ----------
+// No background tracking: the map shows where the master last opened the app. While "Показывать меня на карте"
+// is on, the position is refreshed when the app/site opens and when it comes back from the background
+// (at most once every 2 minutes, so moving between pages doesn't ask the GPS each time).
 async function shareLiveLocation(force = false) {
   if (!navigator.geolocation) return;
   let last = 0;
@@ -344,3 +349,8 @@ async function shareLiveLocation(force = false) {
     } catch (e) { /* ignore */ }
   }, () => {}, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }
+
+// Back to the app after it was minimized: refresh the master's position too.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && getToken() && window.__isMaster) shareLiveLocation();
+});

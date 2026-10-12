@@ -65,7 +65,7 @@
     <!-- Live map: masters sharing their location now -->
     <div id="mapView" hidden>
       <div class="map-bar">
-        <span class="map-live"><span class="dot"></span><span data-i18n="map.live">Сейчас на связи</span></span>
+        <span class="map-live"><span class="dot"></span><span data-i18n="map.nearby">Мастера рядом</span></span>
         <span class="muted" id="mapCount"></span>
         <span class="spacer"></span>
         <button class="btn small secondary" type="button" id="locateBtn"><svg class="i" aria-hidden="true"><use href="#i-map-pin"></use></svg><span data-i18n="map.nearMe">Рядом со мной</span></button>
@@ -186,6 +186,13 @@
     }
 
     // ---------- map ----------
+    // "только что" / "15 мин назад" / "3 ч назад" / "2 дн назад": when the master last opened the app.
+    function positionAge(minutes) {
+      if (minutes < 2) return t("map.justNow");
+      if (minutes < 60) return t("map.minutesAgo", { n: minutes });
+      if (minutes < 24 * 60) return t("map.hoursAgo", { n: Math.floor(minutes / 60) });
+      return t("map.daysAgo", { n: Math.floor(minutes / 1440) });
+    }
     function ensureMap() {
       if (map) return;
       map = L.map("map", { zoomControl: true, attributionControl: true }).setView(center || DEFAULT_CENTER, 13);
@@ -208,7 +215,7 @@
         <div class="map-popup">
           <b>${esc(m.name)}</b>
           <div class="tasker-rating">${icon("star", "sm")}<b>${Number(m.rating).toFixed(1)}</b><span>· ${plural(m.completed_orders, "p.orders")}</span></div>
-          <div class="muted">${t("map.distance", { km: m.distance_km })} · ${m.minutes_ago < 2 ? t("map.justNow") : t("map.minutesAgo", { n: m.minutes_ago })}</div>
+          <div class="muted">${t("map.distance", { km: m.distance_km })} · ${positionAge(m.minutes_ago)}</div>
           ${m.price_from !== null ? `<div class="tasker-price">${priceFromHtml(m.price_from)}</div>` : ""}
           <div class="row" style="gap:6px;margin-top:8px">
             ${m.phone ? `<a class="btn small" href="${esc(telLink(m.phone))}">${icon("phone")}${t("common.call")}</a>` : ""}

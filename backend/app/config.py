@@ -25,8 +25,6 @@ class Settings(BaseSettings):
     # Response promise: masters must answer a request (offer a price or decline) within this time,
     # otherwise the miss is recorded with a fine and a rating penalty (see the master agreement).
     response_minutes: int = 20
-    # A master's live location is shown on the map only while it is this fresh.
-    live_location_minutes: int = 30
     missed_request_fine: int = 200  # сом за пропущенную заявку (черновик — согласовать)
     missed_request_rating_penalty: float = 0.1
     # Only masters verified by the service are listed and receive requests ("гарантия сервиса").
