@@ -83,7 +83,7 @@ const I18N = {
   "cat.Другое": ["Другое", "Башка", "Other"],
 
   // ---------- home ----------
-  "home.docTitle": ["Мастер рядом — предложения мастеров за 20 минут", "Мастер рядом — усталардын сунуштары 20 мүнөттө", "Мастер рядом — offers from pros in 20 minutes"],
+  "home.docTitle": ["Мастер рядом — сантехник, электрик, ремонт в Бишкеке и Кыргызстане", "Мастер рядом — Бишкекте жана Кыргызстанда сантехник, электрик, оңдоо", "Мастер рядом — plumbers, electricians, repairs in Bishkek and Kyrgyzstan"],
   "home.searchAria": ["Что нужно сделать", "Эмне кылуу керек", "What needs to be done"],
   "home.trust1": ["Гарантия сервиса", "Кызматтын кепилдиги", "Service guarantee"],
   "home.trust1s": ["Проверяем мастеров и заключаем договор", "Усталарды текшерип, келишим түзөбүз", "We vet pros and sign an agreement"],
@@ -101,10 +101,16 @@ const I18N = {
                    "Үйгө жакын текшерилген устаны тез таап, адилет баага макулдашууга жардам берген кызмат.",
                    "A service that helps you quickly find a verified pro near home and agree on a fair price."],
   "footer.clients": ["Клиентам", "Кардарларга", "For clients"],
+  "footer.popular": ["Популярные услуги", "Популярдуу кызматтар", "Popular services"],
+  "footer.plumberBishkek": ["Сантехник в Бишкеке", "Бишкекте сантехник", "Plumber in Bishkek"],
+  "footer.electricianBishkek": ["Электрик в Бишкеке", "Бишкекте электрик", "Electrician in Bishkek"],
+  "footer.repairBishkek": ["Ремонт квартир в Бишкеке", "Бишкекте батир оңдоо", "Apartment repair in Bishkek"],
+  "footer.plumberOsh": ["Сантехник в Оше", "Ошто сантехник", "Plumber in Osh"],
+  "footer.allServices": ["Все услуги и города", "Бардык кызматтар жана шаарлар", "All services and towns"],
   "footer.masters": ["Мастерам", "Усталарга", "For pros"],
 
   // ---------- search ----------
-  "search.docTitle": ["Поиск мастеров — Мастер рядом", "Усталарды издөө — Мастер рядом", "Find pros — Мастер рядом"],
+  "search.docTitle": ["Мастера рядом с вами: цены, отзывы, карта — Мастер рядом", "Усталарды издөө — Мастер рядом", "Find pros — Мастер рядом"],
   "search.title": ["Все мастера", "Бардык усталар", "All pros"],
   "search.query": ["Поиск: «{q}»", "Издөө: «{q}»", "Search: “{q}”"],
   "search.found": ["Найдено {count}", "Табылды: {count}", "Found {count}"],
@@ -148,7 +154,7 @@ const I18N = {
   "login.password": ["Пароль", "Сырсөз", "Password"],
   "login.noAccount": ["Вы мастер и ещё не с нами?", "Сиз устасыз, бирок али биз менен эмессизби?", "A pro who hasn't joined yet?"],
   "login.fail": ["Не удалось войти: ", "Кирүү мүмкүн болгон жок: ", "Couldn't log in: "],
-  "reg.docTitle": ["Регистрация — Мастер рядом", "Каттоо — Мастер рядом", "Sign up — Мастер рядом"],
+  "reg.docTitle": ["Работа для мастеров: заказы от клиентов рядом — Мастер рядом", "Каттоо — Мастер рядом", "Sign up — Мастер рядом"],
   "reg.title": ["Регистрация мастера", "Устаны каттоо", "Pro sign-up"],
   "reg.sub": ["Получайте заявки из своего города. Клиентам регистрация не нужна.", "Шаарыңыздан арыздарды алыңыз. Кардарларга каттоонун кереги жок.", "Get requests from your city. Clients don't need to sign up."],
   "reg.name": ["Имя", "Аты", "Name"],
@@ -159,7 +165,7 @@ const I18N = {
   "reg.fail": ["Не удалось зарегистрироваться: ", "Катталуу мүмкүн болгон жок: ", "Couldn't sign up: "],
 
   // ---------- new order ----------
-  "neworder.docTitle": ["Оставить заявку — Мастер рядом", "Арыз калтыруу — Мастер рядом", "Leave a request — Мастер рядом"],
+  "neworder.docTitle": ["Вызвать мастера на дом — заявка без регистрации | Мастер рядом", "Арыз калтыруу — Мастер рядом", "Leave a request — Мастер рядом"],
   "neworder.category": ["Категория", "Категория", "Category"],
   "neworder.describePh": ["Например: течёт кран на кухне, нужен новый смеситель", "Мисалы: ашканада кран агып жатат, жаңы смеситель керек", "For example: the kitchen tap is leaking, need a new faucet"],
   "neworder.describeHint": ["Чем подробнее — тем точнее мастера назовут цену", "Канчалык толук жазсаңыз, усталар ошончолук так баа айтышат", "The more detail, the more accurate the prices"],
@@ -665,7 +671,7 @@ const I18N = {
   "tab.feed": ["Заказы", "Буйрутмалар", "Orders"],
   "tab.jobs": ["Мои работы", "Иштерим", "My jobs"],
   "tab.profile": ["Профиль", "Профиль", "Profile"],
-  "app.docTitle": ["Приложение — Мастер рядом", "Тиркеме — Мастер рядом", "App — Мастер рядом"],
+  "app.docTitle": ["Приложение «Мастер рядом» для Android и iPhone", "Тиркеме — Мастер рядом", "App — Мастер рядом"],
   "app.title": ["Приложение «Мастер рядом»", "«Мастер рядом» тиркемеси", "The «Мастер рядом» app"],
   "app.sub": ["Мастера и заявки всегда под рукой: один тап — и вы на месте. Бесплатно.", "Усталар жана арыздар дайыма колуңузда: бир басуу менен ачылат. Акысыз.", "Pros and requests always at hand, one tap away. Free."],
   "app.android": ["Android", "Android", "Android"],
@@ -955,6 +961,8 @@ function getLang() {
     /* storage unavailable */
   }
   if (saved && saved in LANG_INDEX) return saved;
+  // Search engines render pages with an English browser: keep them on Russian, the language people search in.
+  if (/bot|crawl|spider|slurp|yandex|google|bing|lighthouse/i.test(navigator.userAgent || "")) return "ru";
   const browser = (navigator.language || "ru").slice(0, 2).toLowerCase();
   return browser in LANG_INDEX ? browser : "ru";
 }

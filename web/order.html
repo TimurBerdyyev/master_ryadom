@@ -3,7 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title data-i18n="neworder.docTitle">Оставить заявку — Мастер рядом</title>
+  <title data-i18n="neworder.docTitle">Вызвать мастера на дом — заявка без регистрации | Мастер рядом</title>
+  <meta name="description" content="Опишите задачу — сантехник, электрик или другой мастер рядом пришлёт цену за 20 минут. Без регистрации, только имя и телефон." />
+  <link rel="canonical" href="__SITE_URL__/order.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Мастер рядом" />
+  <meta property="og:locale" content="ru_RU" />
+  <meta property="og:title" content="Вызвать мастера на дом — заявка без регистрации | Мастер рядом" />
+  <meta property="og:description" content="Опишите задачу — сантехник, электрик или другой мастер рядом пришлёт цену за 20 минут. Без регистрации, только имя и телефон." />
+  <meta property="og:url" content="__SITE_URL__/order.html" />
+  <meta property="og:image" content="__SITE_URL__/og-image.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#ffffff" />
@@ -372,7 +382,7 @@
       }
     });
 
-    setupPlacePicker(document.getElementById("region"), document.getElementById("city"), stored("lastCity")).catch(() => {});
+    setupPlacePicker(document.getElementById("region"), document.getElementById("city"), params.get("city") || stored("lastCity")).catch(() => {});
     loadCategories();
     show(1);
     renderNav();

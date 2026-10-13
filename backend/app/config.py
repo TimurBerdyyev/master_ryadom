@@ -67,6 +67,16 @@ class Settings(BaseSettings):
     # Single-service hosting (Render): the backend also serves the web client from this folder
     # and the API moves under /api, exactly like behind nginx. Empty = API only (docker compose).
     serve_web_dir: str = ""
+    # Search engines (app/seo.py): codes from Google Search Console / Yandex Webmaster ("HTML tag" method),
+    # put into <head> of the home page. Empty = no tag.
+    google_site_verification: str = ""
+    yandex_verification: str = ""
+    # Android App Links (/.well-known/assetlinks.json): links to the site open the app. SHA-256 of the
+    # signing certificate(s), comma-separated — add the Play "App signing key" one if Google signs the app.
+    android_package: str = "kg.masterryadom.app"
+    android_cert_sha256: str = (
+        "B2:69:1F:04:E2:28:64:AB:B2:2B:8B:7D:0E:71:07:00:4A:8D:00:93:B6:D5:8E:9E:D0:E7:DD:7F:06:54:EE:26"
+    )
 
     @field_validator("database_url")
     @classmethod

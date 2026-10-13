@@ -3,8 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title data-i18n="home.docTitle">Мастер рядом — предложения мастеров за 20 минут</title>
-  <meta name="description" content="Проверенные сантехники, электрики, ремонт и уборка рядом с вами. Без регистрации: предложения мастеров за 20 минут — или мы сами найдём вам мастера." />
+  <title data-i18n="home.docTitle">Мастер рядом — сантехник, электрик, ремонт в Бишкеке и Кыргызстане</title>
+  <meta name="description" content="Проверенные сантехники, электрики, мастера по ремонту, уборке и перевозкам в Бишкеке, Оше и по всему Кыргызстану. Без регистрации: цены от мастеров за 20 минут — или мы сами найдём вам мастера." />
+  <link rel="canonical" href="__SITE_URL__/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Мастер рядом" />
+  <meta property="og:locale" content="ru_RU" />
+  <meta property="og:title" content="Мастер рядом — сантехник, электрик, ремонт в Бишкеке и Кыргызстане" />
+  <meta property="og:description" content="Проверенные сантехники, электрики, мастера по ремонту, уборке и перевозкам в Бишкеке, Оше и по всему Кыргызстану. Без регистрации: цены от мастеров за 20 минут — или мы сами найдём вам мастера." />
+  <meta property="og:url" content="__SITE_URL__/" />
+  <meta property="og:image" content="__SITE_URL__/og-image.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <!--SEO_VERIFY-->
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#ffffff" />
@@ -13,6 +23,14 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Мастер рядом" />
   <link rel="stylesheet" href="css/style.css" />
+  <script type="application/ld+json">
+  {"@context": "https://schema.org", "@graph": [
+    {"@type": "Organization", "@id": "__SITE_URL__/#org", "name": "Мастер рядом", "url": "__SITE_URL__/",
+     "logo": "__SITE_URL__/icons/icon-512.png", "email": "masteryadomkg@gmail.com", "areaServed": "KG"},
+    {"@type": "WebSite", "@id": "__SITE_URL__/#site", "name": "Мастер рядом", "url": "__SITE_URL__/",
+     "inLanguage": ["ru", "ky", "en"], "publisher": {"@id": "__SITE_URL__/#org"}}
+  ]}
+  </script>
   <script>
     // A logged-in master starts on their order feed, not on the clients' home page.
     try {
@@ -136,6 +154,16 @@
           <li><a href="my-requests.html" data-i18n="nav.myRequests">Мои заявки</a></li>
           <li><a href="chats.html" data-i18n="nav.messages">Сообщения</a></li>
           <li><a href="app.html" data-i18n="nav.app">Приложение</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 data-i18n="footer.popular">Популярные услуги</h4>
+        <ul>
+          <li><a href="/uslugi/santehnik/bishkek" data-i18n="footer.plumberBishkek">Сантехник в Бишкеке</a></li>
+          <li><a href="/uslugi/elektrik/bishkek" data-i18n="footer.electricianBishkek">Электрик в Бишкеке</a></li>
+          <li><a href="/uslugi/remont-kvartir/bishkek" data-i18n="footer.repairBishkek">Ремонт квартир в Бишкеке</a></li>
+          <li><a href="/uslugi/santehnik/osh" data-i18n="footer.plumberOsh">Сантехник в Оше</a></li>
+          <li><a href="/uslugi" data-i18n="footer.allServices">Все услуги и города</a></li>
         </ul>
       </div>
       <div>

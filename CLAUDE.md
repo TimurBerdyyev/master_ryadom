@@ -96,6 +96,19 @@
 - Кто получает заказ (`dispatch.eligible_masters`, лента `/orders/feed`, поиск мастеров): мастера того же места
   + мастера той же области с `serves_region`. Мастер без места видит пустую ленту.
 
+## SEO
+- `backend/app/seo.py` — страницы, которые сервер собирает сам (поисковики видят текст без JS): `/uslugi`,
+  `/uslugi/{услуга}`, `/uslugi/{услуга}/{место}` («Сантехник в Бишкеке»: мастера, цены, частые задачи, FAQ,
+  schema.org), `/master/{id}` (публичный профиль; `master.html` — интерактивный, `noindex`), `/sitemap.xml`,
+  `/robots.txt`, `/.well-known/assetlinks.json` (ссылки на сайт открывают Android-приложение).
+  Тексты, слаги и падежи («в Бишкеке», «в Чуйской области») — `app/seo_content.py`; новая категория без записи
+  в `SEO_CATEGORIES` получает общие тексты. Страница места без мастеров (кроме `KEY_CITIES`) — `noindex`.
+- Статичные страницы: `__SITE_URL__` (canonical, og:image) и `<!--SEO_VERIFY-->` подставляет сервер (`WebFiles` в
+  `main.py`, в nginx — `sub_filter`). Коды Search Console / Яндекс Вебмастера — `GOOGLE_SITE_VERIFICATION`,
+  `YANDEX_VERIFICATION`. Поисковые роботы всегда видят русский (`getLang` в `i18n.js`).
+- Новая публичная страница: `<meta name="description">`, canonical, og-теги — как в `index.html`, и строка в
+  `STATIC_PAGES` (sitemap). Закрытая — `noindex` + строка в `ROBOTS`.
+
 ## Деплой
 Render (самый простой): `render.yaml` + `deploy/render.Dockerfile` — один сервис, backend сам отдаёт `web/`
 (`SERVE_WEB_DIR`), API под `/api`. Свой сервер — пошагово `DEPLOY.md` (Caddy с HTTPS → nginx → backend; Postgres, Redis; бэкапы `deploy/backup.sh`).

@@ -4,7 +4,7 @@ import os
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -17,6 +17,7 @@ from app.sms import get_sms_provider
 from app.routers import (
     admin, auth, categories, chats, masters, notifications, orders, requests, reviews, subscriptions,
 )
+from app import seo
 from app.dispatch import check_missed
 from app.create_admin import ensure_admin
 from app.seed import seed_categories
@@ -171,14 +172,28 @@ def health():
     return {"status": "ok"}
 
 
+class WebFiles(StaticFiles):
+    """The web client; pages get the site address (og:image, canonical) and search-engine verification tags."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200 and response.media_type == "text/html":
+            with open(response.path, encoding="utf-8") as fh:
+                return HTMLResponse(seo.fill_placeholders(fh.read()))
+        return response
+
+
 def _single_service_site(api: FastAPI) -> FastAPI:
     """Web client at / and the API at /api in one process (what nginx does in docker compose)."""
     site = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     site.middleware("http")(security_headers)
     site.mount("/api", api)
-    site.mount("/", StaticFiles(directory=settings.serve_web_dir, html=True), name="web")
+    site.include_router(seo.router)  # /uslugi, /master/{id}, /sitemap.xml, /robots.txt
+    site.mount("/", WebFiles(directory=settings.serve_web_dir, html=True), name="web")
     return site
 
 
 if settings.serve_web_dir:
     app = _single_service_site(app)
+else:
+    app.include_router(seo.router)  # nginx (deploy/nginx.conf) sends these paths here

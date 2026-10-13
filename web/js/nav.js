@@ -39,6 +39,30 @@ if (PUSH) {
   PUSH.addListener("registrationError", (e) => setPushError(t("push.errFirebase") + ((e && e.error) || "")));
 }
 
+// ---------- links to the site open the app (Android App Links, /.well-known/assetlinks.json) ----------
+// The app starts on its home page; show the page of the link that opened it instead (same site only).
+const APP_PLUGIN = PUSH ? (window.Capacitor.Plugins || {}).App : null;
+
+function openAppLink(url) {
+  try {
+    const target = new URL(url);
+    if (target.origin !== location.origin || target.href === location.href) return;
+    location.href = target.pathname + target.search + target.hash;
+  } catch (e) { /* not a URL */ }
+}
+
+if (APP_PLUGIN) {
+  APP_PLUGIN.addListener("appUrlOpen", ({ url }) => openAppLink(url));
+  APP_PLUGIN.getLaunchUrl().then((launch) => {
+    const url = launch && launch.url;
+    let seen = "";
+    try { seen = sessionStorage.getItem("launchUrl") || ""; } catch (e) { /* ignore */ }
+    if (!url || url === seen) return;  // handled once: don't pull the user back on every page
+    try { sessionStorage.setItem("launchUrl", url); } catch (e) { /* ignore */ }
+    openAppLink(url);
+  }).catch(() => {});
+}
+
 // The last push problem on this phone — shown in the master's profile next to the test button.
 function setPushError(text) {
   try { text ? localStorage.setItem("pushError", text) : localStorage.removeItem("pushError"); } catch (e) { /* ignore */ }

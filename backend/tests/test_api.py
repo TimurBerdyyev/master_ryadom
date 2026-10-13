@@ -1498,3 +1498,60 @@ def test_email_migration_normalises_and_dedupes(tmp_path):
     command.upgrade(cfg, "head")
     with engine.connect() as conn:
         assert dict(conn.execute(text("SELECT id, email FROM users")).all()) == {1: "usta@mail.com", 2: None, 3: None}
+
+
+def test_seo_pages(client):
+    """Server-rendered pages for search engines: service × place, master profiles, sitemap, robots."""
+    import re
+    master_h, _ = register_master(client, "Сео <b>Мастер</b>", city="Токмок")
+    mid = master_id_of(client, master_h)
+
+    r = client.get("/uslugi/santehnik/tokmok")
+    assert r.status_code == 200 and "text/html" in r.headers["content-type"]
+    page = r.text
+    assert "<h1>Сантехник в Токмоке</h1>" in page
+    assert "Сео &lt;b&gt;Мастер&lt;/b&gt;" in page and "<b>Мастер" not in page  # names escaped
+    assert f'href="/master/{mid}"' in page and "от 500 сом" in page
+    assert '"@type": "FAQPage"' in page and 'content="index, follow"' in page
+    assert re.search(r'<link rel="canonical" href="[^"]+/uslugi/santehnik/tokmok"', page)
+    # the region's masters cover its villages too; an empty village page isn't indexed
+    village = client.get("/uslugi/santehnik/lebedinovka").text
+    assert "в селе Лебединовка" in village and "Сео &lt;b&gt;" in village
+    assert 'content="noindex, follow"' in client.get("/uslugi/master-krasoty/lebedinovka").text  # nobody there
+    assert "<h1>Сантехник в Чуйской области</h1>" in client.get("/uslugi/santehnik/chuyskaya-oblast").text
+    assert "Аламудунском районе" in client.get("/uslugi/elektrik/alamudunskiy-rayon").text
+    assert client.get("/uslugi/santehnik/nowhere").status_code == 404
+    assert client.get("/uslugi/unknown").status_code == 404
+    assert client.get("/uslugi/santehnik").status_code == 200 and client.get("/uslugi").status_code == 200
+
+    profile = client.get(f"/master/{mid}").text
+    assert "Сео &lt;b&gt;Мастер&lt;/b&gt;" in profile and "Замена смесителя" in profile and '"@type": "Plumber"' in profile
+    assert client.get("/master/999999").status_code == 404
+
+    sitemap = client.get("/sitemap.xml").text
+    assert "/uslugi/santehnik/bishkek</loc>" in sitemap and f"/master/{mid}</loc>" in sitemap
+    assert "/uslugi/santehnik/tokmok</loc>" in sitemap
+    robots = client.get("/robots.txt").text
+    assert "Disallow: /order-detail.html" in robots and "Sitemap: " in robots
+    links = client.get("/.well-known/assetlinks.json").json()
+    assert links[0]["target"]["package_name"] == "kg.masterryadom.app"
+
+
+def test_seo_hides_blocked_and_unverified_masters(client, monkeypatch):
+    from app.config import settings
+    master_h, _ = register_master(client, "Непроверенный", city="Нарын")
+    mid = master_id_of(client, master_h)
+    monkeypatch.setattr(settings, "masters_require_verification", True)
+    assert client.get(f"/master/{mid}").status_code == 404
+    assert "Непроверенный" not in client.get("/uslugi/santehnik/naryn").text
+    assert f"/master/{mid}<" not in client.get("/sitemap.xml").text
+
+
+def test_seo_slugs_unique():
+    from app.cities import CITIES
+    from app.seed import DEFAULT_CATEGORIES
+    from app.seo_content import PLACE_SLUG, category_info, locative
+    assert all(c in PLACE_SLUG for c in CITIES)
+    slugs = [category_info(c)["slug"] for c in DEFAULT_CATEGORIES]
+    assert len(slugs) == len(set(slugs))
+    assert locative("Бишкек") == "в Бишкеке" and locative("Иссык-Кульская область") == "в Иссык-Кульской области"

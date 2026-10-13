@@ -1937,7 +1937,7 @@ footer.site-footer {
 
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.4fr repeat(2, 1fr);
+  grid-template-columns: 1.4fr repeat(3, 1fr);
   gap: 32px;
   margin-bottom: 28px;
 }
@@ -5422,3 +5422,67 @@ form.card .check-row input[type="checkbox"],
   flex: 0 0 20px;
 }
 .stack-tight { display: flex; flex-direction: column; gap: 4px; }
+
+/* ---------- Search-engine pages (backend/app/seo.py): /uslugi/…, /master/{id} ---------- */
+.seo-page { max-width: 960px; }
+.seo-page h1 { font-size: clamp(26px, 5vw, 38px); line-height: 1.15; margin: 8px 0 12px; }
+.seo-page h2 { font-size: 21px; margin: 0 0 12px; }
+.seo-page h3 { font-size: 16px; margin: 0 0 6px; }
+.seo-crumbs { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.seo-crumbs a { color: var(--muted); }
+.seo-lead { font-size: 17px; color: var(--ink-2); line-height: 1.55; max-width: 720px; }
+.seo-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 8px; }
+.seo-section { margin-top: 36px; }
+.seo-section p { line-height: 1.6; }
+.seo-masters, .seo-cats, .seo-regions, .seo-reviews, .seo-jobs { list-style: none; padding: 0; margin: 0; }
+.seo-master {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--border);
+  border-radius: var(--r-lg); margin-bottom: 10px; background: var(--surface);
+}
+.seo-master-body { flex: 1; min-width: 0; }
+.seo-master-name { font-weight: 700; color: var(--ink); font-size: 16px; }
+.seo-meta { color: var(--muted); font-size: 14px; margin: 2px 0 0; }
+.seo-price { font-weight: 700; white-space: nowrap; }
+.seo-rating { color: var(--star); font-weight: 700; }
+.seo-avatar {
+  width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; display: inline-flex;
+  align-items: center; justify-content: center; background: var(--primary-50); color: var(--primary);
+  font-weight: 800; font-size: 22px;
+}
+.seo-avatar.xl { width: 96px; height: 96px; font-size: 36px; }
+.seo-profile { display: flex; gap: 18px; align-items: center; margin-top: 8px; }
+.seo-profile h1 { margin: 0 0 4px; }
+.seo-about { white-space: pre-line; }
+.seo-table-wrap { overflow-x: auto; }
+.seo-prices { width: 100%; border-collapse: collapse; }
+.seo-prices th, .seo-prices td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.seo-prices td:last-child, .seo-prices th:last-child { text-align: right; white-space: nowrap; font-weight: 600; }
+.seo-jobs { display: flex; flex-wrap: wrap; gap: 8px; }
+.seo-jobs a {
+  display: inline-block; padding: 8px 14px; border: 1px solid var(--border-strong); border-radius: 999px;
+  color: var(--ink); text-decoration: none; font-weight: 500;
+}
+.seo-jobs a:hover { border-color: var(--primary); color: var(--primary); }
+.seo-steps { padding-left: 20px; line-height: 1.6; }
+.seo-steps li { margin-bottom: 8px; }
+.seo-faq details { border-bottom: 1px solid var(--border); padding: 12px 0; }
+.seo-faq summary { cursor: pointer; font-weight: 600; }
+.seo-faq details p { margin: 8px 0 0; color: var(--ink-2); }
+.seo-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.seo-cats li { border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px; }
+.seo-cats p { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+.seo-towns { line-height: 1.9; }
+.seo-towns a, .seo-regions a, .seo-cats a { color: var(--primary); }
+.seo-regions li { margin-bottom: 14px; }
+.seo-regions p { font-size: 14px; margin: 0; line-height: 1.8; }
+.seo-links { display: grid; gap: 20px; }
+.seo-links h2 { font-size: 17px; }
+.seo-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.seo-photos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r); }
+.seo-reviews li { border-bottom: 1px solid var(--border); padding: 12px 0; }
+.seo-reviews p { margin: 4px 0; }
+@media (max-width: 560px) {
+  .seo-master { flex-wrap: wrap; }
+  .seo-price { width: 100%; padding-left: 70px; }
+  .seo-actions .btn { flex: 1; }
+}
