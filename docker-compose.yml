@@ -27,6 +27,11 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    # Every setting from .env reaches the backend (GOOGLE_SITE_VERIFICATION, ANDROID_CERT_SHA256, …);
+    # the list below only adds defaults and the addresses of db/redis inside compose.
+    env_file:
+      - path: .env
+        required: false
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: postgresql://master_ryadom:${POSTGRES_PASSWORD:-master_ryadom}@db:5432/master_ryadom

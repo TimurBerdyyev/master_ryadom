@@ -1555,3 +1555,20 @@ def test_seo_slugs_unique():
     slugs = [category_info(c)["slug"] for c in DEFAULT_CATEGORIES]
     assert len(slugs) == len(set(slugs))
     assert locative("Бишкек") == "в Бишкеке" and locative("Иссык-Кульская область") == "в Иссык-Кульской области"
+
+
+def test_redirect_to_new_domain(monkeypatch):
+    """REDIRECT_TO on the old deployment sends everything to the new address."""
+    import importlib
+    import app.main as main_module
+    from app.config import settings
+    monkeypatch.setattr(settings, "redirect_to", "https://new.example.kg/")
+    try:
+        moved = importlib.reload(main_module).app
+        with TestClient(moved) as c:
+            r = c.get("/uslugi/santehnik/bishkek?x=1", follow_redirects=False)
+            assert r.status_code == 301 and r.headers["location"] == "https://new.example.kg/uslugi/santehnik/bishkek?x=1"
+            assert c.get("/health").status_code == 200
+    finally:
+        monkeypatch.setattr(settings, "redirect_to", "")
+        importlib.reload(main_module)

@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # Single-service hosting (Render): the backend also serves the web client from this folder
     # and the API moves under /api, exactly like behind nginx. Empty = API only (docker compose).
     serve_web_dir: str = ""
+    # After moving to another server/domain: the old deployment answers every request with a permanent redirect
+    # to this address (e.g. https://master-ryadom.kg), so old app builds and search results land on the new site.
+    redirect_to: str = ""
     # Search engines (app/seo.py): codes from Google Search Console / Yandex Webmaster ("HTML tag" method),
     # put into <head> of the home page. Empty = no tag.
     google_site_verification: str = ""

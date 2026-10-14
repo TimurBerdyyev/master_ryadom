@@ -166,6 +166,27 @@ cd backend && alembic revision --autogenerate -m "что изменилось"
 Проверьте сгенерированный файл в `backend/alembic/versions/` и закоммитьте его — тест
 `test_models_match_migrations` упадёт, если миграцию забыли.
 
+## 9. Переезд с Render на свой сервер
+
+На бесплатном Render база удаляется через 30 дней, а фото пропадают при перезапуске — для работы нужен свой сервер.
+
+1. Сервер и домен — разделы 1–2 (`setup.sh`, `.env`). В `.env` перенесите с Render: `SMTP_*`, `FIREBASE_SERVICE_ACCOUNT`,
+   `TELEGRAM_*`, `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`.
+2. **До первого запуска backend** запустите только базу и перенесите данные (Render → база → Connections →
+   External Database URL; ключ для Web Push лежит в базе и переедет вместе с ней):
+   ```bash
+   docker compose up -d db
+   docker run --rm postgres:17-alpine pg_dump "<External Database URL>" --no-owner --no-acl > render.sql
+   docker compose exec -T db psql -U master_ryadom -d master_ryadom < render.sql
+   ```
+   Ошибку `unrecognized configuration parameter "transaction_timeout"` можно игнорировать.
+3. Запуск — раздел 3, затем `./deploy/smoke_test.sh https://ваш-домен`. Войдите в админку и проверьте мастеров.
+4. На Render добавьте переменную `REDIRECT_TO=https://ваш-домен`: старый адрес будет навсегда перенаправлять
+   на новый — старые версии приложения и ссылки из Google попадут на новый сайт.
+5. Приложение (репозиторий master_ryadom_app): в `capacitor.config.json` поменяйте `server.url`, а в
+   `android/app/src/main/AndroidManifest.xml` — `android:host` на новый домен, загрузите изменения — GitHub соберёт новый APK.
+6. Google Search Console: добавьте новый домен и в старом ресурсе выберите «Смена адреса».
+
 ## Чек-лист перед запуском
 
 - [ ] `ENVIRONMENT=production`, сервер стартует без ошибок (`docker compose logs backend`)

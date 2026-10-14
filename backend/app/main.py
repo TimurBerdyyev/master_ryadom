@@ -197,3 +197,15 @@ if settings.serve_web_dir:
     app = _single_service_site(app)
 else:
     app.include_router(seo.router)  # nginx (deploy/nginx.conf) sends these paths here
+
+if settings.redirect_to:
+    from fastapi.responses import RedirectResponse
+
+    @app.middleware("http")
+    async def moved_permanently(request: Request, call_next):
+        if request.url.path.endswith("/health"):  # the old host's health check keeps passing
+            return await call_next(request)
+        target = settings.redirect_to.rstrip("/") + request.url.path
+        if request.url.query:
+            target += "?" + request.url.query
+        return RedirectResponse(target, status_code=301)
