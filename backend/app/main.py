@@ -1,9 +1,10 @@
 import asyncio
+import json
 import logging
 import os
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -124,6 +125,53 @@ PAGE_CSP = (
 MAX_BODY_BYTES = (settings.max_upload_size_mb * 5 + 1) * 1024 * 1024
 
 
+class BodyLimit:
+    """Stops reading a request body once it passes MAX_BODY_BYTES.
+
+    The Content-Length check in security_headers is cheap but can be skipped by sending the body in chunks
+    (Transfer-Encoding: chunked, no length). This counts what actually arrives, so a huge multipart upload
+    is cut off while it streams in, before the form parser has stored it — on Render nothing sits in front
+    of the app to do that (nginx has client_max_body_size in docker compose).
+    """
+
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        received = 0
+        too_large = False
+        replaced = False
+
+        async def limited_receive():
+            nonlocal received, too_large
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    too_large = True
+                    raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Слишком большой запрос")
+            return message
+
+        async def guarded_send(message):
+            # Whatever the app answers after the cut-off (FastAPI reports it as a parse error), the client gets 413.
+            nonlocal replaced
+            if too_large:
+                if not replaced and message["type"] == "http.response.start":
+                    replaced = True
+                    body = json.dumps({"detail": "Слишком большой запрос"}, ensure_ascii=False).encode()
+                    await send({"type": "http.response.start", "status": 413, "headers": [
+                        (b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()),
+                        (b"connection", b"close")]})
+                    await send({"type": "http.response.body", "body": body})
+                return
+            await send(message)
+
+        await self.app(scope, limited_receive, guarded_send)
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     length = request.headers.get("content-length")
@@ -197,6 +245,8 @@ if settings.serve_web_dir:
     app = _single_service_site(app)
 else:
     app.include_router(seo.router)  # nginx (deploy/nginx.conf) sends these paths here
+
+app.add_middleware(BodyLimit, max_bytes=MAX_BODY_BYTES)  # outermost app: covers the API and the site
 
 if settings.redirect_to:
     from fastapi.responses import RedirectResponse

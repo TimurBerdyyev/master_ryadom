@@ -18,7 +18,9 @@ from app.dispatch import close_request, recalc_rating, send_request
 from app.models import Category, Complaint, Master, Order, OrderOffer, OfferStatus, OrderStatus, Photo, Review, utcnow
 from app.notify import notify
 from app.rate_limit import rate_limit
-from app.routers.orders import CLIENT_CAN_COMPLETE_FROM, MAX_ORDER_PHOTOS, OFFERABLE_STATUSES, STATUS_TITLES
+from app.routers.orders import (
+    CLIENT_CAN_COMPLETE_FROM, MAX_ORDER_PHOTOS, OFFERABLE_STATUSES, STATUS_TITLES, move_order,
+)
 from app.schemas import (
     ContactOut,
     MasterBriefOut,
@@ -138,19 +140,21 @@ def accept_offer(token: str, offer_id: int, db: Session = Depends(get_db)):
     order = _get(db, token)
     if order.status not in OFFERABLE_STATUSES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Заказ уже не принимает выбор предложения")
-    offer = next((o for o in order.offers if o.id == offer_id), None)
-    if offer is None:
+    if not any(o.id == offer_id for o in order.offers):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Предложение не найдено")
-    if offer.status != OfferStatus.pending:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Это предложение уже обработано")
 
+    # Lock the order, then read the offer as it is now (a master may have just changed the price).
+    move_order(db, order, OFFERABLE_STATUSES, status=OrderStatus.master_selected)
+    offer = (db.query(OrderOffer).populate_existing()
+             .filter(OrderOffer.id == offer_id, OrderOffer.order_id == order.id).one())
+    if offer.status != OfferStatus.pending:
+        db.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Это предложение уже обработано")
     offer.status = OfferStatus.accepted
-    for other in order.offers:
-        if other.id != offer.id:
-            other.status = OfferStatus.rejected
+    db.query(OrderOffer).filter(OrderOffer.order_id == order.id, OrderOffer.id != offer.id).update(
+        {OrderOffer.status: OfferStatus.rejected}, synchronize_session=False)
     order.master_id = offer.master_id
     order.price = offer.price
-    order.status = OrderStatus.master_selected
     close_request(db, order)
     notify(db, offer.master.user_id, "Вас выбрали для заказа", f"Клиент выбрал ваше предложение по заказу #{order.id}",
            kind="chosen", id=order.id)
@@ -163,18 +167,21 @@ def complete(token: str, db: Session = Depends(get_db)):
     order = _get(db, token)
     if order.status not in CLIENT_CAN_COMPLETE_FROM or order.master is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Недопустимая смена статуса")
-    order.status = OrderStatus.completed
+    move_order(db, order, CLIENT_CAN_COMPLETE_FROM, status=OrderStatus.completed)
     notify(db, order.master.user_id, STATUS_TITLES[OrderStatus.completed], f"Заказ #{order.id}")
     db.commit()
     return _out(_get(db, token))
 
 
+FINAL_STATUSES = (OrderStatus.completed, OrderStatus.reviewed, OrderStatus.cancelled)
+
+
 @router.post("/{token}/cancel", response_model=RequestOut)
 def cancel(token: str, db: Session = Depends(get_db)):
     order = _get(db, token)
-    if order.status in (OrderStatus.completed, OrderStatus.reviewed, OrderStatus.cancelled):
+    if order.status in FINAL_STATUSES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Этот заказ нельзя отменить")
-    order.status = OrderStatus.cancelled
+    move_order(db, order, [s for s in OrderStatus if s not in FINAL_STATUSES], status=OrderStatus.cancelled)
     close_request(db, order)
     if order.master is not None:
         notify(db, order.master.user_id, "Клиент отменил заказ", f"Заказ #{order.id} отменён", kind="cancelled", id=order.id)
@@ -187,11 +194,17 @@ def review(token: str, data: ReviewCreate, db: Session = Depends(get_db)):
     order = _get(db, token)
     if order.status != OrderStatus.completed or order.master is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Отзыв можно оставить только для завершённого заказа")
+    # completed → reviewed in one UPDATE: a double click can't create two reviews or count the order twice
+    # (reviews.order_id is also unique in the database).
+    move_order(db, order, [OrderStatus.completed], status=OrderStatus.reviewed)
     db.add(Review(order_id=order.id, master_id=order.master_id, rating=data.rating, text=data.text))
-    order.status = OrderStatus.reviewed
+    # Increment in SQL (no lost update) — this also locks the master row, so the average below
+    # already includes reviews that other requests saved for this master a moment ago.
+    db.query(Master).filter(Master.id == order.master_id).update(
+        {Master.completed_orders: Master.completed_orders + 1}, synchronize_session=False)
     db.flush()
     master = order.master
-    master.completed_orders += 1
+    db.expire(master, ["completed_orders"])
     recalc_rating(db, master)
     db.commit()
     return _out(_get(db, token))

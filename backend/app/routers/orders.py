@@ -1,6 +1,7 @@
 """Orders from the master's side. Clients manage their requests through private links (routers/requests.py)."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import get_current_user
@@ -44,6 +45,28 @@ STATUS_TITLES = {
     OrderStatus.in_progress: "Мастер приступил к работе",
     OrderStatus.completed: "Заказ выполнен",
 }
+
+ORDER_CHANGED = "Заказ уже изменился — обновите страницу"
+
+
+def move_order(db: Session, order: Order, allowed_from, **values) -> None:
+    """Change an order only if its status is still one of `allowed_from` — checked and written in one UPDATE.
+
+    Two simultaneous requests (the client picks an offer while a master sends one, two clicks on "Выбрать")
+    can't both pass a check made earlier in Python: the database locks the row, the second UPDATE sees
+    the new status and changes nothing, and that request gets 409. Lock the order with this first, then read
+    anything else that must not change under you (offers, prices).
+    """
+    changed = (
+        db.query(Order)
+        .filter(Order.id == order.id, Order.status.in_(list(allowed_from)))
+        .update({getattr(Order, k): v for k, v in values.items()}, synchronize_session=False)
+    )
+    if changed != 1:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, ORDER_CHANGED)
+    db.expire(order)
+
 
 NOT_VERIFIED = "Профиль на проверке: заявки начнут приходить, когда сервис подтвердит вас"
 NO_AGREEMENT = "Примите договор с сервисом, чтобы получать заявки"
@@ -219,18 +242,25 @@ def offer_order(
             "Добавьте в профиль услугу этой категории, чтобы откликаться на такие заказы",
         )
 
+    # Lock the order first: if the client is choosing an offer right now, one of the two waits for the other.
+    move_order(db, order, OFFERABLE_STATUSES, status=OrderStatus.offers_received)
     # One offer per master per order: a repeated offer updates the price instead of spamming the client.
     offer = db.query(OrderOffer).filter(OrderOffer.order_id == order.id, OrderOffer.master_id == master.id).first()
     if offer is not None:
         if offer.status != OfferStatus.pending:
+            db.rollback()
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Это предложение уже обработано")
         offer.price = data.price
         offer.comment = data.comment
     else:
         offer = OrderOffer(order_id=order.id, master_id=master.id, price=data.price, comment=data.comment)
         db.add(offer)
+        try:
+            db.flush()
+        except IntegrityError:  # the same master's second offer sent at the same moment (uq_offer_order_master)
+            db.rollback()
+            raise HTTPException(status.HTTP_409_CONFLICT, ORDER_CHANGED) from None
 
-    order.status = OrderStatus.offers_received
     mark_answered(db, order.id, master.id, "offered")
     notify_client(db, order.client_key_hash, "offer", id=order.id, name=current_user.name, price=float(data.price))
     if order.client_id is not None:
@@ -266,7 +296,7 @@ def update_status(
     if MASTER_PROGRESS.index(new_status) <= MASTER_PROGRESS.index(order.status):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Статус можно менять только вперёд")
 
-    order.status = new_status
+    move_order(db, order, [order.status], status=new_status)
     if new_status.value in STATUS_WORDS:
         notify_client(db, order.client_key_hash, "status", id=order.id, status=new_status.value)
     if order.client_id is not None and new_status in STATUS_TITLES:

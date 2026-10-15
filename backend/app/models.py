@@ -183,6 +183,8 @@ class Order(Base):
 
 class OrderOffer(Base):
     __tablename__ = "order_offers"
+    # One offer per master per order (a repeated offer updates the price) — also under simultaneous requests.
+    __table_args__ = (UniqueConstraint("order_id", "master_id", name="uq_offer_order_master"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)

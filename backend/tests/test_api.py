@@ -30,7 +30,15 @@ from app.database import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import User, UserRole  # noqa: E402
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+def _image(fmt="PNG", size=(8, 8), **save):
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", size, (200, 40, 40)).save(buf, fmt, **save)
+    return buf.getvalue()
+
+
+PNG = _image()
 
 
 @pytest.fixture(scope="module")
@@ -529,30 +537,58 @@ def test_offer_only_in_own_city(client):
 
 
 def test_photo_location_is_removed(client):
-    """EXIF (GPS of the client's home) must not survive the upload."""
+    """Uploads are decoded and saved again from pixels: EXIF (GPS of the client's home) and text chunks are gone."""
+    import io
     import os
 
+    from PIL import Image
+
     from app.config import settings
-    exif = b"\xff\xe1" + (len(b"Exif\x00\x00GPS-42.87,74.59") + 2).to_bytes(2, "big") + b"Exif\x00\x00GPS-42.87,74.59"
-    jfif = b"\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
-    jpeg = b"\xff\xd8" + jfif + exif + b"\xff\xda\x00\x02" + b"\x11" * 20 + b"\xff\xd9"
+    exif = Image.Exif()
+    exif[0x010E] = "GPS-42.87,74.59"  # ImageDescription
+    exif[0x0112] = 6  # "rotate 90°": the pixels get turned instead of losing the orientation
+    jpeg = _image("JPEG", (40, 20), exif=exif.tobytes())
     token, _ = create_request(client)
     url = client.post(f"/requests/{token}/photos", files={"files": ("p.jpg", jpeg, "image/jpeg")}).json()[0]["url"]
     saved = open(os.path.join(settings.upload_dir, url.removeprefix("/uploads/")), "rb").read()
     assert b"GPS" not in saved and b"Exif" not in saved
-    assert saved.startswith(b"\xff\xd8\xff\xe0") and saved.endswith(b"\x11" * 20 + b"\xff\xd9")
+    assert Image.open(io.BytesIO(saved)).size == (20, 40)
 
-    text = b"GPS\x0042.87,74.59"
-    ihdr = (13).to_bytes(4, "big") + b"IHDR" + b"\x00" * 13 + b"\x00" * 4
-    png = PNG[:8] + ihdr + len(text).to_bytes(4, "big") + b"tEXt" + text + b"\x00" * 4 + b"\x00" * 4 + b"IEND" + b"\x00" * 4
+    from PIL import PngImagePlugin
+    info = PngImagePlugin.PngInfo()
+    info.add_text("Comment", "GPS 42.87,74.59")
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(buf, "PNG", pnginfo=info)
+    assert b"GPS" in buf.getvalue()
     token, _ = create_request(client)
-    url = client.post(f"/requests/{token}/photos", files={"files": ("p.png", png, "image/png")}).json()[0]["url"]
+    url = client.post(f"/requests/{token}/photos", files={"files": ("p.png", buf.getvalue(), "image/png")}).json()[0]["url"]
     saved = open(os.path.join(settings.upload_dir, url.removeprefix("/uploads/")), "rb").read()
-    assert b"GPS" not in saved and b"IHDR" in saved and b"IEND" in saved
+    assert b"GPS" not in saved and Image.open(io.BytesIO(saved)).format == "PNG"
 
-    # a file the stripper can't parse is stored unchanged rather than mangled
-    from app.uploads import strip_metadata
-    assert strip_metadata(PNG, "image/png") == PNG
+
+def test_upload_must_really_be_an_image(client):
+    token, _ = create_request(client)
+    url = f"/requests/{token}/photos"
+    # right signature, nothing behind it; an HTML polyglot; a PNG sent as JPEG
+    fake = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+    assert client.post(url, files={"files": ("x.png", fake, "image/png")}).status_code == 400
+    assert client.post(url, files={"files": ("x.jpg", b"\xff\xd8\xff<html><script>alert(1)</script>", "image/jpeg")}).status_code == 400
+    assert client.post(url, files={"files": ("x.jpg", PNG, "image/jpeg")}).status_code == 400
+    # data appended after a real image (a classic polyglot) doesn't survive the re-encoding
+    import os
+
+    from app.config import settings
+    r = client.post(url, files={"files": ("x.png", PNG + b"<script>alert(1)</script>", "image/png")})
+    assert r.status_code == 200
+    saved = open(os.path.join(settings.upload_dir, r.json()[0]["url"].removeprefix("/uploads/")), "rb").read()
+    assert b"<script>" not in saved
+    # a decompression bomb: tiny file, gigantic picture
+    bomb = _image("PNG", (9000, 9000))
+    assert client.post(url, files={"files": ("b.png", bomb, "image/png")}).status_code == 400
+    # a big phone photo is accepted and scaled down
+    big = _image("JPEG", (4000, 3000))
+    r = client.post(url, files={"files": ("big.jpg", big, "image/jpeg")})
+    assert r.status_code == 200, r.text
 
 
 def test_huge_request_is_rejected(client):
@@ -560,6 +596,16 @@ def test_huge_request_is_rejected(client):
     r = client.post("/requests", content=b"x", headers={"Content-Type": "application/json",
                                                        "Content-Length": str(MAX_BODY_BYTES + 1)})
     assert r.status_code == 413
+
+    # no Content-Length (chunked): the body is counted while it streams in
+    def chunks():
+        for _ in range(MAX_BODY_BYTES // (1024 * 1024) + 2):
+            yield b"x" * (1024 * 1024)
+    token, _ = create_request(client)
+    r = client.post(f"/requests/{token}/photos", content=chunks(),
+                    headers={"Content-Type": "multipart/form-data; boundary=zzz"})
+    assert r.status_code == 413, r.text
+    assert r.json()["detail"] == "Слишком большой запрос"
 
 
 def test_admin_deletes_master(client, outbox):
@@ -1572,3 +1618,117 @@ def test_redirect_to_new_domain(monkeypatch):
     finally:
         monkeypatch.setattr(settings, "redirect_to", "")
         importlib.reload(main_module)
+
+
+def _race(funcs):
+    """Run the calls at the same moment in threads; returns their results or exceptions."""
+    import threading
+    barrier = threading.Barrier(len(funcs))
+    results = [None] * len(funcs)
+
+    def run(i, fn):
+        barrier.wait()
+        try:
+            results[i] = fn()
+        except Exception as exc:  # 409/400 from the losers; "database is locked" on SQLite
+            results[i] = exc
+    threads = [threading.Thread(target=run, args=(i, fn)) for i, fn in enumerate(funcs)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    return results
+
+
+def test_stale_order_change_is_refused(client):
+    """A check made before another request committed doesn't let a write through (the core of every race fix)."""
+    from fastapi import HTTPException
+    from app.models import Order, OrderStatus
+    from app.routers.orders import OFFERABLE_STATUSES, move_order
+    master_h, _ = register_master(client)
+    token, req = create_request(client)
+    offer = client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 700}).json()
+
+    stale = SessionLocal()
+    order = stale.get(Order, req["id"])
+    assert order.status == OrderStatus.offers_received
+    assert client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]}).status_code == 200
+    with pytest.raises(HTTPException) as err:  # the master's late offer saw "offers_received" a moment ago
+        move_order(stale, order, OFFERABLE_STATUSES, status=OrderStatus.offers_received)
+    assert err.value.status_code == 409
+    stale.close()
+    other_h, _ = register_master(client)
+    assert client.post(f"/orders/{req['id']}/offer", headers=other_h, json={"price": 1}).status_code == 400
+    assert client.get(f"/requests/{token}").json()["status"] == "master_selected"
+
+
+def test_simultaneous_accepts_pick_one_master(client):
+    from app.models import OfferStatus, Order, OrderOffer
+    from app.routers.requests import accept_offer
+    token, req = create_request(client)
+    offers = []
+    for price in (500, 600, 700):
+        h, _ = register_master(client)
+        offers.append(client.post(f"/orders/{req['id']}/offer", headers=h, json={"price": price}).json())
+
+    def accept(offer_id):
+        def call():
+            db = SessionLocal()
+            try:
+                return accept_offer(token, offer_id, db)
+            finally:
+                db.close()
+        return call
+    results = _race([accept(o["id"]) for o in offers])
+    assert sum(not isinstance(r, Exception) for r in results) == 1, results
+
+    db = SessionLocal()
+    order = db.get(Order, req["id"])
+    accepted = db.query(OrderOffer).filter(OrderOffer.order_id == order.id, OrderOffer.status == OfferStatus.accepted).all()
+    assert len(accepted) == 1 and order.master_id == accepted[0].master_id and order.price == accepted[0].price
+    db.close()
+
+
+def test_double_review_counts_once(client):
+    from app.models import Master, Review
+    from app.routers.requests import review
+    from app.schemas import ReviewCreate
+    master_h, _ = register_master(client)
+    token, req = create_request(client)
+    offer = client.post(f"/orders/{req['id']}/offer", headers=master_h, json={"price": 700}).json()
+    client.post(f"/requests/{token}/accept", params={"offer_id": offer["id"]})
+    client.post(f"/orders/{req['id']}/status", headers=master_h, json={"status": "in_progress"})
+    assert client.post(f"/requests/{token}/complete").status_code == 200
+
+    def leave():
+        db = SessionLocal()
+        try:
+            return review(token, ReviewCreate(rating=5), db)
+        finally:
+            db.close()
+    results = _race([leave, leave, leave])
+    assert sum(not isinstance(r, Exception) for r in results) == 1, results
+    db = SessionLocal()
+    master = db.get(Master, master_id_of(client, master_h))
+    assert db.query(Review).filter(Review.order_id == req["id"]).count() == 1 and master.completed_orders == 1
+    db.close()
+
+
+def test_answer_and_miss_dont_overwrite_each_other(client):
+    """A master who answered isn't fined by a timer check that read the request a moment earlier."""
+    from app.dispatch import check_missed, mark_answered
+    from app.models import Master, RequestDelivery
+    master_h, _ = register_master(client)
+    _, req = create_request(client)
+    mid = master_id_of(client, master_h)
+    expire_deliveries(req["id"])
+
+    db = SessionLocal()
+    mark_answered(db, req["id"], mid, "declined")  # answered just before the check commits its "missed"
+    db.commit()
+    db.close()
+    run_missed_check()
+    db = SessionLocal()
+    delivery = db.query(RequestDelivery).filter_by(order_id=req["id"], master_id=mid).one()
+    assert delivery.status == "declined" and db.get(Master, mid).missed_requests == 0
+    db.close()

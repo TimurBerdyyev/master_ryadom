@@ -36,7 +36,11 @@ def _get_redis():
         _redis = client
         logger.info("Лимиты попыток хранятся в Redis")
     except Exception:
-        logger.warning("Redis недоступен (%s) — лимиты попыток хранятся в памяти процесса", settings.redis_url)
+        # Only host:port in the log — the URL may carry a password.
+        from urllib.parse import urlsplit
+        where = urlsplit(settings.redis_url)
+        logger.warning("Redis недоступен (%s:%s) — лимиты попыток хранятся в памяти процесса",
+                       where.hostname, where.port)
     return _redis
 
 

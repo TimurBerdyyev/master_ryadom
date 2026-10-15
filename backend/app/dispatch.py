@@ -59,16 +59,15 @@ def send_request(db: Session, order: Order) -> int:
 
 
 def mark_answered(db: Session, order_id: int, master_id: int, status: str) -> None:
-    """The master offered a price or declined — the timer for them stops."""
-    delivery = (
-        db.query(RequestDelivery)
-        .filter(RequestDelivery.order_id == order_id, RequestDelivery.master_id == master_id,
-                RequestDelivery.status == "pending")
-        .first()
-    )
-    if delivery is not None:
-        delivery.status = status
-        delivery.resolved_at = utcnow()
+    """The master offered a price or declined — the timer for them stops.
+
+    One UPDATE on a pending row: it can't overwrite a "missed" that check_missed has just recorded, and
+    check_missed can't fine an answer recorded a moment earlier (it only takes rows that are still pending).
+    """
+    db.query(RequestDelivery).filter(
+        RequestDelivery.order_id == order_id, RequestDelivery.master_id == master_id,
+        RequestDelivery.status == "pending",
+    ).update({RequestDelivery.status: status, RequestDelivery.resolved_at: utcnow()}, synchronize_session=False)
 
 
 def close_request(db: Session, order: Order) -> None:
@@ -95,15 +94,25 @@ def check_missed(db: Session) -> int:
     )
     missed = 0
     for delivery in expired:
-        delivery.resolved_at = now
-        if delivery.order.status not in OPEN_STATUSES:
-            delivery.status = "closed"
+        open_order = delivery.order.status in OPEN_STATUSES
+        # Claim the row only if it is still pending: the master may have answered after we read it.
+        claimed = db.query(RequestDelivery).filter(
+            RequestDelivery.id == delivery.id, RequestDelivery.status == "pending",
+        ).update({
+            RequestDelivery.status: "missed" if open_order else "closed",
+            RequestDelivery.resolved_at: now,
+            RequestDelivery.fine: settings.missed_request_fine if open_order else delivery.fine,
+        }, synchronize_session=False)
+        if not claimed or not open_order:
             continue
-        delivery.status = "missed"
-        delivery.fine = settings.missed_request_fine
         master = delivery.master
-        master.missed_requests = (master.missed_requests or 0) + 1
-        master.rating_penalty = (master.rating_penalty or 0) + settings.missed_request_rating_penalty
+        # Counters in SQL: no lost update when two misses (or a review) touch the same master at once.
+        db.query(Master).filter(Master.id == master.id).update({
+            Master.missed_requests: func.coalesce(Master.missed_requests, 0) + 1,
+            Master.rating_penalty: func.coalesce(Master.rating_penalty, 0) + settings.missed_request_rating_penalty,
+        }, synchronize_session=False)
+        db.flush()
+        db.expire(master, ["missed_requests", "rating_penalty"])
         recalc_rating(db, master)
         notify(
             db, master.user_id, "Пропущена заявка",
