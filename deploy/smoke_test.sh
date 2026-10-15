@@ -38,8 +38,8 @@ REQ=$(curl -fsS -X POST "$API/requests" -H 'Content-Type: application/json' \
   -d "{\"name\":\"Smoke\",\"phone\":\"$CLIENT_PHONE\",\"category_id\":1,\"city\":\"Бишкек\",\"description\":\"smoke test\"}")
 REQ_TOKEN=$(echo "$REQ" | json '["token"]')
 pass "заявка без регистрации создана (#$(echo "$REQ" | json '["request"]["id"]'))"
-# A tiny valid PNG: checks that the non-root backend can write to the uploads volume.
-printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > /tmp/smoke.png
+# A real 1×1 PNG (uploads are decoded, a fake one is refused): checks that the non-root backend can write to the uploads volume.
+printf '\x89\x50\x4e\x47\x0d\x0a\x1a\x0a\x00\x00\x00\x0d\x49\x48\x44\x52\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0d\x49\x44\x41\x54\x78\x9c\x63\x10\x6a\x8f\xfa\x0f\x00\x03\x95\x01\xf3\x83\x81\x53\x43\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82' > /tmp/smoke.png
 PHOTO=$(curl -fsS -X POST "$API/requests/$REQ_TOKEN/photos" -F "files=@/tmp/smoke.png;type=image/png" | json '[0]["url"]')
 curl -fsS "$API$PHOTO" -o /dev/null && pass "фото загружено и отдаётся ($PHOTO)" || fail "фото"
 AVATAR=$(curl -fsS -X POST "$API/masters/me/avatar" -H "Authorization: Bearer $TOKEN" -F "file=@/tmp/smoke.png;type=image/png" | json '["user"]["photo"]')
